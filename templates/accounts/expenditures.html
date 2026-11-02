@@ -28,6 +28,26 @@
         <div class="col-md-6"><div class="card kpi s-pink"><div class="card-body"><div class="lab">Entries in Period</div><div class="val">{{ total_count }}</div></div><i class="bi bi-list-ol ico"></i></div></div>
     </div>
 
+    {% if accrued_purchase_expenses %}
+    <div class="led-card mb-3">
+        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+            <b class="text-warning"><i class="bi bi-truck me-1"></i>Accrued purchase expenses (GRN separate-expense charges)</b>
+            <b>Rs. {{ "%.2f"|format(accrued_total or 0) }}</b>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="small text-muted"><tr><th>Date</th><th>Category</th><th class="text-end">Amount</th><th>Note</th></tr></thead>
+                <tbody>
+                {% for e in accrued_purchase_expenses %}
+                    <tr><td>{{ e.date_posted.strftime('%d/%b/%Y') if e.date_posted else '—' }}</td><td>{{ e.category }}</td><td class="text-end">{{ "%.2f"|format(e.amount) }}</td><td>{{ e.note }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="small text-muted px-3 py-2">These are recognised in P&amp;L once, at receipt. They are excluded from inventory valuation and are never counted again when paid.</div>
+    </div>
+    {% endif %}
+
     <div class="led-card">
         <form class="filter-bar" method="get">
             <div><div class="form-label">From</div><input type="date" name="from" class="form-control form-control-sm" value="{{ date_from.strftime('%Y-%m-%d') }}"></div>

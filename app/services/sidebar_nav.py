@@ -276,6 +276,17 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
         description="Supplier payment vouchers.",
     ),
     NavLink(
+        key="grn_payments",
+        label="PAY EXISTING GRN",
+        icon="bi-cash-coin",
+        endpoint="accounts.grn_payments",
+        fallback_url="/accounts/grn_payments",
+        prefix=("/accounts/grn_payments",),
+        perm=lambda can, user: can("can_manage_payments") or can("can_manage_accounts"),
+        default_category="accounts",
+        description="Pay supplier / transporter / loading / other GRN obligations.",
+    ),
+    NavLink(
         key="profit_reports",
         label="Profit Reports",
         icon="bi-bar-chart-line",

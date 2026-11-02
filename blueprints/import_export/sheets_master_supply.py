@@ -1,5 +1,6 @@
 """sheets_master — split from import_export.py."""
 from ._common import *  # noqa
+from models import GRNCharge
 
 def _process_grn(df, strategy, report):
     for _, row in df.iterrows():
@@ -84,3 +85,69 @@ def _process_grn_items(df, strategy, report):
         report['imported'] += 1
 
 
+
+
+def _process_grn_charges(df, strategy, report):
+    """Import LANDED GRN charge lines (A1/A2 redesign)."""
+    from app.services.grn_costing import (
+        get_or_create_party, CHARGE_TYPES, RECIPIENT_TYPES,
+        COST_TREATMENTS, DECLARED_STATUSES, ALLOCATION_BASES,
+    )
+    from utils.money import to_minor, from_minor
+    for _, row in df.iterrows():
+        manual_bill = str(row.get('grn_manual_bill_no', '') or '').strip()
+        auto_bill = str(row.get('grn_auto_bill_no', '') or '').strip()
+        grn = None
+        if manual_bill:
+            grn = GRN.query.filter_by(manual_bill_no=manual_bill).first()
+        elif auto_bill:
+            grn = GRN.query.filter_by(auto_bill_no=auto_bill).first()
+        if not grn:
+            report['skipped'] += 1
+            continue
+        try:
+            amount = float(row.get('amount', 0) or 0)
+            minor = to_minor(amount, field='Charge amount')
+        except (TypeError, ValueError):
+            report['errors'] += 1
+            continue
+        ctype = str(row.get('charge_type', 'OTHER') or 'OTHER').strip().upper()
+        if ctype not in CHARGE_TYPES:
+            ctype = 'OTHER'
+        recipient = str(row.get('recipient_type', 'OTHER') or 'OTHER').strip().upper()
+        if recipient not in RECIPIENT_TYPES:
+            recipient = 'OTHER'
+        treatment = str(row.get('cost_treatment', 'INVENTORY') or 'INVENTORY').strip().upper()
+        if treatment not in COST_TREATMENTS:
+            treatment = 'INVENTORY'
+        status = str(row.get('declared_status', 'UNPAID') or 'UNPAID').strip().upper()
+        if status not in DECLARED_STATUSES:
+            status = 'UNPAID'
+        basis = str(row.get('allocation_basis', 'VALUE') or 'VALUE').strip().upper()
+        if basis not in ALLOCATION_BASES:
+            basis = 'VALUE'
+        name = str(row.get('recipient_name', '') or '').strip()
+        party = get_or_create_party(name) if name else None
+        existing = GRNCharge.query.filter_by(
+            grn_id=grn.id, charge_type=ctype,
+            label=str(row.get('label', '') or '').strip(),
+            amount_minor=minor,
+        ).first()
+        if existing:
+            report['skipped'] += 1
+            continue
+        db.session.add(GRNCharge(
+            grn_id=grn.id,
+            charge_type=ctype,
+            label=str(row.get('label', '') or '').strip(),
+            amount=float(from_minor(minor)),
+            amount_minor=minor,
+            recipient_type=recipient,
+            recipient_party_id=party.id if party else None,
+            recipient_name=party.name if party else name,
+            declared_status=status,
+            cost_treatment=treatment,
+            allocation_basis=basis,
+            is_void=bool(row.get('is_void', False)),
+        ))
+        report['imported'] += 1

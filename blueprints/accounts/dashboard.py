@@ -110,7 +110,13 @@ def dashboard():
             driver_outstanding_map[person.id] = driver_outstanding(person.id)
         except Exception:
             driver_outstanding_map[person.id] = 0.0
+    grn_payment_options = [
+        {'id': g.id, 'label': (g.manual_bill_no or g.auto_bill_no or f"GRN-{g.id}") + ' · ' + (g.supplier or '')}
+        for g in GRN.query.filter(GRN.is_void == False, GRN.is_cancelled == False)
+                          .order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(200).all()
+    ]
     return render_template('accounts/dashboard.html',
+                          grn_payment_options=grn_payment_options,
                           client_payments_today=client_payments_today,
                           supplier_payments_today=supplier_payments_today,
                           expenditures_today=expenditures_today,

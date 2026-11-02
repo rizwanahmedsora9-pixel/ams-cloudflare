@@ -721,7 +721,7 @@ def _run_master_import_bytes(file_bytes, actor_username=None, progress_cb=None):
         'Clients', 'MaterialCategories', 'Materials', 'PendingBills',
         'Dispatch', 'Bookings', 'BookingItems', 'Payments', 'FBMCashDrawer',
         'FBMCashDrawerCategories', 'Sales', 'SaleItems', 'GRN', 'GRNItems',
-        'DeliveryPersons', 'DeliveryRents'
+        'GRNCharges', 'DeliveryPersons', 'DeliveryRents'
     ]
     total = len(steps)
 
@@ -865,6 +865,9 @@ def _run_master_import_bytes(file_bytes, actor_username=None, progress_cb=None):
         elif sheet_name == 'GRNItems':
             df = _read_sheet('GRNItems')
             _process_master_rows(sheet_name, df, lambda one: _process_grn_items(one, 'update', report), report)
+        elif sheet_name == 'GRNCharges':
+            df = _read_sheet('GRNCharges')
+            _process_master_rows(sheet_name, df, lambda one: _process_grn_charges(one, 'update', report), report)
         elif sheet_name == 'DeliveryPersons':
             df = _read_sheet('DeliveryPersons')
             for _, row in df.iterrows():

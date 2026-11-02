@@ -57,6 +57,7 @@ from models import (
 )
 
 from app.services.lookups import is_rent_like_name
+from app.services.grn_costing import lot_cost_rate
 
 EPS = 1e-6
 
@@ -214,7 +215,7 @@ class _LotLedger:
             self.grn_order.append(grn)
             for item in live_items:
                 qty = max(0.0, _f(item.qty))
-                rate = max(0.0, _f(item.price_at_time))
+                rate = max(0.0, _f(lot_cost_rate(item)))
                 lot = {
                     "grn_item_id": item.id,
                     "grn_id": grn.id,
@@ -766,7 +767,7 @@ class _ProjectionLedger:
                     "material": item.mat_name or "",
                     "received": received,
                     "remaining": remaining,
-                    "rate": max(0.0, _f(balance.get("rate", item.price_at_time))),
+                    "rate": max(0.0, _f(balance.get("rate", lot_cost_rate(item)))),
                     "key": material_key(item.mat_name),
                 }
                 self.lots[item.id] = lot

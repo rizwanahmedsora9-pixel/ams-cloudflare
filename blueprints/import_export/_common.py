@@ -98,14 +98,14 @@ MASTER_SHEET_SECTIONS = {
     'bookings': ['Bookings', 'BookingItems'],
     'payments': ['Payments', 'FBMCashDrawer', 'FBMCashDrawerCategories'],
     'sales': ['Sales', 'SaleItems'],
-    'supplier': ['GRN', 'GRNItems'],
+    'supplier': ['GRN', 'GRNItems', 'GRNCharges'],
     'delivery': ['DeliveryPersons', 'DeliveryRents'],
     'pending': ['PendingBills'],
 }
 MASTER_ALL_SHEETS = [
     'Clients', 'MaterialCategories', 'Materials', 'PendingBills',
     'Dispatch', 'Bookings', 'BookingItems', 'Payments', 'Sales',
-    'SaleItems', 'GRN', 'GRNItems', 'DeliveryPersons', 'DeliveryRents',
+    'SaleItems', 'GRN', 'GRNItems', 'GRNCharges', 'DeliveryPersons', 'DeliveryRents',
     'FBMCashDrawer', 'FBMCashDrawerCategories', 'Users',
 ]
 META_SHEET_NAME = '__AMS_META__'

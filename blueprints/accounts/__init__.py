@@ -4,6 +4,7 @@ from .helpers import *  # noqa
 from .extra import *  # noqa
 from .dashboard import *  # noqa
 from .payments import *  # noqa
+from .grn_payments import *  # noqa
 from .accounts_crud import *  # noqa
 from .transactions import *  # noqa
 from .kpis import *  # noqa

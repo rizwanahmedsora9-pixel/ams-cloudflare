@@ -3,7 +3,7 @@
 The scenario is the owner's acceptance walk-through:
 
     one supplier, one client, one material, one service ("Rent"), one cash
-    account → one GRN (partly paid) → one cash booking with a due → the
+    account → one GRN (record only) → its part payment from Accounts → one cash booking with a due → the
     booked material supplied → read the supplier ledger, the client ledger,
     the transaction lists, the Profit & Loss report and the audit trail.
 
@@ -116,6 +116,22 @@ def cycle(app, client):
         "date": today,
     }, follow_redirects=True)
     assert "GRN added successfully" in resp.get_data(as_text=True)
+
+    # A1: the GRN never pays.  Record the supplier's part payment from
+    # Accounts -> PAY EXISTING GRN instead (the legacy paid_amount fields in
+    # the GRN payload above are intentionally ignored).
+    with app.app_context():
+        cycle_grn_id = GRN.query.filter(GRN.manual_bill_no.like("%CYCLE-GRN-1%")).one().id
+    resp = client.post("/accounts/grn_payments/save", data={
+        "grn_id": str(cycle_grn_id),
+        "obligation_key": f"SUPPLIER:{cycle_grn_id}",
+        "amount": str(GRN_PAID),
+        "method": "Cash",
+        "payment_account_id": str(ids["account"]),
+        "date_posted": today,
+        "reference": "CYCLE-GRN-PAY-1",
+    }, follow_redirects=True)
+    assert resp.status_code == 200
 
     resp = client.post("/add_booking", data={
         "client_code": "CYCLE-1",

@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+{% block title %}Outstanding Purchase Payables{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+      <h3 class="mb-0"><i class="bi bi-list-check me-2 text-warning"></i>Outstanding Purchase Payables</h3>
+      <div class="text-muted small">Supplier payables contain material qty &times; rate only. Charge recipients have their own ledgers.</div>
+    </div>
+    <a href="{{ url_for('accounts.grn_payments') }}" class="btn btn-sm btn-success"><i class="bi bi-cash-coin"></i> PAY EXISTING GRN</a>
+  </div>
+  <div class="row g-2 mb-3">
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Total outstanding</div><h4 class="mb-0 text-warning">Rs. {{ '{:,.2f}'.format(report.total) }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Supplier payables</div><h4 class="mb-0">Rs. {{ '{:,.2f}'.format(report.suppliers | sum(attribute='outstanding')) }}</h4></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Unassigned legacy charges</div><h4 class="mb-0">Rs. {{ '{:,.2f}'.format(report.unassigned_legacy_charges) }}</h4></div></div></div>
+  </div>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="small text-muted"><tr><th>Recipient</th><th>Type</th><th class="text-end">Outstanding</th><th></th></tr></thead>
+        <tbody>
+        {% for row in report.suppliers + report.parties %}
+          <tr><td>{{ row.name }}</td><td>{{ row.kind }}</td><td class="text-end fw-bold">{{ '{:,.2f}'.format(row.outstanding) }}</td><td><a class="btn btn-sm btn-outline-info py-0" href="{{ row.url }}">Open ledger</a></td></tr>
+        {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-3">No outstanding purchase payables.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

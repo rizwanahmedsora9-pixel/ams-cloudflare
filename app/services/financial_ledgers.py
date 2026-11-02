@@ -37,6 +37,7 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import joinedload, selectinload
 
 from models import (
+    db,
     AccountTransaction,
     Booking,
     BookingItem,
@@ -55,6 +56,28 @@ from models import (
     WaiveOff,
 )
 from app.services.grn_svc import calculate_grn_total
+from app.services.grn_costing import supplier_material_minor as _grn_supplier_material_minor
+
+
+def _grn_supplier_credit(grn) -> Decimal:
+    """Owner rule A2: Supplier Ledger credit = sum(qty x rate) ONLY.
+
+    Freight, loading, unloading, other charges, tax, discount and adjustment
+    are never part of the supplier payable.
+    """
+    try:
+        return Decimal(int(_grn_supplier_material_minor(grn))) / Decimal(100)
+    except Exception:
+        return Decimal("0.00")
+
+
+def _is_supplier_ledger_payment(payment) -> bool:
+    """A payment to a transporter/labour/other recipient is NOT a supplier debit."""
+    if (getattr(payment, 'payment_kind', None) or '').strip().upper() == 'GRN_CHARGE':
+        return False
+    recipient = (getattr(payment, 'recipient_type', None) or '').strip().upper()
+    return recipient in ('', 'SUPPLIER')
+
 from app.services.time_money import pk_now
 
 CENT = Decimal("0.01")
@@ -1256,7 +1279,8 @@ def _supplier_rows(supplier):
         or_(GRN.supplier_id == supplier.id, func.lower(func.trim(GRN.supplier)) == _norm(supplier.name)),
     ).order_by(GRN.date_posted.asc(), GRN.id.asc()).all()
     for grn in grns:
-        total = _decimal(calculate_grn_total(grn))
+        # A2: exactly material quantity x purchase rate, nothing else.
+        total = _grn_supplier_credit(grn)
         if total == 0:
             # Keep a zero-value adjustment out of balances, but historical
             # detail remains available in the GRN page itself.
@@ -1291,7 +1315,9 @@ def _supplier_rows(supplier):
         # Older GRNs predate the canonical SupplierPayment auto-row.  Preserve
         # their paid amount as one read-side debit only when no linked active
         # payment exists; new GRNs are not counted twice.
-        paid_amount = _decimal(getattr(grn, "paid_amount", 0))
+        paid_amount = (_decimal(getattr(grn, "paid_amount", 0))
+                       if (getattr(grn, "costing_mode", "LEGACY") or "LEGACY").upper() == "LEGACY"
+                       else Decimal("0.00"))
         auto_payment = SupplierPayment.query.filter(
             SupplierPayment.supplier_id == supplier.id,
             SupplierPayment.is_void == False,
@@ -1314,9 +1340,10 @@ def _supplier_rows(supplier):
                 source=grn,
             ))
 
-    payments = SupplierPayment.query.filter_by(supplier_id=supplier.id, is_void=False).order_by(
-        SupplierPayment.date_posted.asc(), SupplierPayment.id.asc()
-    ).all()
+    payments = [p for p in SupplierPayment.query.filter_by(
+        supplier_id=supplier.id, is_void=False
+    ).order_by(SupplierPayment.date_posted.asc(), SupplierPayment.id.asc()).all()
+        if _is_supplier_ledger_payment(p)]
     for payment in payments:
         amount = _decimal(getattr(payment, "amount", 0))
         if amount == 0:
@@ -1382,7 +1409,8 @@ def build_supplier_payable_overview(suppliers=None):
         return {}
 
     grns = GRN.query.options(selectinload(GRN.items)).filter(GRN.is_void == False).all()
-    payments = SupplierPayment.query.filter(SupplierPayment.is_void == False).all()
+    payments = [p for p in SupplierPayment.query.filter(SupplierPayment.is_void == False).all()
+                if _is_supplier_ledger_payment(p)]
     payments_by_supplier = defaultdict(list)
     for payment in payments:
         payments_by_supplier[payment.supplier_id].append(payment)
@@ -1403,7 +1431,7 @@ def build_supplier_payable_overview(suppliers=None):
         for grn in grns:
             if grn.supplier_id != supplier.id and _norm(grn.supplier) != supplier_name:
                 continue
-            grn_total = _decimal(calculate_grn_total(grn))
+            grn_total = _grn_supplier_credit(grn)   # A2
             total_purchase += grn_total
             balance += grn_total
             if grn_total != 0:
@@ -1412,7 +1440,9 @@ def build_supplier_payable_overview(suppliers=None):
             if grn_date and (last_purchase_at is None or grn_date > last_purchase_at):
                 last_purchase_at = grn_date
 
-            paid_amount = _decimal(getattr(grn, "paid_amount", 0))
+            paid_amount = (_decimal(getattr(grn, "paid_amount", 0))
+                           if (getattr(grn, "costing_mode", "LEGACY") or "LEGACY").upper() == "LEGACY"
+                           else Decimal("0.00"))
             marker = f"[auto_grn_pay:{grn.id}]"
             has_auto_payment = any(
                 (payment.source_type == "GRN" and payment.source_id == grn.id)
@@ -1665,6 +1695,14 @@ def financial_integrity_audit() -> dict:
     for payment in SupplierPayment.query.filter(SupplierPayment.is_void == False).all():
         if not Supplier.query.get(payment.supplier_id):
             issues.append({"kind": "orphan_supplier_payment", "id": payment.id, "supplier_id": payment.supplier_id})
+    try:
+        from app.services.grn_payments import grn_payment_integrity
+        grn_issues = grn_payment_integrity()
+        if grn_issues:
+            issues.append({"kind": "grn_payment_integrity", "count": len(grn_issues),
+                           "sample": grn_issues[:25]})
+    except Exception:
+        pass
 
     # Driver payments must reconcile 1:1 with their authoritative account
     # transaction.  Findings are reported, never auto-corrected.
@@ -1690,6 +1728,119 @@ def financial_integrity_audit() -> dict:
     }
 
 
+def build_party_financial_ledger(party, **filters):
+    """Transporter / labour / other recipient ledger (same shape as suppliers).
+
+    Credits = that party's GRNCharge obligations; debits = GRN payments posted
+    from Accounts.  Nothing here ever touches a supplier ledger (A2).
+    """
+    from models import GRNCharge
+    rows = []
+    opening = _decimal(getattr(party, "opening_balance", 0))
+    if opening != 0:
+        rows.append(_row(
+            date_value=getattr(party, "opening_balance_date", None) or getattr(party, "created_at", None),
+            row_type="OPENING", reference="OPENING", description="Opening Balance",
+            debit=max(-opening, Decimal("0.00")), credit=max(opening, Decimal("0.00")),
+            source_type="CashFlowParty", source_id=party.id, party_id=party.id,
+        ))
+    charges = GRNCharge.query.filter(
+        GRNCharge.recipient_party_id == party.id,
+        GRNCharge.is_void == False,  # noqa: E712
+    ).order_by(GRNCharge.created_at.asc(), GRNCharge.id.asc()).all()
+    for charge in charges:
+        amount = _decimal(getattr(charge, "amount_minor", 0) or 0) / Decimal(100)
+        if amount == 0:
+            continue
+        grn = db.session.get(GRN, charge.grn_id)
+        rows.append(_row(
+            date_value=getattr(grn, "date_posted", None) if grn else getattr(charge, "created_at", None),
+            row_type="CHARGE",
+            reference=(getattr(grn, "manual_bill_no", None) or getattr(grn, "auto_bill_no", None)
+                       or f"GRN-{charge.grn_id}") if grn else f"GRN-{charge.grn_id}",
+            description=(charge.label or charge.charge_type or "Charge"),
+            credit=amount,
+            source_type="GRNCharge", source_id=charge.id, party_id=party.id,
+            note=(f"GRN #{charge.grn_id} · {getattr(charge, 'cost_treatment', '') or ''}").strip(),
+            source=charge,
+        ))
+    payments = SupplierPayment.query.filter(
+        SupplierPayment.recipient_party_id == party.id,
+        SupplierPayment.is_void == False,  # noqa: E712
+    ).order_by(SupplierPayment.date_posted.asc(), SupplierPayment.id.asc()).all()
+    for payment in payments:
+        amount = _decimal(getattr(payment, "amount", 0))
+        if amount == 0:
+            continue
+        rows.append(_row(
+            date_value=getattr(payment, "date_posted", None),
+            row_type="Payment",
+            reference=(getattr(payment, "reference", None) or f"PAY-{payment.id}"),
+            description=f"Payment ({getattr(payment, 'method', None) or 'Cash'})",
+            debit=abs(amount),
+            source_type="SupplierPayment", source_id=payment.id, party_id=party.id,
+            note=getattr(payment, "note", "") or "", source=payment,
+        ))
+    _sort_rows(rows, supplier=True)
+    closing = _apply_running_balance(rows, convention="supplier")
+    total_debit = _float(sum((_decimal(r["debit"]) for r in rows), Decimal("0.00")))
+    total_credit = _float(sum((_decimal(r["credit"]) for r in rows), Decimal("0.00")))
+    ledger = {
+        "entity": party, "entity_type": "party", "rows": rows,
+        "total_debit": total_debit, "total_credit": total_credit,
+        "closing_balance": closing,
+        "last_transaction_date": max((r["date"] for r in rows if r["date"] != datetime.min), default=None),
+        "last_payment_date": max((r["date"] for r in rows if r.get("type") == "Payment"), default=None),
+        "status": "Payable" if closing > _float(EPS) else ("Credit" if closing < -_float(EPS) else "Settled"),
+    }
+    ledger["filtered_rows"] = filter_ledger_rows(ledger["rows"], **filters)
+    return ledger
+
+
+def build_purchase_payables():
+    """All outstanding purchase obligations grouped by recipient (read-only)."""
+    from models import CashFlowParty, GRNCharge
+    result = {"suppliers": [], "parties": [], "unassigned_legacy_charges": 0.0, "total": 0.0}
+    overview = build_supplier_payable_overview()
+    for supplier_id, info in overview.items():
+        if info["outstanding"] > 0:
+            supplier = db.session.get(Supplier, supplier_id)
+            result["suppliers"].append({
+                "id": supplier_id, "name": getattr(supplier, "name", "") or "",
+                "kind": "Supplier", "outstanding": info["outstanding"],
+                "url": f"/supplier_ledger/{supplier_id}",
+            })
+            result["total"] += info["outstanding"]
+    for party in CashFlowParty.query.order_by(CashFlowParty.name.asc()).all():
+        ledger = build_party_financial_ledger(party)
+        if ledger["closing_balance"] > 0:
+            result["parties"].append({
+                "id": party.id, "name": party.name,
+                "kind": (getattr(party, "party_role", None) or "other").replace("_", " ").title(),
+                "outstanding": ledger["closing_balance"],
+                "url": f"/party_ledger/{party.id}",
+            })
+            result["total"] += ledger["closing_balance"]
+    # Legacy mirrored charges with no named recipient stay visible as an
+    # explicit "unassigned" bucket so nothing silently disappears.
+    unassigned_charges = GRNCharge.query.filter(
+        GRNCharge.recipient_party_id.is_(None),
+        GRNCharge.is_void == False,  # noqa: E712
+    ).all()
+    unassigned_paid = sum(
+        float(getattr(p, "amount", 0) or 0)
+        for p in SupplierPayment.query.filter(
+            SupplierPayment.recipient_party_id.is_(None),
+            SupplierPayment.payment_kind == 'GRN_CHARGE',
+            SupplierPayment.is_void == False,  # noqa: E712
+        ).all()
+    )
+    unassigned = sum(float(getattr(c, "amount", 0) or 0) for c in unassigned_charges) - unassigned_paid
+    result["unassigned_legacy_charges"] = max(0.0, unassigned)
+    result["total"] += result["unassigned_legacy_charges"]
+    return result
+
+
 __all__ = [
     "build_client_financial_ledger",
     "build_current_payables",
@@ -1697,6 +1848,8 @@ __all__ = [
     "build_supplier_payable_overview",
     "build_supplier_payable_summaries",
     "build_delivery_person_financial_ledger",
+    "build_party_financial_ledger",
+    "build_purchase_payables",
     "filter_ledger_rows",
     "financial_integrity_audit",
 ]

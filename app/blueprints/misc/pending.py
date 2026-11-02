@@ -240,6 +240,7 @@ def edit_grn(id):
 
     if request.method == 'POST':
         header_only_edit = False
+        is_landed = (getattr(grn_obj, 'costing_mode', 'LEGACY') or 'LEGACY').upper() == 'LANDED'
         if _grn_has_locked_lots(grn_obj):
             if not _grn_submitted_item_lines_unchanged(grn_obj):
                 flash(
@@ -305,11 +306,18 @@ def edit_grn(id):
         if new_photo:
             grn_obj.photo_path = new_photo
 
+        # Legacy flat charge columns: only touch them when the old form
+        # actually posted them, otherwise a charge-grid form would silently
+        # erase historical values.  LANDED GRNs use grn_charge rows instead.
         try:
-            grn_obj.loading_cost = _parse_grn_money(request.form.get('loading_cost', 0), 'Load Expense')
-            grn_obj.freight_cost = _parse_grn_money(request.form.get('freight_cost', 0), 'Freight Expense')
-            grn_obj.other_expense = _parse_grn_money(request.form.get('other_expense', 0), 'Other Expense')
-            grn_obj.adjustment_amount = _parse_grn_money(request.form.get('adjustment_amount', 0), 'Adjustment Amount')
+            if 'loading_cost' in request.form:
+                grn_obj.loading_cost = _parse_grn_money(request.form.get('loading_cost', 0), 'Load Expense')
+            if 'freight_cost' in request.form:
+                grn_obj.freight_cost = _parse_grn_money(request.form.get('freight_cost', 0), 'Freight Expense')
+            if 'other_expense' in request.form:
+                grn_obj.other_expense = _parse_grn_money(request.form.get('other_expense', 0), 'Other Expense')
+            if 'adjustment_amount' in request.form:
+                grn_obj.adjustment_amount = _parse_grn_money(request.form.get('adjustment_amount', 0), 'Adjustment Amount')
         except ValueError as ve:
             flash(str(ve), 'danger')
             return redirect(url_for('edit_grn', id=grn_obj.id))
@@ -323,16 +331,25 @@ def edit_grn(id):
         except ValueError as ve:
             flash(str(ve), 'danger')
             return redirect(url_for('edit_grn', id=grn_obj.id))
-        try:
-            grn_obj.paid_amount = _parse_grn_money(request.form.get('paid_amount', 0), 'Paid Amount')
-        except ValueError as ve:
-            flash(str(ve), 'danger')
-            return redirect(url_for('edit_grn', id=grn_obj.id))
-        grn_obj.payment_type = request.form.get('payment_type', '').strip()
-        payment_account_id = request.form.get('payment_account_id')
-        grn_obj.bank_name = request.form.get('bank_name', '').strip()
-        grn_obj.account_name = request.form.get('account_name', '').strip()
-        grn_obj.account_no = request.form.get('account_no', '').strip()
+        if is_landed:
+            # A1: a GRN never pays, on edit either.
+            grn_obj.paid_amount = 0
+            grn_obj.payment_type = 'Credit'
+            grn_obj.payment_account_id = None
+            grn_obj.bank_name = grn_obj.account_name = grn_obj.account_no = ''
+            payment_account_id = None
+            expected_pay_category = None
+        else:
+            try:
+                grn_obj.paid_amount = _parse_grn_money(request.form.get('paid_amount', 0), 'Paid Amount')
+            except ValueError as ve:
+                flash(str(ve), 'danger')
+                return redirect(url_for('edit_grn', id=grn_obj.id))
+            grn_obj.payment_type = request.form.get('payment_type', '').strip()
+            payment_account_id = request.form.get('payment_account_id')
+            grn_obj.bank_name = request.form.get('bank_name', '').strip()
+            grn_obj.account_name = request.form.get('account_name', '').strip()
+            grn_obj.account_no = request.form.get('account_no', '').strip()
         try:
             grn_obj.tax_percent = _parse_grn_money(request.form.get('tax_percent', 0), 'Purchase Tax %')
             grn_obj.tax_amount = _parse_grn_money(request.form.get('tax_amount', 0), 'Purchase Tax Amount')
@@ -342,49 +359,52 @@ def edit_grn(id):
         grn_obj.tax_type = request.form.get('tax_type', '').strip()
         grn_obj.supplier_invoice_no = request.form.get('supplier_invoice_no', '').strip()
 
-        expected_pay_category = _payment_expected_account_category(grn_obj.payment_type)
-        pay_account = None
-        if payment_account_id:
-            try:
-                payment_account_id = int(payment_account_id)
-            except Exception:
-                payment_account_id = None
+        if not is_landed:
+            expected_pay_category = _payment_expected_account_category(grn_obj.payment_type)
+            pay_account = None
+            if payment_account_id:
+                try:
+                    payment_account_id = int(payment_account_id)
+                except Exception:
+                    payment_account_id = None
 
-        if float(grn_obj.paid_amount or 0) > 0 and expected_pay_category in ['cash', 'bank'] and not payment_account_id:
-            flash('Select a cash/bank account to post the GRN paid amount into Accounts.', 'danger')
-            return redirect(url_for('edit_grn', id=grn_obj.id))
-
-        if payment_account_id:
-            pay_account = Account.query.get(payment_account_id)
-            if not pay_account or bool(getattr(pay_account, 'is_active', True)) is False:
-                flash('Please select a valid payment account.', 'danger')
-                return redirect(url_for('edit_grn', id=grn_obj.id))
-            if expected_pay_category and (pay_account.category or '').strip().lower() != expected_pay_category:
-                flash(f"Selected payment account must be a {expected_pay_category} account for payment type '{grn_obj.payment_type}'.", 'danger')
+            if float(grn_obj.paid_amount or 0) > 0 and expected_pay_category in ['cash', 'bank'] and not payment_account_id:
+                flash('Select a cash/bank account to post the GRN paid amount into Accounts.', 'danger')
                 return redirect(url_for('edit_grn', id=grn_obj.id))
 
-            new_paid = float(grn_obj.paid_amount or 0)
-            if payment_account_id == old_pay_account_id:
-                delta = new_paid - float(old_pay_amount or 0)
-                if delta > 0 and float(pay_account.balance or 0) + 0.00001 < delta:
-                    flash('Insufficient balance in selected payment account for the increased paid amount.', 'danger')
+            if payment_account_id:
+                pay_account = Account.query.get(payment_account_id)
+                if not pay_account or bool(getattr(pay_account, 'is_active', True)) is False:
+                    flash('Please select a valid payment account.', 'danger')
                     return redirect(url_for('edit_grn', id=grn_obj.id))
-            else:
-                if new_paid > 0 and float(pay_account.balance or 0) + 0.00001 < new_paid:
-                    flash('Insufficient balance in selected payment account.', 'danger')
+                if expected_pay_category and (pay_account.category or '').strip().lower() != expected_pay_category:
+                    flash(f"Selected payment account must be a {expected_pay_category} account for payment type '{grn_obj.payment_type}'.", 'danger')
                     return redirect(url_for('edit_grn', id=grn_obj.id))
 
-            if expected_pay_category == 'bank':
-                grn_obj.bank_name = pay_account.bank_name or ''
-                grn_obj.account_name = pay_account.account_holder_name or pay_account.name or ''
-                grn_obj.account_no = pay_account.account_number or ''
-            else:
-                grn_obj.bank_name = ''
-                grn_obj.account_name = ''
-                grn_obj.account_no = ''
+                new_paid = float(grn_obj.paid_amount or 0)
+                if payment_account_id == old_pay_account_id:
+                    delta = new_paid - float(old_pay_amount or 0)
+                    if delta > 0 and float(pay_account.balance or 0) + 0.00001 < delta:
+                        flash('Insufficient balance in selected payment account for the increased paid amount.', 'danger')
+                        return redirect(url_for('edit_grn', id=grn_obj.id))
+                else:
+                    if new_paid > 0 and float(pay_account.balance or 0) + 0.00001 < new_paid:
+                        flash('Insufficient balance in selected payment account.', 'danger')
+                        return redirect(url_for('edit_grn', id=grn_obj.id))
 
-        grn_obj.payment_account_id = (payment_account_id if (float(grn_obj.paid_amount or 0) > 0 and expected_pay_category in ['cash', 'bank']) else None)
-        
+                if expected_pay_category == 'bank':
+                    grn_obj.bank_name = pay_account.bank_name or ''
+                    grn_obj.account_name = pay_account.account_holder_name or pay_account.name or ''
+                    grn_obj.account_no = pay_account.account_number or ''
+                else:
+                    grn_obj.bank_name = ''
+                    grn_obj.account_name = ''
+                    grn_obj.account_no = ''
+
+            grn_obj.payment_account_id = (payment_account_id if (float(grn_obj.paid_amount or 0) > 0 and expected_pay_category in ['cash', 'bank']) else None)
+
+        # A1: LANDED GRNs keep payment_account_id/paid_amount cleared above.
+
         if grn_obj.manual_bill_no:
             conflict = find_bill_conflict(grn_obj.manual_bill_no)
             if conflict and not (conflict[0] == 'GRN' and conflict[1] == grn_obj.id):
@@ -510,6 +530,19 @@ def edit_grn(id):
         else:
             edit_skipped_lines = []
 
+        # Charge grid (LANDED) and exact landed-cost recomputation.  A charge
+        # with posted payments cannot be changed silently (see service).
+        if 'charge_type[]' in request.form or 'charge_amount[]' in request.form:
+            try:
+                sync_charges_from_form(grn_obj, request.form, actor=current_user.username)
+                mirror_legacy_charge_columns(grn_obj)
+            except ValueError as ve:
+                db.session.rollback()
+                flash(str(ve), 'danger')
+                return redirect(url_for('edit_grn', id=grn_obj.id))
+        if is_landed:
+            recompute_landed_costs(grn_obj, actor=current_user.username)
+
         # The auto supplier payment follows the GRN's date/time (and paid
         # amount).  Moving a paid GRN into an already-reconciled period is
         # refused by the accounting guard with a ValueError; surface that as a
@@ -548,14 +581,24 @@ def edit_grn(id):
         func.coalesce(Account.is_active, True) == True
     ).order_by(Account.category.asc(), Account.name.asc()).all()
 
+    try:
+        grn_breakdowns = {g.id: grn_breakdown(g) for g in grns}
+    except Exception:
+        logging.getLogger('grn').exception('GRN cost breakdown failed')
+        grn_breakdowns = {}
+
     return render_template(
         'grn_wizard.html',
         grns=grns,
+        grn_breakdowns=grn_breakdowns,
         materials=materials,
         settings=settings,
         clients=clients,
         suppliers=suppliers_list,
         accounts=accounts,
+        grn_parties=CashFlowParty.query.filter(
+            func.coalesce(CashFlowParty.is_active, True) == True
+        ).order_by(CashFlowParty.name.asc()).limit(500).all(),
         today_date=pk_today().strftime('%Y-%m-%d'),
         now_time=pk_now().strftime('%H:%M'),
         edit_grn=grn_obj,
@@ -595,7 +638,8 @@ def export_grn():
     
     data = []
     for g in grns:
-        total = calculate_grn_total(g)
+        bd = grn_breakdown(g)
+        total = bd['landed_cost_total']
         data.append({
             'Date': g.date_posted.strftime('%Y-%m-%d'),
             'GRN #': g.manual_bill_no or g.auto_bill_no,
@@ -604,7 +648,19 @@ def export_grn():
             'Total Qty': sum((i.qty or 0) for i in (g.items or []) if not bool(getattr(i, 'is_void', False))),
             'Discount': g.discount,
             'Tax': g.tax_amount,
-            'Expenses': (g.loading_cost or 0) + (g.freight_cost or 0) + (g.other_expense or 0),
+            'Supplier Material Amount': bd['supplier_material_amount'],
+            'Vehicle Fare': bd['vehicle_fare'],
+            'Loading': bd['loading'],
+            'Unloading': bd['unloading'],
+            'Other Charges': bd['other_charges'],
+            'Expenses': bd['capitalised_charge_total'],
+            'Total Actual Purchase Cost': total,
+            'Avg Actual Cost Per Unit': bd['average_actual_rate'],
+            'Supplier Paid': bd['supplier_paid'],
+            'Supplier Remaining': bd['supplier_remaining'],
+            'Additional Charges Paid': bd['additional_paid'],
+            'Additional Charges Remaining': bd['additional_remaining'],
+            'Total Cash Actually Paid': bd['total_cash_paid'],
             'Net Amount': total,
             'Note': g.note
         })

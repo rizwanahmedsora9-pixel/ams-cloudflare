@@ -129,7 +129,22 @@ def _source_grn_query(source: Supplier):
 
 
 def _source_payment_query(source: Supplier):
-    return SupplierPayment.query.filter(SupplierPayment.supplier_id == source.id)
+    """Only supplier-recipient payments move with a supplier ledger.
+
+    A GRN payment to a transporter / labourer / other recipient has the GRN's
+    supplier only as a context FK; it must stay with its own party (A2).
+    """
+    return SupplierPayment.query.filter(
+        SupplierPayment.supplier_id == source.id,
+        or_(
+            SupplierPayment.recipient_type.is_(None),
+            func.lower(func.trim(func.coalesce(SupplierPayment.recipient_type, ''))).in_(['', 'supplier']),
+        ),
+        or_(
+            SupplierPayment.payment_kind.is_(None),
+            func.lower(func.trim(func.coalesce(SupplierPayment.payment_kind, ''))) != 'grn_charge',
+        ),
+    )
 
 
 def _grn_ref(grn) -> str:
@@ -154,9 +169,14 @@ def _supplier_balances(*suppliers):
 
 
 def _cash_flow_party_query(source: Supplier):
+    """Only the supplier's own cash-flow party rows move, never GRN payees."""
     name = _norm(source.name)
     return CashFlowParty.query.filter(
         func.lower(func.trim(func.coalesce(CashFlowParty.name, ''))) == name,
+        or_(
+            CashFlowParty.party_role.is_(None),
+            func.lower(func.trim(func.coalesce(CashFlowParty.party_role, ''))).in_(['', 'other']),
+        ),
     )
 
 
@@ -308,22 +328,16 @@ def preview_supplier_ledger_shift(source, target=None, **options):
 
 
 def _grn_total(grn) -> float:
+    """A2: only material qty x rate moves with a supplier ledger shift."""
     try:
-        from app.services.grn_svc import calculate_grn_total
-        return _money(calculate_grn_total(grn))
+        from app.services.grn_costing import supplier_material_minor
+        return _money(int(supplier_material_minor(grn)) / 100.0)
     except Exception:
-        total = 0.0
-        for item in (getattr(grn, 'items', None) or []):
-            if getattr(item, 'is_void', False):
-                continue
-            total += _money(getattr(item, 'qty', 0)) * _money(getattr(item, 'price_at_time', 0))
-        total += _money(getattr(grn, 'loading_cost', 0))
-        total += _money(getattr(grn, 'freight_cost', 0))
-        total += _money(getattr(grn, 'other_expense', 0))
-        total += _money(getattr(grn, 'tax_amount', 0))
-        total -= _money(getattr(grn, 'discount', 0))
-        total += _money(getattr(grn, 'adjustment_amount', 0))
-        return _money(total)
+        return _money(sum(
+            _money(getattr(item, 'qty', 0)) * _money(getattr(item, 'price_at_time', 0))
+            for item in (getattr(grn, 'items', None) or [])
+            if not getattr(item, 'is_void', False)
+        ))
 
 
 def _ledger_rows(supplier) -> list:

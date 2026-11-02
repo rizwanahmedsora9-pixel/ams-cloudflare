@@ -75,17 +75,18 @@ def grn():
                 flash(str(ve), 'danger')
                 return redirect(url_for('grn'))
             try:
-                paid_amount = _parse_grn_money(request.form.get('paid_amount', 0), 'Paid Amount')
                 tax_percent = _parse_grn_money(request.form.get('tax_percent', 0), 'Purchase Tax %')
                 tax_amount = _parse_grn_money(request.form.get('tax_amount', 0), 'Purchase Tax Amount')
             except ValueError as ve:
                 flash(str(ve), 'danger')
                 return redirect(url_for('grn'))
-            payment_type = request.form.get('payment_type', '').strip()
-            payment_account_id = request.form.get('payment_account_id')
-            bank_name = request.form.get('bank_name', '').strip()
-            account_name = request.form.get('account_name', '').strip()
-            account_no = request.form.get('account_no', '').strip()
+            # Owner rule A1: a GRN NEVER pays.  No payment amount, method,
+            # account or bank detail is accepted on a receive document.  All
+            # payments are posted from Accounts -> PAY EXISTING GRN.
+            paid_amount = 0.0
+            payment_type = 'Credit'
+            payment_account_id = None
+            bank_name = account_name = account_no = ''
             tax_type = request.form.get('tax_type', '').strip()
             supplier_invoice_no = request.form.get('supplier_invoice_no', '').strip()
             due_date_str = request.form.get('due_date')
@@ -124,36 +125,7 @@ def grn():
                     flash(f"Manual bill '{manual_bill}' already exists in {conflict[0]} #{conflict[1]}.", 'danger')
                     return redirect(url_for('grn'))
 
-            expected_pay_category = _payment_expected_account_category(payment_type)
-            pay_account = None
-            if payment_account_id:
-                try:
-                    payment_account_id = int(payment_account_id)
-                except Exception:
-                    payment_account_id = None
-
-            if paid_amount > 0 and expected_pay_category in ['cash', 'bank'] and not payment_account_id:
-                flash('Select a cash/bank account to post the GRN paid amount into Accounts.', 'danger')
-                return redirect(url_for('grn'))
-
-            if payment_account_id:
-                pay_account = Account.query.get(payment_account_id)
-                if not pay_account or bool(getattr(pay_account, 'is_active', True)) is False:
-                    flash('Please select a valid payment account.', 'danger')
-                    return redirect(url_for('grn'))
-                if expected_pay_category and (pay_account.category or '').strip().lower() != expected_pay_category:
-                    flash(f"Selected payment account must be a {expected_pay_category} account for payment type '{payment_type}'.", 'danger')
-                    return redirect(url_for('grn'))
-                if float(pay_account.balance or 0) + 0.00001 < float(paid_amount or 0):
-                    flash('Insufficient balance in selected payment account.', 'danger')
-                    return redirect(url_for('grn'))
-
-                if expected_pay_category == 'bank':
-                    bank_name = pay_account.bank_name or ''
-                    account_name = pay_account.account_holder_name or pay_account.name or ''
-                    account_no = pay_account.account_number or ''
-                else:
-                    bank_name = ''
+            # No payment validation on a receiving document (A1).
 
             new_grn = GRN(
                 supplier=supplier_name, 
@@ -168,9 +140,9 @@ def grn():
                 other_expense=other_expense,
                 adjustment_amount=adjustment_amount,
                 discount=discount,
-                paid_amount=paid_amount,
+                paid_amount=0,
                 payment_type=payment_type,
-                payment_account_id=(payment_account_id if (paid_amount > 0 and expected_pay_category in ['cash', 'bank']) else None),
+                payment_account_id=None,
                 bank_name=bank_name,
                 account_name=account_name,
                 account_no=account_no,
@@ -180,10 +152,22 @@ def grn():
                 supplier_invoice_no=supplier_invoice_no,
                 due_date=due_date,
                 bill_date=bill_date,
-                date_posted=date_posted
+                date_posted=date_posted,
+                costing_mode='LANDED',
+                allocation_basis_default=(request.form.get('allocation_basis_default') or 'VALUE').strip().upper(),
+                created_by=current_user.username,
             )
             db.session.add(new_grn)
             db.session.flush()
+
+            # Charge lines / payment obligations (A1: no money is paid here).
+            try:
+                sync_charges_from_form(new_grn, request.form, actor=current_user.username)
+            except ValueError as ve:
+                db.session.rollback()
+                flash(str(ve), 'danger')
+                return redirect(url_for('grn'))
+            mirror_legacy_charge_columns(new_grn)
 
             mat_names = request.form.getlist('mat_name[]')
             qtys = request.form.getlist('qty[]')
@@ -246,6 +230,10 @@ def grn():
                 db.session.add(entry)
                 saved_item_count += 1
 
+            # Landed costs are computed from the received lots + capitalised
+            # charges.  Paid/unpaid status never affects the rate (owner rule).
+            recompute_landed_costs(new_grn, actor=current_user.username)
+            # Legacy auto-payment sync is a no-op for LANDED GRNs (A1).
             _sync_grn_auto_supplier_payment(new_grn)
 
             try:
@@ -277,18 +265,23 @@ def grn():
             grn_id = request.form.get('id')
             grn_obj = db.session.get(GRN, grn_id)
             if grn_obj:
-                restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Delete GRN')
+                restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Cancel GRN')
                 if restricted:
                     return restricted
-                if _grn_has_locked_lots(grn_obj):
-                    flash('Cannot delete GRN: lots are locked by cash/credit sales. Delete those sales first.', 'danger')
-                    return redirect(url_for('grn'))
+                # Soft cancellation: preserve the GRN, its charge obligations
+                # and every Accounts payment as history; only stock is reversed.
                 try:
-                    if hard_delete_transaction('GRN', grn_obj.id):
-                        db.session.commit()
-                        flash('GRN deleted and stock reversed.', 'success')
-                    else:
-                        flash('GRN not found.', 'warning')
+                    from app.services.grn_cancel import cancel_grn
+                    result = cancel_grn(
+                        grn_obj, actor=current_user,
+                        reason=(request.form.get('cancel_reason') or '').strip(),
+                    )
+                    db.session.commit()
+                    flash(
+                        f"GRN cancelled; {result['items_reversed']} lot(s) reversed, "
+                        f"{result['payments_preserved']} payment record(s) preserved.",
+                        'success'
+                    )
                 except ValueError as ve:
                     db.session.rollback()
                     flash(str(ve), 'danger')
@@ -346,9 +339,16 @@ def grn():
         logging.getLogger('grn').exception('GRN consumption projection failed')
         grn_consumption = None
 
+    try:
+        grn_breakdowns = {g.id: grn_breakdown(g) for g in grns}
+    except Exception:
+        logging.getLogger('grn').exception('GRN cost breakdown failed')
+        grn_breakdowns = {}
+
     return render_template(
         'grn_wizard.html',
         grns=grns,
+        grn_breakdowns=grn_breakdowns,
         grn_consumption=grn_consumption,
         materials=materials,
         settings=settings,
@@ -356,6 +356,9 @@ def grn():
         clients=clients,
         suppliers=suppliers_list,
         accounts=accounts,
+        grn_parties=CashFlowParty.query.filter(
+            func.coalesce(CashFlowParty.is_active, True) == True
+        ).order_by(CashFlowParty.name.asc()).limit(500).all(),
         today_date=pk_today().strftime('%Y-%m-%d'),
         now_time=pk_now().strftime('%H:%M'),
         search=search,

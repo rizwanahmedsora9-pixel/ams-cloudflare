@@ -160,6 +160,7 @@ def delete_selected_data():
             _tq(BookingAllocationRepairArchive).delete()
             _tq(BookingAllocation).delete()
             _tq(DirectSaleItem).delete()
+            _tq(GRNCharge).delete()
             _tq(GRNItem).delete()
             _tq(GRN).delete()
             # --- driver payments: void their ledger rows, then remove rows ---
@@ -257,6 +258,7 @@ def delete_selected_data():
             # Sale line items may reference GRN lots (grn_item_id → grn_item).
             # Unlink before deleting the lots, or the FK gate aborts the wipe.
             _tq(DirectSaleItem).update({'grn_item_id': None}, synchronize_session=False)
+            _tq(GRNCharge).delete()
             _tq(GRNItem).delete()
             _tq(GRN).delete()
             deleted_info.append('GRN Records')

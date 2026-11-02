@@ -1,5 +1,19 @@
 {% extends "layout.html" %}
 
+{# ---- GRN landed-cost / charge grid setup (owner rules A1 + A2) ---------- #}
+{% set default_charges = ['VEHICLE_FARE', 'LOADING', 'UNLOADING', 'OTHER'] %}
+{% set charge_labels = {'VEHICLE_FARE': 'Vehicle Fare', 'TRANSPORT': 'Transportation', 'LOADING': 'Loading', 'UNLOADING': 'Unloading', 'OTHER': 'Other Expenses'} %}
+{% set cns = namespace(rows=[]) %}
+{% if edit_grn %}
+    {% for c in edit_grn.charges if not c.is_void %}
+        {% set _ = cns.rows.append(c) %}
+    {% endfor %}
+{% endif %}
+{% if cns.rows|length == 0 %}
+    {% for t in default_charges %}{% set _ = cns.rows.append(none) %}{% endfor %}
+{% endif %}
+{% set charge_count = cns.rows|length %}
+
 
 
 {% block content %}
@@ -467,24 +481,13 @@
                             </div>
 
                             <div class="col-md-3">
-
-                                <label class="form-label">Payment Type</label>
-
-                                <select class="form-select" name="payment_type" id="paymentTypeSelect" required>
-
-                                    <option value="Credit" {{ 'selected' if edit_grn and edit_grn.payment_type == 'Credit' }}>Credit</option>
-
-                                    <option value="Cash" {{ 'selected' if edit_grn and edit_grn.payment_type == 'Cash' }}>Cash</option>
-
-                                    <option value="Bank Transfer" {{ 'selected' if edit_grn and edit_grn.payment_type == 'Bank Transfer' }}>Bank Transfer</option>
-
-                                </select>
-
+                                <label class="form-label">Payment Handling</label>
+                                <div class="form-control-plaintext text-info fw-semibold">
+                                    <i class="bi bi-info-circle me-1"></i>Record only — pay from Accounts
+                                </div>
                             </div>
 
-                            <!-- Manual date/time override helper: the two fields above stay
-                                 freely editable so a GRN can be stamped with the moment the
-                                 goods actually arrived, not the moment it was typed. -->
+                            <!-- Manual date/time override helper -->
                             <div class="col-12">
                                 <div class="d-flex flex-wrap align-items-center gap-2 small text-muted">
                                     <span>
@@ -503,42 +506,13 @@
 
                         </div>
 
-                        <div id="paymentAccountSection" class="row g-3 mt-2" style="display: {{ 'flex' if edit_grn and edit_grn.payment_type in ['Cash', 'Bank Transfer'] else 'none' }};">
-                            <div class="col-md-6">
-                                <label class="form-label">Pay From Account</label>
-                                <select class="form-select" name="payment_account_id" id="paymentAccountSelect">
-                                    <option value="">— Select Cash/Bank Account —</option>
-                                    {% for a in accounts %}
-                                    <option value="{{ a.id }}"
-                                            data-category="{{ a.category or '' }}"
-                                            data-bank="{{ a.bank_name or '' }}"
-                                            data-holder="{{ a.account_holder_name or a.name or '' }}"
-                                            data-no="{{ a.account_number or '' }}"
-                                            {{ 'selected' if edit_grn and edit_grn.payment_account_id == a.id }}>
-                                        [{{ (a.category or 'cash')|upper }}] {{ a.name }}{% if a.bank_name %} — {{ a.bank_name }}{% endif %}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                                <div class="form-text">Required when Paid Amount &gt; 0 for Cash/Bank Transfer.</div>
-                            </div>
+                        <div class="alert alert-info mt-3 mb-0 py-2 small">
+                            <i class="bi bi-shield-check me-1"></i>
+                            <strong>GRN never pays.</strong> This document records material received, its complete
+                            actual (landed) cost and who must be paid. All payments — full, partial or repeated —
+                            are made later from <strong>Accounts &rarr; PAY EXISTING GRN</strong>. The Supplier Ledger
+                            receives <strong>only</strong> material quantity &times; rate.
                         </div>
-
-                        <!-- Bank Details Section -->
-                        <div id="bankDetailsSection" class="row g-3 mt-2" style="display: {{ 'flex' if edit_grn and edit_grn.payment_type == 'Bank Transfer' else 'none' }};">
-                            <div class="col-md-4">
-                                <label class="form-label">Bank Name</label>
-                                <input type="text" class="form-control" id="bankNameInput" name="bank_name" value="{{ (edit_grn.bank_name or '') if edit_grn else '' }}" placeholder="e.g. HBL">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Account Holder Name</label>
-                                <input type="text" class="form-control" id="bankAccountHolderInput" name="account_name" value="{{ (edit_grn.account_name or '') if edit_grn else '' }}" placeholder="e.g. John Doe">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Account Number</label>
-                                <input type="text" class="form-control" id="bankAccountNoInput" name="account_no" value="{{ (edit_grn.account_no or '') if edit_grn else '' }}" placeholder="e.g. 1234-5678">
-                            </div>
-                        </div>
-
 
                         <div class="mt-3 text-end">
 
@@ -700,15 +674,109 @@
                         <div class="tab-content p-3 border border-top-0 mb-3">
 
                             <div class="tab-pane fade show active" id="expenses">
-
-                                <div class="row g-3">
-
-                                    <div class="col-md-3"><label>Load Expense</label><input type="number" class="form-control" name="loading_cost" step="any" min="0" inputmode="decimal" value="{{ edit_grn.loading_cost if edit_grn else '' }}"></div>
-                                    <div class="col-md-3"><label>Freight Expense</label><input type="number" class="form-control" name="freight_cost" step="any" min="0" inputmode="decimal" value="{{ edit_grn.freight_cost if edit_grn else '' }}"></div>
-                                    <div class="col-md-3"><label>Other Expense</label><input type="number" class="form-control" name="other_expense" step="any" min="0" inputmode="decimal" value="{{ edit_grn.other_expense if edit_grn else '' }}"></div>
-                                    <div class="col-md-3"><label>Adjustment Amount</label><input type="number" class="form-control" name="adjustment_amount" step="any" inputmode="decimal" value="{{ edit_grn.adjustment_amount if edit_grn else '' }}"></div>
-                                    <div class="col-md-3"><label>Discount</label><input type="number" class="form-control" name="discount" id="grnDiscount" step="any" inputmode="decimal" value="{{ edit_grn.discount if edit_grn else '' }}"></div>
+                                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                                    <div class="small text-muted">
+                                        <i class="bi bi-truck me-1"></i>Additional material-related costs.
+                                        Paid or unpaid, they are part of the actual purchase cost.
+                                        Each charge creates its own payable to its own recipient — never to the supplier.
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-info" id="addGrnChargeBtn"><i class="bi bi-plus-lg"></i> Add charge</button>
                                 </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-dark table-bordered align-middle mb-2" id="grnChargesTable">
+                                        <thead class="small text-uppercase text-muted">
+                                            <tr>
+                                                <th style="width:14%">Charge</th>
+                                                <th style="width:13%">Label / Detail</th>
+                                                <th style="width:11%">Amount (Rs.)</th>
+                                                <th style="width:14%">Recipient Type</th>
+                                                <th style="width:14%">Recipient / Person</th>
+                                                <th style="width:12%">Payment Status</th>
+                                                <th style="width:13%">Cost Treatment</th>
+                                                <th style="width:9%">Alloc. Basis</th>
+                                                <th style="width:3%"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for c in cns.rows %}
+                                            {% set idx0 = loop.index0 %}
+                                            {% set ctype = c.charge_type if c else (default_charges[idx0] if idx0 < 4 else 'OTHER') %}
+                                            {% set crec = c.recipient_type if c else ('TRANSPORTER' if ctype in ['VEHICLE_FARE','TRANSPORT'] else ('LABOUR' if ctype in ['LOADING','UNLOADING'] else 'OTHER')) %}
+                                            <tr class="grn-charge-row">
+                                                <input type="hidden" name="charge_id[]" value="{{ c.id if c else '' }}">
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_type[]">
+                                                        <option value="VEHICLE_FARE" {{ 'selected' if ctype == 'VEHICLE_FARE' }}>Vehicle Fare</option>
+                                                        <option value="TRANSPORT" {{ 'selected' if ctype == 'TRANSPORT' }}>Transportation</option>
+                                                        <option value="LOADING" {{ 'selected' if ctype == 'LOADING' }}>Loading</option>
+                                                        <option value="UNLOADING" {{ 'selected' if ctype == 'UNLOADING' }}>Unloading</option>
+                                                        <option value="OTHER" {{ 'selected' if ctype == 'OTHER' }}>Other Expenses</option>
+                                                    </select>
+                                                </td>
+                                                <td><input type="text" class="form-control form-control-sm" name="charge_label[]" value="{{ (c.label or '') if c else '' }}" placeholder="e.g. Rana Transport"></td>
+                                                <td><input type="number" class="form-control form-control-sm grn-charge-amount" name="charge_amount[]" step="any" min="0" value="{{ (c.amount or 0) if c else '' }}" placeholder="0.00"></td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_recipient_type[]">
+                                                        <option value="TRANSPORTER" {{ 'selected' if crec == 'TRANSPORTER' }}>Vehicle / Transporter</option>
+                                                        <option value="LABOUR" {{ 'selected' if crec == 'LABOUR' }}>Loading / Labour</option>
+                                                        <option value="OTHER" {{ 'selected' if crec == 'OTHER' }}>Other charge recipient</option>
+                                                    </select>
+                                                </td>
+                                                <td><input type="text" class="form-control form-control-sm" name="charge_recipient[]" value="{{ (c.recipient_name or '') if c else '' }}" list="grnPartyOptions" placeholder="Person / party name"></td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_status[]">
+                                                        <option value="UNPAID" {{ 'selected' if not c or c.declared_status == 'UNPAID' }}>Unpaid</option>
+                                                        <option value="PAID" {{ 'selected' if c and c.declared_status == 'PAID' }}>Paid (declaration only)</option>
+                                                        <option value="NOT_APPLICABLE" {{ 'selected' if c and c.declared_status == 'NOT_APPLICABLE' }}>Not Applicable</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_treatment[]">
+                                                        <option value="INVENTORY" {{ 'selected' if not c or c.cost_treatment in ['INVENTORY', none] }}>Include in material cost</option>
+                                                        <option value="EXPENSE" {{ 'selected' if c and c.cost_treatment == 'EXPENSE' }}>Separate expense</option>
+                                                        <option value="NON_MATERIAL" {{ 'selected' if c and c.cost_treatment == 'NON_MATERIAL' }}>Not material cost</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_basis[]">
+                                                        <option value="VALUE" {{ 'selected' if not c or c.allocation_basis in ['VALUE', none] }}>By value</option>
+                                                        <option value="QUANTITY" {{ 'selected' if c and c.allocation_basis == 'QUANTITY' }}>By quantity</option>
+                                                        <option value="MANUAL" {{ 'selected' if c and c.allocation_basis == 'MANUAL' }}>Manual</option>
+                                                    </select>
+                                                </td>
+                                                <td><button type="button" class="btn btn-sm btn-outline-danger grn-charge-remove" title="Remove charge"><i class="bi bi-x"></i></button></td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <datalist id="grnPartyOptions">
+                                    {% for party in grn_parties or [] %}<option value="{{ party.name }}"></option>{% endfor %}
+                                </datalist>
+                                <div class="small text-muted mb-2">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    "Payment Status" is an informational declaration only — it does not settle anything.
+                                    Actual paid / remaining amounts come exclusively from Accounts payments.
+                                    "Separate expense" charges are excluded from inventory valuation and never double counted.
+                                </div>
+                                <div class="row g-2 small">
+                                    <div class="col-md-3"><span class="text-muted">Supplier Material:</span> <b id="grnSupplierMaterial">0.00</b></div>
+                                    <div class="col-md-3"><span class="text-muted">Capitalised Charges:</span> <b id="grnCapitalisedCharges">0.00</b></div>
+                                    <div class="col-md-3"><span class="text-muted">Total Actual Cost:</span> <b class="text-success" id="grnLandedCost">0.00</b></div>
+                                    <div class="col-md-3"><span class="text-muted">Avg Actual Rate / Unit:</span> <b class="text-info" id="grnAvgRate">0.00</b></div>
+                                </div>
+                                <hr class="my-2">
+                                <div class="row g-3">
+                                    <div class="col-md-4"><label class="small">Default allocation basis</label>
+                                        <select class="form-select form-select-sm" name="allocation_basis_default">
+                                            <option value="VALUE" {{ 'selected' if not edit_grn or edit_grn.allocation_basis_default in ['VALUE', none] }}>By line value (recommended)</option>
+                                            <option value="QUANTITY" {{ 'selected' if edit_grn and edit_grn.allocation_basis_default == 'QUANTITY' }}>By quantity</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4"><label class="small">Adjustment (memo only)</label><input type="number" class="form-control form-control-sm" name="adjustment_amount" step="any" value="{{ edit_grn.adjustment_amount if edit_grn else '' }}"></div>
+                                    <div class="col-md-4"><label class="small">Discount (memo only)</label><input type="number" class="form-control form-control-sm" name="discount" id="grnDiscount" step="any" value="{{ edit_grn.discount if edit_grn else '' }}"></div>
+                                </div>
+                                <div class="small text-muted mt-1">Tax / discount / adjustment are memo fields only: they never enter the Supplier Ledger and are never capitalised into inventory.</div>
                             </div>
                             <div class="tab-pane fade" id="tax">
                                 <div class="row g-3">
@@ -737,7 +805,7 @@
                                     <div class="col-md-3"><label>Bill No.</label><input type="text" class="form-control" name="manual_bill_no" placeholder="Internal Bill #" value="{{ (edit_grn.manual_bill_no or '') if edit_grn else '' }}"></div>
                                     <div class="col-md-3"><label>Bill Date</label><input type="date" class="form-control" name="bill_date" value="{{ edit_grn.bill_date.strftime('%Y-%m-%d') if (edit_grn and edit_grn.bill_date) else '' }}"></div>
                                     <div class="col-md-3"><label>Due Date</label><input type="date" class="form-control" name="due_date" value="{{ edit_grn.due_date.strftime('%Y-%m-%d') if (edit_grn and edit_grn.due_date) else '' }}"></div>
-                                    <div class="col-md-3"><label class="text-success fw-bold">Paid Amount</label><input type="number" class="form-control border-success" name="paid_amount" step="any" inputmode="decimal" value="{{ edit_grn.paid_amount if edit_grn else '' }}" placeholder="Partial/Full Payment"></div>
+                                    <div class="col-md-3"><label class="text-info fw-bold">Payments</label><div class="form-control-plaintext small">Recorded only in Accounts</div></div>
                                 </div>
                             </div>
                             <div class="tab-pane fade" id="comments">
@@ -883,6 +951,12 @@
 
                             <th class="grn-col-num">Discount</th>
 
+                            <th class="grn-col-num" title="Supplier material + all material-related charges">Actual Cost</th>
+
+                            <th class="grn-col-num" title="Money actually paid from Accounts">Cash Paid</th>
+
+                            <th>Payment Status</th>
+
                             <th class="text-end grn-actions-cell">Actions</th>
 
                         </tr>
@@ -949,6 +1023,29 @@
 
                             <td class="grn-col-num">{{ '{:,.2f}'.format(grn.discount or 0) }}</td>
 
+                            {% set bd = (grn_breakdowns or {}).get(grn.id) %}
+                            <td class="grn-col-num">
+                                <b class="text-success">{{ '{:,.2f}'.format(bd.landed_cost_total if bd else (grn.landed_cost_total or 0)) }}</b>
+                                {% if bd and bd.average_actual_rate %}<span class="grn-qty-label">@ {{ '{:,.2f}'.format(bd.average_actual_rate) }}/unit</span>{% endif %}
+                            </td>
+
+                            <td class="grn-col-num">{{ '{:,.2f}'.format(bd.total_cash_paid if bd else 0) }}</td>
+
+                            <td>
+                                {% if bd %}
+                                    {% if bd.total_remaining <= 0 and bd.total_obligations > 0 %}
+                                        <span class="badge bg-success">Fully Paid</span>
+                                    {% elif bd.total_cash_paid > 0 %}
+                                        <span class="badge bg-warning text-dark">Partially Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Unpaid</span>
+                                    {% endif %}
+                                    <span class="small text-muted d-block">Due {{ '{:,.2f}'.format(bd.total_remaining) }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+
                             <td class="grn-actions-cell">
 
                                 <div class="grn-row-actions">
@@ -1014,12 +1111,68 @@
                         </tr>
 
                         <tr class="grn-details-row" id="grnDetails{{ grn.id }}" hidden>
-                            <td colspan="9">
+                            <td colspan="12">
                                 <div class="grn-details">
                                     <div class="grn-details-head">
                                         <span class="grn-details-title"><i class="bi bi-box-seam me-1"></i>Consumption by lot</span>
                                         <span class="grn-details-note">{{ live_items|length }} line{{ '' if live_items|length == 1 else 's' }} on this GRN &middot; every lot keeps its own purchase rate and FIFO consumption</span>
                                     </div>
+                                    {% set bd = (grn_breakdowns or {}).get(grn.id) %}
+                                    {% if bd %}
+                                    <div class="grn-cost-panel mb-3 p-2 border border-secondary rounded">
+                                        <div class="d-flex flex-wrap gap-3 small mb-2">
+                                            <span class="fw-bold text-info"><i class="bi bi-receipt me-1"></i>Cost &amp; Payments</span>
+                                            <span>Supplier Material: <b>{{ '{:,.2f}'.format(bd.supplier_material_amount) }}</b></span>
+                                            <span>Vehicle Fare: <b>{{ '{:,.2f}'.format(bd.vehicle_fare) }}</b></span>
+                                            <span>Loading: <b>{{ '{:,.2f}'.format(bd.loading) }}</b></span>
+                                            <span>Unloading: <b>{{ '{:,.2f}'.format(bd.unloading) }}</b></span>
+                                            <span>Other: <b>{{ '{:,.2f}'.format(bd.other_charges) }}</b></span>
+                                            <span>Total Actual Cost: <b class="text-success">{{ '{:,.2f}'.format(bd.landed_cost_total) }}</b></span>
+                                            <span>Avg Actual Rate: <b>{{ '{:,.2f}'.format(bd.average_actual_rate) }}</b></span>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-3 small mb-2">
+                                            <span>Supplier Paid: <b>{{ '{:,.2f}'.format(bd.supplier_paid) }}</b></span>
+                                            <span>Supplier Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.supplier_remaining) }}</b></span>
+                                            <span>Charges Paid: <b>{{ '{:,.2f}'.format(bd.additional_paid) }}</b></span>
+                                            <span>Charges Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.additional_remaining) }}</b></span>
+                                            <span>Total Cash Actually Paid: <b class="text-success">{{ '{:,.2f}'.format(bd.total_cash_paid) }}</b></span>
+                                            <a class="btn btn-sm btn-outline-info py-0" href="{{ url_for('accounts.grn_payments', grn_id=grn.id) }}"><i class="bi bi-cash-coin"></i> Pay this GRN</a>
+                                        </div>
+                                        <div class="small mb-1">
+                                            <div class="row g-1 fw-bold text-muted border-bottom pb-1">
+                                                <div class="col-md-4">Obligation / Recipient</div>
+                                                <div class="col-md-2 text-end">Original</div>
+                                                <div class="col-md-2 text-end">Paid</div>
+                                                <div class="col-md-2 text-end">Remaining</div>
+                                                <div class="col-md-2">Status / Treatment</div>
+                                            </div>
+                                            {% for ob in bd.obligations %}
+                                            <div class="row g-1 border-bottom py-1">
+                                                <div class="col-md-4">{{ ob.label }}{% if ob.kind == 'CHARGE' %} <span class="text-muted">→ {{ ob.recipient_name or ob.recipient_label }}</span>{% endif %}</div>
+                                                <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.original) }}</div>
+                                                <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.paid) }}</div>
+                                                <div class="col-md-2 text-end fw-bold">{{ '{:,.2f}'.format(ob.remaining) }}</div>
+                                                <div class="col-md-2">{{ ob.status }} <span class="text-muted">/ {{ ob.cost_treatment if ob.cost_treatment else 'Supplier material' }}</span></div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% if bd.payment_rows %}
+                                        <div class="small fw-bold mt-2"><i class="bi bi-clock-history me-1"></i>Payment history</div>
+                                        <div class="small">
+                                            {% for pay in bd.payment_rows %}
+                                            <div class="row g-1 border-bottom py-1">
+                                                <div class="col-md-2">{{ pay.date_posted.strftime('%d/%b/%Y') if pay.date_posted else '—' }}</div>
+                                                <div class="col-md-3">{{ pay.recipient_name or pay.recipient_type }}</div>
+                                                <div class="col-md-2 text-end">{{ '{:,.2f}'.format(pay.amount) }}</div>
+                                                <div class="col-md-2">{{ pay.method }}</div>
+                                                <div class="col-md-2">{{ pay.reference }}</div>
+                                                <div class="col-md-1">{{ 'Voided' if pay.is_void else ('Posted' if pay.cash_posted else 'Recorded') }}</div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
                                     <div class="grn-lot-list">
                                         {% for item in live_items %}
                                         {% set lot = (grn_consumption['items'].get(item.id) if grn_consumption else None) %}
@@ -1146,23 +1299,95 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateGrnTotal() {
-        let total = 0;
+        // Owner rule A2: supplier material = sum(qty x rate) ONLY.
+        // Owner rule: paid/unpaid status never changes the landed cost.
+        let supplierMaterial = 0;
+        let totalQty = 0;
         document.querySelectorAll('#grnItemsTable tbody tr').forEach(row => {
             const qtyInput = row.querySelector('input[name="qty[]"]');
             const priceInput = row.querySelector('input[name="price[]"]');
             const totalCell = row.querySelector('.grn-row-total');
             if (qtyInput && priceInput) {
-                const lineTotal = (parseFloat(qtyInput.value) || 0) * (parseFloat(priceInput.value) || 0);
+                const qty = parseFloat(qtyInput.value) || 0;
+                const lineTotal = qty * (parseFloat(priceInput.value) || 0);
                 if (totalCell) totalCell.textContent = formatNumber(lineTotal);
-                total += lineTotal;
+                supplierMaterial += lineTotal;
+                totalQty += qty;
             }
         });
-        
-        const discount = parseFloat(document.getElementById('grnDiscount').value || 0);
-        total = Math.max(0, total - discount);
-        
-        document.getElementById('grnTotalAmount').innerText = formatNumber(total);
+
+        let capitalised = 0;
+        document.querySelectorAll('#grnChargesTable tbody tr.grn-charge-row').forEach(row => {
+            const amountInput = row.querySelector('input[name="charge_amount[]"]');
+            const treatment = row.querySelector('select[name="charge_treatment[]"]');
+            const status = row.querySelector('select[name="charge_status[]"]');
+            if (!amountInput) return;
+            const amount = parseFloat(amountInput.value) || 0;
+            if (treatment && treatment.value === 'INVENTORY' && (!status || status.value !== 'NOT_APPLICABLE')) {
+                capitalised += amount;
+            }
+        });
+
+        const landed = supplierMaterial + capitalised;
+        const avg = totalQty > 0 ? (landed / totalQty) : 0;
+        const setText = (id, value) => { const el = document.getElementById(id); if (el) el.innerText = formatNumber(value); };
+        setText('grnSupplierMaterial', supplierMaterial);
+        setText('grnCapitalisedCharges', capitalised);
+        setText('grnLandedCost', landed);
+        setText('grnAvgRate', avg);
+        setText('grnTotalAmount', landed);
     }
+
+    function bindChargeRows() {
+        document.querySelectorAll('#grnChargesTable tbody tr.grn-charge-row').forEach(row => {
+            row.querySelectorAll('input, select').forEach(el => {
+                if (!el.dataset.grnChargeBound) {
+                    el.dataset.grnChargeBound = '1';
+                    el.addEventListener('input', updateGrnTotal);
+                    el.addEventListener('change', updateGrnTotal);
+                }
+            });
+            const remove = row.querySelector('.grn-charge-remove');
+            if (remove && !remove.dataset.grnChargeBound) {
+                remove.dataset.grnChargeBound = '1';
+                remove.addEventListener('click', () => {
+                    const tbody = document.querySelector('#grnChargesTable tbody');
+                    if (tbody && tbody.querySelectorAll('tr.grn-charge-row').length > 1) {
+                        row.remove();
+                    } else {
+                        row.querySelectorAll('input[type="number"], input[type="text"]').forEach(i => i.value = '');
+                    }
+                    updateGrnTotal();
+                });
+            }
+        });
+    }
+
+    const addChargeBtn = document.getElementById('addGrnChargeBtn');
+    if (addChargeBtn) {
+        addChargeBtn.addEventListener('click', () => {
+            const tbody = document.querySelector('#grnChargesTable tbody');
+            if (!tbody) return;
+            const first = tbody.querySelector('tr.grn-charge-row');
+            if (!first) return;
+            const clone = first.cloneNode(true);
+            clone.querySelectorAll('input').forEach(i => {
+                if (i.type === 'hidden') i.value = '';
+                else i.value = '';
+                i.removeAttribute('data-grn-charge-bound');
+            });
+            clone.querySelectorAll('select').forEach(sel => {
+                sel.selectedIndex = 0;
+                sel.removeAttribute('data-grn-charge-bound');
+            });
+            const rm = clone.querySelector('.grn-charge-remove');
+            if (rm) rm.removeAttribute('data-grn-charge-bound');
+            tbody.appendChild(clone);
+            bindChargeRows();
+            updateGrnTotal();
+        });
+    }
+    bindChargeRows();
 
 
     document.querySelectorAll('.next-step').forEach(btn => {

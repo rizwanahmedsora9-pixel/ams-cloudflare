@@ -197,6 +197,28 @@ def _build_master_export_bytes(scope_ctx=None):
                 })
         pd.DataFrame(grn_items or [], columns=['GRN Manual Bill', 'GRN Auto Bill', 'Material Name', 'Quantity', 'Rate']).to_excel(writer, sheet_name='GRNItems', index=False)
 
+        grn_charge_rows = []
+        for g in grns:
+            for c in getattr(g, 'charges', None) or []:
+                grn_charge_rows.append({
+                    'GRN Manual Bill': g.manual_bill_no or '',
+                    'GRN Auto Bill': g.auto_bill_no or '',
+                    'Charge Type': c.charge_type,
+                    'Label': c.label or '',
+                    'Amount': c.amount or 0,
+                    'Recipient Type': c.recipient_type or '',
+                    'Recipient Name': c.recipient_name or '',
+                    'Declared Status': c.declared_status or '',
+                    'Cost Treatment': c.cost_treatment or '',
+                    'Allocation Basis': c.allocation_basis or '',
+                    'Is Void': bool(c.is_void),
+                })
+        pd.DataFrame(grn_charge_rows or [], columns=[
+            'GRN Manual Bill', 'GRN Auto Bill', 'Charge Type', 'Label', 'Amount',
+            'Recipient Type', 'Recipient Name', 'Declared Status',
+            'Cost Treatment', 'Allocation Basis', 'Is Void',
+        ]).to_excel(writer, sheet_name='GRNCharges', index=False)
+
         delivery_persons = _scoped_model_query(DeliveryPerson, scope_ctx).order_by(DeliveryPerson.name.asc()).all()
         delivery_person_data = [{
             'name': d.name,

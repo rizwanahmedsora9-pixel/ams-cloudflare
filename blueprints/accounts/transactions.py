@@ -302,6 +302,14 @@ def add_transaction():
             flash('Receive transaction recorded successfully.', 'success')
 
         elif tx_mode == 'pay':
+            # A GRN payment has its own wizard (GRN + obligation + recipient +
+            # partial/remaining/history).  Reuse that single path so the modal
+            # can never create a second, inconsistent payment system.
+            if (request.form.get('pay_target') or '').strip().lower() == 'grn_payment':
+                grn_id = request.form.get('grn_payment_grn_id', type=int)
+                flash('Choose the GRN recipient/charge and record the payment on the GRN Payments page.', 'info')
+                db.session.rollback()
+                return redirect(url_for('accounts.grn_payments', **({'grn_id': grn_id} if grn_id else {})))
             from_account_id = request.form.get('pay_from_account_id', type=int)
             to_account_id = request.form.get('pay_to_account_id', type=int)
             pay_target = (request.form.get('pay_target') or '').strip().lower()

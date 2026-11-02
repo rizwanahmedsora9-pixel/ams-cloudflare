@@ -252,6 +252,7 @@ SRC_TRANSFER = 'TRANSFER'
 SRC_DRIVER_PAYMENT = 'DRIVER_PAYMENT'
 SRC_ACCOUNT_RECEIPT = 'ACCOUNT_RECEIPT'
 SRC_ACCOUNT_EXPENSE = 'ACCOUNT_EXPENSE'
+SRC_GRN_PAYMENT = 'GRN_PAYMENT'
 
 CF_SOURCE_LABELS = {
     SRC_MANUAL: 'Manual',
@@ -262,6 +263,7 @@ CF_SOURCE_LABELS = {
     SRC_DRIVER_PAYMENT: 'Driver',
     SRC_ACCOUNT_RECEIPT: 'Other system-generated',
     SRC_ACCOUNT_EXPENSE: 'Other system-generated',
+    SRC_GRN_PAYMENT: 'GRN Payment',
 }
 
 # ---------------------------------------------------------------------------
@@ -280,6 +282,7 @@ CF_SECTION_CLIENT_REFUNDS = 'Client Refunds'
 CF_SECTION_WAIVE_OFFS = 'Waive-Offs'
 CF_SECTION_SUPPLIER_PAYMENTS = 'Supplier Payments'
 CF_SECTION_GRN = 'GRN'
+CF_SECTION_GRN_PAYMENTS = 'GRN Payments'
 CF_SECTION_SALES_RETURNS = 'Sales Returns'
 CF_SECTION_DELIVERY_RENT = 'Delivery & Rent'
 CF_SECTION_RECONCILIATION = 'Reconciliation'
@@ -298,6 +301,8 @@ _CF_SECTION_BY_SOURCE = {
     'supplier_payment': CF_SECTION_SUPPLIER_PAYMENTS,
     'supplier': CF_SECTION_SUPPLIER_PAYMENTS,
     'grn': CF_SECTION_GRN,
+    'grn_payment': CF_SECTION_GRN_PAYMENTS,
+    'grnpayment': CF_SECTION_GRN_PAYMENTS,
     'materialreturn': CF_SECTION_SALES_RETURNS,
     'material_return': CF_SECTION_SALES_RETURNS,
     'deliverypersonpayment': CF_SECTION_DELIVERY_RENT,
@@ -323,6 +328,7 @@ _CF_SECTION_BY_TX_TYPE = {
     'waive off': CF_SECTION_WAIVE_OFFS,
     'discount / waive-off': CF_SECTION_WAIVE_OFFS,
     'supplier payment': CF_SECTION_SUPPLIER_PAYMENTS,
+    'grn payment': CF_SECTION_GRN_PAYMENTS,
     'driver payment': CF_SECTION_DELIVERY_RENT,
 }
 
@@ -365,6 +371,8 @@ _CF_CREATOR_SOURCES = {
     'clientrefund': ('Payment', 'created_by', None),
     'supplierpayment': ('SupplierPayment', 'created_by', None),
     'supplier_payment': ('SupplierPayment', 'created_by', None),
+    'grn_payment': ('SupplierPayment', 'created_by', None),
+    'grnpayment': ('SupplierPayment', 'created_by', None),
     'deliverypersonpayment': ('DeliveryPersonPayment', 'created_by', None),
     'delivery_person_payment': ('DeliveryPersonPayment', 'created_by', None),
     'accountreconciliation': ('AccountReconciliation', 'created_by', None),
@@ -382,6 +390,7 @@ _CF_CREATOR_AUDIT_ENTITIES = {
     'supplierpayment': ('SupplierPayment',),
     'supplier_payment': ('SupplierPayment',),
     'grn': ('GRN', 'SupplierPayment'),
+    'grn_payment': ('GRN_PAYMENT', 'SupplierPayment'),
     'directsale': ('DirectSale',),
     'direct_sale': ('DirectSale',),
     'materialreturn': ('MaterialReturn',),
@@ -1416,8 +1425,8 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
         else:
             category = ''
             subcategory = ''
-            party_name = ''
-            party_type = ''
+            party_name = getattr(tx, 'party_name', '') or ''
+            party_type = getattr(tx, 'party_type', '') or ''
             description = tx.description or tx.transaction_type or ''
             note = tx.note or ''
             reference = f'TX-{tx.id}'
@@ -1466,6 +1475,9 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
                 default=(CF_SECTION_CASH_FLOW if e else CF_SECTION_ACCOUNTS),
             ),
             'status': 'voided' if tx.is_void else 'active',
+            'grn_id': getattr(tx, 'grn_id', None),
+            'party_name': party_name,
+            'party_type': party_type,
             'entry_id': e.id if e else None,
             'tx_id': tx.id,
         })

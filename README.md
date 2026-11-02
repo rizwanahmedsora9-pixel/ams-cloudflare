@@ -209,6 +209,40 @@ owned by its GRN, so shift the GRN (its payment follows) or use the full shift.
 
 ---
 
+## GRN receiving, landed cost and purchase payments (2026-11-02)
+
+Two binding owner rules, implemented end to end:
+
+* **A1 — a GRN never pays.** `/grn` records material received, its costs,
+  charge lines and payment obligations only. It creates **no** `SupplierPayment`,
+  no `AccountTransaction` and no cash/bank movement. Every payment (full,
+  partial, repeated, dated) is posted from **Accounts → PAY EXISTING GRN**
+  (`/accounts/grn_payments`), which writes one `SupplierPayment`, exactly one
+  `AccountTransaction` of type `GRN Payment`, and one audit row.
+* **A2 — the Supplier Ledger is exactly `Σ(grn_item.qty × price_at_time)`.**
+  Freight, loading, unloading, transport, other charges, tax, discount and
+  adjustment are never supplier payables, and a payment to a transporter or
+  labourer never reduces the supplier balance. Each charge has its own
+  recipient and its own ledger (`/party_ledger/<id>`).
+
+Additional behaviour:
+
+* `GRNCharge` is the single new table. Material-related charges default to
+  `INVENTORY` and are allocated to GRN lots in exact paisa by line value
+  (`pricing.allocate_cents`); `EXPENSE` charges are recognised once in P&L and
+  excluded from inventory. Paid/unpaid status never changes the landed rate.
+* `GRNItem.landed_unit_cost` is the FIFO/P&L cost. Each lot keeps its own rate;
+  frozen historical sale costs are never rewritten.
+* Cash Flow derives from `AccountTransaction` as before, so an unpaid GRN
+  produces no cash row and every payment produces exactly one outgoing row.
+* GRN cancellation is a soft void with reversed quantities and preserved
+  payments; a GRN with Accounts payments cannot be purged.
+* Outstanding purchase payables: `/accounts/purchase_payables`.
+* Details: `GRN_LANDED_COST_PAYMENTS_PLAN.md` (approved design) and
+  `GRN_REDESIGN_IMPLEMENTATION_REPORT.md` (implementation report).
+
+---
+
 ## Data: load, snapshot, migrate
 
 **Day-to-day full copy** (recommended): Import / Export Center →

@@ -538,6 +538,36 @@
             </tfoot>
         </table>
 
+        {% if type == 'GRN' and grn_bd %}
+        <!-- GRN actual cost, obligations and payments -->
+        <div class="rcpt-section-title" style="margin-top:6px;">Actual Purchase Cost &amp; Payments</div>
+        <table class="rcpt-table">
+            <tbody>
+                <tr><td colspan="3" class="text-end">Supplier Material Amount</td><td class="text-end">{{ fmt_num(grn_bd.supplier_material_amount) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Vehicle Fare</td><td class="text-end">{{ fmt_num(grn_bd.vehicle_fare) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Loading</td><td class="text-end">{{ fmt_num(grn_bd.loading) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Unloading</td><td class="text-end">{{ fmt_num(grn_bd.unloading) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Other Charges</td><td class="text-end">{{ fmt_num(grn_bd.other_charges) }}</td></tr>
+                <tr><td colspan="3" class="text-end"><b>Total Actual Purchase Cost</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.landed_cost_total) }}</b></td></tr>
+                <tr><td colspan="3" class="text-end">Average Actual Cost / Unit</td><td class="text-end">{{ fmt_num(grn_bd.average_actual_rate) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Supplier Paid / Remaining</td><td class="text-end">{{ fmt_num(grn_bd.supplier_paid) }} / {{ fmt_num(grn_bd.supplier_remaining) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Additional Charges Paid / Remaining</td><td class="text-end">{{ fmt_num(grn_bd.additional_paid) }} / {{ fmt_num(grn_bd.additional_remaining) }}</td></tr>
+                <tr><td colspan="3" class="text-end"><b>Total Cash Actually Paid</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.total_cash_paid) }}</b></td></tr>
+            </tbody>
+        </table>
+        {% if grn_bd.obligations %}
+        <div class="rcpt-section-title" style="margin-top:6px;">Payment Obligations &amp; History</div>
+        <table class="rcpt-table">
+            <thead><tr><th class="text-start">Recipient / Charge</th><th class="text-end">Original</th><th class="text-end">Paid</th><th class="text-end">Remaining</th></tr></thead>
+            <tbody>
+            {% for ob in grn_bd.obligations %}
+                <tr><td class="text-start">{{ ob.label }} &rarr; {{ ob.recipient_name or ob.recipient_label }}</td><td class="text-end">{{ fmt_num(ob.original) }}</td><td class="text-end">{{ fmt_num(ob.paid) }}</td><td class="text-end">{{ fmt_num(ob.remaining) }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% endif %}
+
         <!-- Material Delivery Summary -->
         {% if material_stock_summary %}
         <div class="rcpt-section-title" style="margin-top:6px;">Material Delivery Summary</div>
