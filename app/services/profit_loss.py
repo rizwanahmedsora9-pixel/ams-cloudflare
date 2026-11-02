@@ -63,6 +63,7 @@ from models import (
     GRN,
     GRNAllocation,
     GRNItem,
+    GRNCharge,
     Material,
     MaterialReturn,
     Payment,
@@ -86,6 +87,7 @@ from app.services.profit_loss_breakdown import (
     build_breakdown,
 )
 from app.services.grn_consumption import build_grn_consumption
+from app.services.grn_costing import lot_cost_rate
 from app.services import pricing as _pricing
 from app.services.lookups import is_rent_like_name
 from app.services.sales_core import _direct_sale_default_bill_ref, normalize_sale_category
@@ -448,7 +450,7 @@ class _Projection:
             for item in grn.items:
                 if not _active(item) or _f(item.price_at_time) <= 0:
                     continue
-                self.purchase_rates[_mat_key(item.mat_name)].append((_as_dt(grn.date_posted), _f(item.price_at_time), item, grn))
+                self.purchase_rates[_mat_key(item.mat_name)].append((_as_dt(grn.date_posted), _f(lot_cost_rate(item)), item, grn))
         for values in self.purchase_rates.values():
             values.sort(key=lambda value: (value[0] or datetime.min, value[2].id), reverse=True)
         self.grn_allocations_by_item = defaultdict(list)
@@ -786,7 +788,7 @@ class _Projection:
                     "date": _as_dt(grn.date_posted), "material": item.mat_name or "",
                     "remaining": max(0.0, _f(item.qty)),
                     "original_qty": max(0.0, _f(item.qty)),
-                    "rate": max(0.0, _f(item.price_at_time)),
+                    "rate": max(0.0, _f(lot_cost_rate(item))),
                     "reference": _grn_ref(grn), "supplier": grn.supplier or "",
                 }
                 lots_by_material[_mat_key(item.mat_name)].append(lot)
@@ -891,8 +893,8 @@ class _Projection:
                 rate = _f(alloc.cost_rate)
                 basis = "Recorded FIFO GRN allocation cost"
                 actual = rate > 0
-                if rate <= 0 and grn_item is not None and grn is not None and _active(grn_item) and _active(grn) and _f(grn_item.price_at_time) > 0:
-                    rate = _f(grn_item.price_at_time)
+                if rate <= 0 and grn_item is not None and grn is not None and _active(grn_item) and _active(grn) and _f(lot_cost_rate(grn_item)) > 0:
+                    rate = _f(lot_cost_rate(grn_item))
                     basis = "Recorded GRN item cost linked to allocation"
                     actual = True
                 if rate <= 0 and frozen > 0:
@@ -910,7 +912,7 @@ class _Projection:
                     if grn_item is not None and grn is not None:
                         sources.append({
                             "type": "GRNAllocation", "id": alloc.id,
-                            "grn_item_id": alloc.grn_item_id, "lot_rate": _f(grn_item.price_at_time),
+                            "grn_item_id": alloc.grn_item_id, "lot_rate": _f(lot_cost_rate(grn_item)),
                             "grn_id": grn.id, "reference": _grn_ref(grn),
                             "supplier": grn.supplier or "", "date": _as_dt(grn.date_posted),
                             "qty": take, "rate": rate, "amount": take * rate,
@@ -1337,7 +1339,7 @@ class _Projection:
             rate = _f(alloc.cost_rate)
             basis = "Recorded FIFO GRN allocation cost"
             if rate <= 0 and grn_item is not None and _active(grn_item) and grn_obj is not None and _active(grn_obj):
-                rate = _f(grn_item.price_at_time)
+                rate = _f(lot_cost_rate(grn_item))
                 basis = "Recorded GRN item cost linked to allocation"
             if rate <= 0 and frozen > 0:
                 rate = frozen
@@ -1371,8 +1373,8 @@ class _Projection:
             elif getattr(item, "grn_item_id", None):
                 grn_item = self.grn_item_by_id.get(item.grn_item_id)
                 grn_obj = self.grn_by_id.get(grn_item.grn_id) if grn_item else None
-                if grn_item is not None and grn_obj is not None and _active(grn_item) and _active(grn_obj) and _f(grn_item.price_at_time) > 0:
-                    rate = _f(grn_item.price_at_time)
+                if grn_item is not None and grn_obj is not None and _active(grn_item) and _active(grn_obj) and _f(lot_cost_rate(grn_item)) > 0:
+                    rate = _f(lot_cost_rate(grn_item))
                     known_cost += residual * rate
                     bases.append("Recorded GRN cost linked to sale line")
                     sources.append({
@@ -2095,6 +2097,10 @@ class _Projection:
             if not _active(tx) or _f(tx.amount) <= 0:
                 continue
             tx_type = (tx.transaction_type or "").strip()
+            # A GRN payment settles a payable; it is never an operating
+            # expense.  EXPENSE charges are accrued once below, at receipt.
+            if tx_type == "GRN Payment":
+                continue
             amount = _f(tx.amount)
             flow = cash_flow_by_tx.get(tx.id)
             description = tx.description or tx_type
@@ -2166,6 +2172,32 @@ class _Projection:
                 source_type="FbmCashDrawerEntry", source_id=drawer.id, material="Expense",
                 expense=_f(drawer.amount), note=drawer.note or "",
                 cost_basis="Standalone manual cash-drawer expense",
+            ))
+
+        # GRN charges flagged EXPENSE are recognised ONCE, at receipt, even
+        # when they are still unpaid.  INVENTORY charges are never expensed
+        # (they live in the landed FIFO lot cost instead), and GRN Payment
+        # transactions above are skipped, so nothing is double counted.
+        for charge in GRNCharge.query.order_by(GRNCharge.id.asc()).all():
+            if not _active(charge) or _f(charge.amount) <= 0:
+                continue
+            if (charge.cost_treatment or "INVENTORY").upper() != "EXPENSE":
+                continue
+            grn = self.grn_by_id.get(charge.grn_id)
+            if grn is None or not _active(grn):
+                continue
+            self.rows.append(_base_row(
+                date=_as_dt(grn.date_posted),
+                source="GRNCharge", source_label="GRN Separate Expense",
+                transaction_type="Purchase Charge Expense", entry_type="expense",
+                category=(charge.charge_type or "GRN Expense"),
+                subcategory=(charge.label or ""),
+                reference=f"GRNCH-{charge.id}",
+                document_type="GRNCharge", document_id=charge.id,
+                source_type="GRNCharge", source_id=charge.id,
+                material="Expense", expense=_f(charge.amount),
+                note=(f"GRN #{charge.grn_id} · {charge.recipient_name or ''}").strip(),
+                cost_basis="Separately expensed purchase charge; excluded from inventory valuation",
             ))
 
         represented_payment_ids = set()
@@ -2842,7 +2874,7 @@ def build_profit_loss_report(
             "Hard-deleted source documents cannot be reconstructed from ordinary report rows; only explicit allocation repair archives and audit records are used as evidence.",
             "Standalone imported dispatches without a reliable client/material/open-booking match are warnings only; revenue and cost are never invented.",
             "Unlinked legacy AccountTransaction Payment rows (except identifiable loans/transfers/settlements) are treated as explicit other expenses; review their stored descriptions.",
-            "GRN loading, freight, tax and other landed-cost fields are not allocated into the existing FIFO unit-cost records, so they are not silently expensed or added to COGS here.",
+            "GRN material-related charges marked INVENTORY are allocated to each FIFO lot as landed unit cost; EXPENSE charges are recognised once as operating expenses and are never added to inventory or COGS.",
             "Customer receipts, supplier payments, driver payments and purchases are position/settlement information, not new P&L events.",
             "Current stock quantities have no authoritative moving-average valuation; stock value is therefore not presented as a profit figure.",
         ],

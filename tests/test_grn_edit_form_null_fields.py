@@ -22,15 +22,18 @@ from tests.test_grn_datetime_override import seed_supplier_material
 LOGIN = {"username": "Admin", "password": "Admin@fbm12345"}
 
 # Optional GRN columns that the edit form renders into a value attribute.
+# Owner rule A1 (approved 2026-11-02): a GRN NEVER pays, so the old
+# payment/bank fields (payment_type, paid_amount, payment_account_id,
+# bank_name, account_name, account_no) are no longer on the GRN form.
+# Payments are recorded only from Accounts -> PAY EXISTING GRN.
 GUARDED_FIELDS = (
     "supplier",
-    "bank_name",
-    "account_name",
-    "account_no",
     "supplier_invoice_no",
     "manual_bill_no",
     "bill_date",
     "due_date",
+    "adjustment_amount",
+    "discount",
 )
 
 

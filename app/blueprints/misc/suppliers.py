@@ -360,3 +360,57 @@ def restore_supplier_payment(id):
         logging.exception('Supplier payment restore failed')
         flash('Unable to restore supplier payment: the payment could not be restored. Please try again.', 'danger')
     return redirect(url_for('accounts.supplier_payments', show='all'))
+
+
+@bp.route('/party_ledger/<int:id>')
+@login_required
+def party_ledger(id):
+    """Transporter / loading / other recipient ledger.
+
+    Reuses the supplier/client ledger template and the same read-only
+    projection contract.  Only that party's GRN charges and Accounts payments
+    appear here; nothing is mixed into a supplier ledger (owner rule A2).
+    """
+    from app.services.financial_ledgers import (
+        build_party_financial_ledger, ledger_page_closing,
+    )
+    party = CashFlowParty.query.get_or_404(id)
+    filters = {
+        'start_date': (request.args.get('start_date') or '').strip(),
+        'end_date': (request.args.get('end_date') or '').strip(),
+        'type_filter': (request.args.get('type') or '').strip(),
+        'query': (request.args.get('q') or '').strip(),
+        'amount_min': '', 'amount_max': '', 'account_filter': '', 'status_filter': '',
+    }
+    ledger = build_party_financial_ledger(party, **filters)
+    selected = ledger['filtered_rows']
+    page = max(request.args.get('page', 1, type=int) or 1, 1)
+    per_page = min(max(request.args.get('per_page', 25, type=int) or 25, 10), 100)
+    total = len(selected)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    page_rows = selected[(page - 1) * per_page: page * per_page]
+    closing = ledger_page_closing(ledger, filters)
+    parties = CashFlowParty.query.order_by(CashFlowParty.name.asc()).all()
+    return render_template(
+        'financial_ledger.html',
+        entity=party,
+        entity_type='party',
+        ledger=ledger,
+        rows=page_rows,
+        all_rows=ledger['rows'],
+        obligations=[],
+        filters=filters,
+        page=page,
+        per_page=per_page,
+        total=total,
+        total_pages=total_pages,
+        ledger_closing=closing['final'],
+        filtered_closing=closing['filtered'],
+        filters_active=closing['filters_active'],
+        selector_entities=parties,
+        current_payable=max(0.0, closing['final']),
+        back_url=url_for('accounts.grn_payments'),
+        opening_url=None,
+        today_date=pk_today().strftime('%Y-%m-%d'),
+    )

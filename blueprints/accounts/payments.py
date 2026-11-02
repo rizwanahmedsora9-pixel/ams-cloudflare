@@ -398,7 +398,32 @@ def expenditures():
         all_methods.add(r[0].capitalize())
     methods = sorted(list(all_methods))
 
+    # GRN charges flagged EXPENSE are accrued purchase expenses (they may be
+    # unpaid).  They are shown separately from cash-based expenditure totals
+    # so nothing is double counted.
+    from models import GRNCharge, GRN
+    accrued = []
+    for charge in GRNCharge.query.filter(GRNCharge.cost_treatment == 'EXPENSE',
+                                         GRNCharge.is_void == False).all():
+        grn = db.session.get(GRN, charge.grn_id)
+        if grn is None or bool(getattr(grn, 'is_void', False)):
+            continue
+        posted = getattr(grn, 'date_posted', None)
+        if date_from and posted and posted < date_from:
+            continue
+        if posted and posted >= date_to_excl:
+            continue
+        accrued.append({
+            'date_posted': posted,
+            'category': charge.charge_type or 'GRN Charge',
+            'amount': float(getattr(charge, 'amount', 0) or 0),
+            'note': f"GRN #{charge.grn_id} · {getattr(charge, 'recipient_name', '') or ''}",
+        })
+    accrued.sort(key=lambda x: x['date_posted'] or date_from, reverse=True)
+
     return render_template('accounts/expenditures.html', expenditures=pagination_wrapper,
+                           accrued_purchase_expenses=accrued,
+                           accrued_total=sum(a['amount'] for a in accrued),
                            date_from=date_from, date_to=date_to_excl - timedelta(days=1),
                            search=search, category_f=category_f, method_f=method_f,
                            categories=categories, methods=methods,
@@ -431,8 +456,8 @@ def receipts():
     # every received material line, so an ordinary purchase of 100 bags showed
     # "Total Rs. 0.00" while its paid amount was 50,000.  Use the same
     # authoritative total as the GRN page, ledger and printed bill.
-    from app.services.grn_svc import calculate_grn_total
-    grn_totals = {grn.id: calculate_grn_total(grn) for grn in grns}
+    from app.services.grn_costing import grn_breakdown
+    grn_totals = {grn.id: grn_breakdown(grn)['landed_cost_total'] for grn in grns}
 
     return render_template('accounts/receipts.html', sales=sales, grns=grns,
                            grn_totals=grn_totals,

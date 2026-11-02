@@ -510,12 +510,21 @@
                                     <select class="form-select" name="pay_target" id="pay_target">
                                         <option value="company_transfer">Company Account Transfer</option>
                                         <option value="supplier">Supplier Payment</option>
+                                        <option value="grn_payment">PAY EXISTING GRN / GRN PAYMENT</option>
                                         <option value="driver">Driver Service Payment</option>
                                         <option value="client_refund">Client Refund</option>
                                         <option value="loan">Loan Payment</option>
                                         <option value="personal_expense">Personal Expense</option>
                                         <option value="other_expense">Other Expense</option>
                                     </select>
+                                    <div class="col-md-12 mt-2" id="grnPaymentWrap">
+                                        <label class="form-label">GRN to pay</label>
+                                        <select class="form-select" name="grn_payment_grn_id">
+                                            <option value="">— Open the GRN Payments page —</option>
+                                            {% for g in grn_payment_options or [] %}<option value="{{ g.id }}">{{ g.label }}</option>{% endfor %}
+                                        </select>
+                                        <div class="form-text">This opens the dedicated GRN payment wizard; no money is posted from this modal for GRNs.</div>
+                                    </div>
                                 </div>
 
                                 <div class="col-md-6" id="payToAccountWrap">

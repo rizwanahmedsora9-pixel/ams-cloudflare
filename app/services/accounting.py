@@ -271,6 +271,90 @@ def _sync_linked_supplier_payment_tx(kind, src_id, from_account_id, amount, date
         primary.date_posted = date_posted
 
 
+def _sync_linked_grn_payment_tx(payment):
+    """Keep exactly ONE money-out row for a GRN payment.
+
+    Owner rule A1: the only cash movement a GRN ever causes is a payment
+    posted from Accounts.  This mirrors ``_sync_linked_supplier_payment_tx``
+    (void-and-recreate convergence), but carries the GRN id and the actual
+    recipient so Cash Flow and party ledgers can attribute it correctly.
+    """
+    if not payment:
+        return
+    marker = _src_marker('GRN_PAYMENT', payment.id)
+    existing = AccountTransaction.query.filter(
+        AccountTransaction.transaction_type == 'GRN Payment',
+        or_(AccountTransaction.note.ilike(f"%{marker}%"),
+            and_(AccountTransaction.source_type == 'GRN_PAYMENT',
+                 AccountTransaction.source_id == payment.id))
+    ).order_by(AccountTransaction.id.desc()).all()
+
+    primary = existing[0] if existing else None
+    for extra in existing[1:]:
+        _void_account_tx(extra)
+
+    amount = float(getattr(payment, 'amount', 0) or 0)
+    desired_ok = (not bool(getattr(payment, 'is_void', False))) and bool(getattr(payment, 'payment_account_id', None)) and amount > 0
+    if not desired_ok:
+        if primary:
+            _void_account_tx(primary)
+        return
+
+    if primary and (not primary.is_void) and (
+        primary.from_account_id != getattr(payment, 'payment_account_id', None)
+        or _tx_minor(primary) != to_minor(amount)
+    ):
+        _void_account_tx(primary)
+        primary = None
+    if primary and primary.is_void:
+        primary = None
+
+    recipient = (getattr(payment, 'recipient_name', None) or
+                 (getattr(payment, 'recipient_type', None) or 'Party')).strip()
+    grn_ref = getattr(payment, 'grn_id', None)
+    desc = f"GRN payment to {recipient} (GRN #{grn_ref})"
+    note = " ".join(x for x in [
+        (getattr(payment, 'note', '') or '').strip(),
+        f"Method: {getattr(payment, 'method', '') or ''}".strip(),
+        f"Recipient: {recipient}",
+        marker,
+    ] if x and not x.endswith(': ')).strip()
+
+    if not primary:
+        tx = AccountTransaction(
+            from_account_id=getattr(payment, 'payment_account_id', None),
+            to_account_id=None,
+            amount=float(from_minor(to_minor(amount))),
+            amount_minor=to_minor(amount),
+            description=desc,
+            note=note,
+            transaction_type='GRN Payment',
+            source_type='GRN_PAYMENT',
+            source_id=payment.id,
+            grn_id=getattr(payment, 'grn_id', None),
+            party_type=(getattr(payment, 'recipient_type', None) or 'OTHER'),
+            party_id=getattr(payment, 'recipient_party_id', None),
+            party_name=recipient,
+            date_posted=getattr(payment, 'date_posted', None) or pk_now(),
+            created_by=getattr(payment, 'created_by', None),
+        )
+        db.session.add(tx)
+        db.session.flush()
+        _apply_account_tx_effect(tx)
+        return
+
+    primary.source_type = 'GRN_PAYMENT'
+    primary.source_id = payment.id
+    primary.description = desc
+    primary.note = note
+    primary.grn_id = getattr(payment, 'grn_id', None)
+    primary.party_type = (getattr(payment, 'recipient_type', None) or 'OTHER')
+    primary.party_id = getattr(payment, 'recipient_party_id', None)
+    primary.party_name = recipient
+    if getattr(payment, 'date_posted', None):
+        primary.date_posted = payment.date_posted
+
+
 def _sync_linked_client_refund_tx(src_id, from_account_id, amount, date_posted, description, note, is_void):
     """Synchronise the cash/bank outflow for a negative client Payment row."""
     canonical = _src_marker('Payment', src_id)

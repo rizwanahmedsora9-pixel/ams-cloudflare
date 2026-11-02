@@ -90,16 +90,15 @@ _DB_HEALTH_DROP_MIN = C._DB_HEALTH_DROP_MIN
 _DB_HEALTH_MIN_BYTES = C._DB_HEALTH_MIN_BYTES
 
 def calculate_grn_total(grn):
-    item_total = sum(
-        (item.qty or 0) * (item.price_at_time or 0)
-        for item in (grn.items or [])
-        if not bool(getattr(item, 'is_void', False))
-    )
-    expenses = (grn.loading_cost or 0) + (grn.freight_cost or 0) + (grn.other_expense or 0)
-    tax = (grn.tax_amount or 0)
-    discount = (grn.discount or 0)
-    adjustment = (grn.adjustment_amount or 0)
-    return item_total + expenses + tax - discount + adjustment
+    """Compatibility wrapper — the authoritative implementation now lives in
+    :mod:`app.services.grn_costing` (single arithmetic source).
+
+    LANDED GRNs return the landed cost; LEGACY GRNs keep the historical
+    formula so old prints/reports never change.  This is a *document total*;
+    it must never be used as a supplier payable (owner rule A2).
+    """
+    from app.services.grn_costing import calculate_grn_total as _authoritative
+    return _authoritative(grn)
 
 
 def _grn_bill_ref(grn):
@@ -135,6 +134,11 @@ def _find_grn_auto_supplier_payment(grn):
 
 def _sync_grn_auto_supplier_payment(grn, old_supplier_id=None):
     if not grn:
+        return
+    # Owner rule A1: a LANDED GRN never pays anybody.  Only pre-existing
+    # LEGACY GRNs keep their historical auto-payment row in sync when edited
+    # (so old data stays valid without creating new payments at GRN entry).
+    if (getattr(grn, 'costing_mode', 'LEGACY') or 'LEGACY').upper() == 'LANDED':
         return
     # If supplier changed, void old supplier's auto row (if any).
     if old_supplier_id and old_supplier_id != getattr(grn, 'supplier_id', None):

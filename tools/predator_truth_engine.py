@@ -97,16 +97,21 @@ RECEIVABLES / PAYABLES (client)
     independent forecast to avoid double counting (the same rule the app
     documents); untraceable (manual) rows are included as debits.
 
-SUPPLIERS / PAYABLES
-  * GRN total (independent):
+SUPPLIERS / PAYABLES  (owner rule A2, approved 2026-11-02)
+  * GRN supplier credit (independent):
       item_total = SUM(grn_item.qty * price_at_time, is_void=0)
-      total      = item_total + loading + freight + other_expense
-                   + tax_amount - discount + adjustment_amount
-  * supplier_payable = SUM(GRN totals, is_void=0)
-                     - SUM(SupplierPayment.amount, is_void=0, amount>0)
-  * supplier_payments include auto-generated GRN payments (one per GRN when
-    paid_amount>0); a GRN with paid_amount>0 must have exactly one linked
-    active SupplierPayment, otherwise a duplicate/ghost payment is flagged.
+      supplier_credit = item_total ONLY  (no freight/loading/other/tax/
+                        discount/adjustment)
+  * landed_cost = item_total + SUM(grn_charge.amount, is_void=0,
+                  cost_treatment='INVENTORY', declared_status<>'NOT_APPLICABLE')
+  * supplier_payable = SUM(GRN supplier credits, is_void=0)
+                     - SUM(SupplierPayment.amount, is_void=0, amount>0,
+                           recipient_type in (NULL,'SUPPLIER'),
+                           payment_kind <> 'GRN_CHARGE')
+  * GRN payments to transporters/labour/other recipients (A1: all payments
+    come from Accounts) are excluded from supplier payables by
+    recipient_type / payment_kind, not by supplier_id (which is a context FK).
+  * legacy GRN paid_amount auto-payments still map 1:1 to a SupplierPayment.
 
 INTEGRITY
   * Foreign-key orphans: every row of every FK-bearing table (grn.supplier_id,
@@ -819,23 +824,22 @@ def suppliers_section(con) -> dict:
             """
             SELECT g.id, g.supplier_id, g.is_void,
                    COALESCE((SELECT SUM(gi.qty*gi.price_at_time) FROM grn_item gi
-                             WHERE gi.grn_id=g.id AND gi.is_void=0),0) AS item_total,
-                   COALESCE(g.loading_cost,0)+COALESCE(g.freight_cost,0)
-                     +COALESCE(g.other_expense,0)+COALESCE(g.tax_amount,0)
-                     -COALESCE(g.discount,0)+COALESCE(g.adjustment_amount,0) AS extras
+                             WHERE gi.grn_id=g.id AND gi.is_void=0),0) AS item_total
             FROM grn g
             """
         ):
             if r["is_void"]:
                 continue
-            grn_totals[r["supplier_id"] or 0] += (
-                float(r["item_total"] or 0) + float(r["extras"] or 0)
-            )
+            # A2: exactly material qty x rate, nothing else.
+            grn_totals[r["supplier_id"] or 0] += float(r["item_total"] or 0)
 
     payments = defaultdict(float)
     if "supplier_payment" in t:
         for r in con.execute(
-            "SELECT supplier_id, amount, is_void FROM supplier_payment WHERE is_void=0 AND amount>0"
+            "SELECT supplier_id, amount, is_void FROM supplier_payment "
+            "WHERE is_void=0 AND amount>0 "
+            "AND COALESCE(LOWER(TRIM(recipient_type)),'supplier') IN ('','supplier') "
+            "AND COALESCE(LOWER(TRIM(payment_kind)),'') <> 'grn_charge'"
         ):
             payments[r["supplier_id"] or 0] += float(r["amount"] or 0)
 

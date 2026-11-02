@@ -103,7 +103,7 @@ def lot_count(details_row):
 def test_collapsed_row_is_one_line_and_has_an_expand_button(grn_screen):
     _app, html, data = grn_screen
     headers = header_cells(html)
-    assert len(headers) == 9, headers
+    assert len(headers) == 12, headers  # + Actual Cost / Cash Paid / Payment Status
     assert not any("overall consumption" in name.lower() for name in headers), headers
 
     pairs = row_pairs(html)
@@ -124,7 +124,7 @@ def test_collapsed_row_is_one_line_and_has_an_expand_button(grn_screen):
         target = re.search(r'aria-controls="([^"]+)"', main).group(1)
         assert 'data-grn-expand="%s"' % target in main
         assert 'id="%s" hidden' % target in details
-        assert 'colspan="9"' in details
+        assert 'colspan="12"' in details
 
         # Everything about every lot waits inside the details row.
         lots = lot_count(details)

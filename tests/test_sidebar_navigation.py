@@ -161,6 +161,7 @@ def test_admin_sidebar_categories_and_item_grouping(client):
         "Cash Flow",
         "Daily Reconciliation",
         "Pay Supplier",
+        "PAY EXISTING GRN",
         "Profit Reports",
     ]
     assert by_label["Ledger"] == [

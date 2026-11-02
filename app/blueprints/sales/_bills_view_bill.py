@@ -300,10 +300,12 @@ def view_bill(bill_no):
         tx_code, tx_label, tx_note = _resolve_transaction_type('Invoice', invoice, entry_hint_id=entry_hint_id)
         return render_template('view_bill.html', bill=invoice, type='Invoice', items=items, client=client, client_balance=client_balance, previous_balance=previous_balance, recent_deliveries=recent_deliveries, material_ledger_recent=material_ledger_recent, material_stock_summary=material_stock_summary, clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, delivery_people=delivery_people, pk_now=pk_now)
     if grn:
-        grn.amount = calculate_grn_total(grn) + (grn.discount or 0)
+        from app.services.grn_costing import grn_breakdown
+        grn_bd = grn_breakdown(grn)
+        grn.amount = grn_bd['landed_cost_total']
         grn.paid_amount = grn.paid_amount or 0
         tx_code, tx_label, tx_note = _resolve_transaction_type('GRN', grn, entry_hint_id=entry_hint_id)
-        return render_template('view_bill.html', bill=grn, type='GRN', items=grn.items, client=None, client_balance=0, previous_balance=0, recent_deliveries=[], material_ledger_recent=[], material_stock_summary=[], clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, pk_now=pk_now)
+        return render_template('view_bill.html', bill=grn, type='GRN', grn_bd=grn_bd, items=grn.items, client=None, client_balance=0, previous_balance=0, recent_deliveries=[], material_ledger_recent=[], material_stock_summary=[], clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, pk_now=pk_now)
     if pending:
         pending_bill_view = SimpleNamespace(
             manual_bill_no=pending.bill_no,

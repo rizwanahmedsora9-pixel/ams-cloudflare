@@ -55,3 +55,23 @@ start** (which includes every deployment reload), by
 
 The next schema change should ship as `0002_*.sql` here instead of a new
 helper function.
+
+- `0003_grn_landed_cost_and_payments.sql` — GRN receiving / landed cost /
+  purchase payments redesign (approved 2026-11-02).  Creates `grn_charge`
+  (self-contained for the release-deploy runner), adds indexes, and backfills
+  pre-existing rows non-destructively:
+
+  * every existing GRN becomes `costing_mode='LEGACY'`; its FIFO lot cost stays
+    at `price_at_time`, so historical P&L never changes;
+  * existing `loading_cost` / `freight_cost` / `other_expense` become
+    `UNTRACKED_LEGACY` charge obligations owned by an unassigned recipient,
+    never by the supplier (owner rule A2);
+  * existing payments are classified as `SUPPLIER` / `LEGACY_GRN_AUTO` /
+    `STANDALONE`, and their `grn_id` / `cash_posted` / account-transaction
+    attribution is backfilled where resolvable.
+
+  New ORM columns are added automatically by `schema._ensure_model_columns()`.
+  No table rebuild, no destructive DDL, and no historical money row is
+  rewritten.  `0004_*.sql` is the next file name.
+
+The next schema change should ship as `0004_*.sql`.

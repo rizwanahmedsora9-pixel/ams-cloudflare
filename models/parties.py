@@ -71,8 +71,24 @@ class SupplierPayment(db.Model):
     created_at = db.Column(db.DateTime, default=pk_model_now, index=True)
     updated_at = db.Column(db.DateTime, default=pk_model_now, onupdate=pk_model_now, index=True)
 
+    # --- GRN payment linkage (additive; the ONE payment table) -------------
+    # A payment targets exactly ONE obligation: either (grn_id, SUPPLIER) for
+    # the supplier's material amount, or (grn_id, grn_charge_id) for one charge.
+    # supplier_id stays NOT NULL as the GRN's *context* supplier; recipient_type
+    # is the sole authority for which party ledger this payment belongs to.
+    grn_id = db.Column(db.Integer, db.ForeignKey('grn.id'), nullable=True, index=True)
+    grn_charge_id = db.Column(db.Integer, db.ForeignKey('grn_charge.id'), nullable=True, index=True)
+    recipient_type = db.Column(db.String(30), nullable=True, index=True)  # SUPPLIER|TRANSPORTER|LABOUR|OTHER ; NULL/legacy => SUPPLIER
+    recipient_party_id = db.Column(db.Integer, db.ForeignKey('cash_flow_party.id'), nullable=True, index=True)
+    recipient_name = db.Column(db.String(160), index=True)
+    payment_kind = db.Column(db.String(30), nullable=True, index=True)  # GRN_MATERIAL|GRN_CHARGE|STANDALONE|ADVANCE|LEGACY_GRN_AUTO
+    cash_posted = db.Column(db.Boolean, default=False, index=True)
+    reference = db.Column(db.String(80), index=True)
+
     supplier = db.relationship('Supplier', backref='payments')
     payment_account = db.relationship('Account', foreign_keys=[payment_account_id], backref='supplier_payments')
+    grn_charge = db.relationship('GRNCharge', foreign_keys=[grn_charge_id])
+    recipient_party = db.relationship('CashFlowParty', foreign_keys=[recipient_party_id])
     __mapper_args__ = {'version_id_col': revision}
 
 

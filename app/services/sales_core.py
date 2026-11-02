@@ -56,6 +56,7 @@ from app.services.time_money import (
     _norm_text,
     pk_now,
 )
+from app.services.grn_costing import lot_cost_rate
 
 
 # Rebind constants used as bare names
@@ -120,7 +121,7 @@ def _cost_rate_for_material(mat_name, tx_dt=None):
             for item, grn in grn_query:
                 posted_dt = grn.date_posted
                 if tx_dt and posted_dt and posted_dt.date() <= tx_dt:
-                    rate = float(item.price_at_time or 0)
+                    rate = lot_cost_rate(item)
                     if rate > 0:
                         return rate, True
             # Nothing was purchased on/before the delivery date.  FIFO values
@@ -134,7 +135,7 @@ def _cost_rate_for_material(mat_name, tx_dt=None):
             ]
             forward.sort(key=lambda pair: (pair[1].date_posted or datetime.min, pair[1].id))
             for item, grn in forward:
-                rate = float(item.price_at_time or 0)
+                rate = lot_cost_rate(item)
                 if rate > 0:
                     return rate, True
     except Exception:
@@ -169,7 +170,7 @@ def _cost_rate_for_grn_item(grn_item_id):
     try:
         grn_item = GRNItem.query.get(grn_item_id)
         if grn_item and not bool(getattr(grn_item, 'is_void', False)) and grn_item.grn and not grn_item.grn.is_void:
-            rate = float(grn_item.price_at_time or 0)
+            rate = lot_cost_rate(grn_item)
             if rate > 0:
                 return rate, True
     except Exception:
@@ -264,7 +265,7 @@ def _grn_fifo_lots_for_material(mat_name, as_of_dt=None, exclude_sale_id=None, r
         available = max(0.0, float(item.qty or 0) - already)
         if available <= 0:
             continue
-        open_lots.append((item, available, float(item.price_at_time or 0)))
+        open_lots.append((item, available, lot_cost_rate(item)))
     return open_lots
 
 

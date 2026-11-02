@@ -454,7 +454,7 @@ def _wipe_dataset_preview_map():
         'notifications': {'label': 'Notifications Data', 'tables': ['follow_up_contact', 'follow_up_reminder', 'staff_email'], 'queries': [('follow_up_contact', q(FollowUpContact)), ('follow_up_reminder', q(FollowUpReminder)), ('staff_email', q(StaffEmail))]},
         'dispatching': {'label': 'Dispatch (OUT)', 'tables': ['entry', 'delivery_item', 'delivery'], 'queries': [('entry OUT', lambda: Entry.query.filter_by(type='OUT')), ('delivery_item', q(DeliveryItem)), ('delivery', q(Delivery))]},
         'receiving': {'label': 'Receive (IN)', 'tables': ['entry'], 'queries': [('entry IN', lambda: Entry.query.filter_by(type='IN'))]},
-        'grn': {'label': 'GRN', 'tables': ['grn_item', 'grn'], 'queries': [('grn_item', q(GRNItem)), ('grn', q(GRN))]},
+        'grn': {'label': 'GRN', 'tables': ['grn_item', 'grn_charge', 'grn'], 'queries': [('grn_item', q(GRNItem)), ('grn_charge', q(GRNCharge)), ('grn', q(GRN))]},
         'materials': {'label': 'Materials', 'tables': ['material'], 'queries': [('material', q(Material))]},
         'material_categories': {'label': 'Material Categories', 'tables': ['material_category'], 'queries': [('material_category', q(MaterialCategory))]},
         'services': {'label': 'Rent & Service Charges', 'tables': ['service'], 'queries': [('service', q(Service))]},

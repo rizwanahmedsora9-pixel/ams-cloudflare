@@ -650,6 +650,14 @@ def hard_delete_transaction(kind, obj_id):
             return False
         if _grn_has_locked_lots(grn):
             raise ValueError('Cannot delete GRN: one or more lots are locked by cash/credit sales. Delete those sales first.')
+        # Owner requirement 10: never purge a GRN that has Accounts payments.
+        from app.services.grn_cancel import grn_linked_payments
+        linked = grn_linked_payments(grn)
+        if linked:
+            raise ValueError(
+                f'GRN #{grn.id} has {len(linked)} payment(s) recorded in Accounts. '
+                'Cancel (soft void) the GRN instead of purging its history.'
+            )
         auto_pay = _find_grn_auto_supplier_payment(grn)
         _set_grn_void_state(grn, True)
         # Remove what the void step only flagged: the IN stock entries, the GRN
@@ -659,6 +667,8 @@ def hard_delete_transaction(kind, obj_id):
             Entry.auto_bill_no == grn.auto_bill_no,
             Entry.type == 'IN'
         ).delete(synchronize_session=False)
+        GRNCharge.query.filter(GRNCharge.grn_id == grn.id).delete(
+            synchronize_session=False)
         grn_item_ids = [r[0] for r in db.session.query(GRNItem.id).filter(
             GRNItem.grn_id == grn.id).all()]
         if grn_item_ids:
@@ -739,6 +749,9 @@ def hard_delete_supplier(supplier_id_or_obj, *, actor=None):
             Entry.auto_bill_no == g.auto_bill_no,
             Entry.type == 'IN'
         ).delete(synchronize_session=False)
+
+        # Charge obligations belong to the GRN too; never leave orphans.
+        GRNCharge.query.filter(GRNCharge.grn_id == g.id).delete(synchronize_session=False)
 
         # Remove allocations and line items
         grn_item_ids = [r[0] for r in db.session.query(GRNItem.id).filter(GRNItem.grn_id == g.id).all()]

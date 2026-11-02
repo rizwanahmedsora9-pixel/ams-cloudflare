@@ -109,6 +109,11 @@ class AccountTransaction(db.Model):
     voided_by = db.Column(db.String(80))
     voided_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=pk_model_now, index=True)
+    # --- GRN / recipient attribution for Cash Flow (additive) --------------
+    grn_id = db.Column(db.Integer, db.ForeignKey('grn.id'), nullable=True, index=True)
+    party_type = db.Column(db.String(30), index=True)
+    party_id = db.Column(db.Integer, index=True)
+    party_name = db.Column(db.String(160), index=True)
 
     from_account = db.relationship('Account', foreign_keys=[from_account_id], backref='outgoing_transactions')
     to_account = db.relationship('Account', foreign_keys=[to_account_id], backref='incoming_transactions')
@@ -182,7 +187,7 @@ class CashFlowSubcategory(db.Model):
 
 
 class CashFlowParty(db.Model):
-    """Reusable party names for manual cash-flow rows."""
+    """Reusable party names for manual cash-flow rows and GRN charge recipients."""
     __tablename__ = 'cash_flow_party'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(160), nullable=False, index=True)
@@ -192,6 +197,12 @@ class CashFlowParty(db.Model):
     is_active = db.Column(db.Boolean, default=True, index=True)
     created_at = db.Column(db.DateTime, default=pk_model_now)
     updated_at = db.Column(db.DateTime, default=pk_model_now, onupdate=pk_model_now)
+    # --- Recipient master for GRN charges (additive) -----------------------
+    party_role = db.Column(db.String(30), default='other', index=True)  # transporter|loading_labour|other
+    is_payee_active = db.Column(db.Boolean, default=True, index=True)
+    opening_balance = db.Column(db.Float, default=0)
+    opening_balance_date = db.Column(db.DateTime, nullable=True)
+    created_by = db.Column(db.String(80))
 
 
 class CashFlowEntry(db.Model):

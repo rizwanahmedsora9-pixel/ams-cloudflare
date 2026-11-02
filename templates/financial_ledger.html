@@ -42,6 +42,7 @@
 {% set is_client = entity_type == 'client' %}
 {% set is_supplier = entity_type == 'supplier' %}
 {% set is_driver = entity_type == 'delivery_person' %}
+{% set is_party = entity_type == 'party' %}
 {% set title = 'Client Ledger' if is_client else ('Supplier Ledger' if is_supplier else 'Delivery Person Ledger') %}
 {% set entity_name = entity.name or '' %}
 
@@ -104,6 +105,8 @@
       <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Client account</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" value="{{ entity.code or entity.name }}" readonly><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.code }}">{{ item.name }}</option>{% endfor %}</datalist></div>
       {% elif is_supplier %}
       <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Supplier</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" name="supplier_search" value="{{ entity.name }}" placeholder="Supplier name/code…"><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}</datalist></div>
+      {% elif is_party %}
+      <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Party / Recipient</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" name="party_search" value="{{ entity.name }}" placeholder="Transporter / labour / other…"><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}</datalist></div>
       {% else %}
       <div class="col-12 col-lg-3"><label class="form-label text-white-50 small fw-bold">Delivery person</label><input class="form-control bg-dark text-white border-secondary" list="ledgerEntityOptions" name="driver_search" value="{{ entity.name }}" placeholder="Delivery person…"><datalist id="ledgerEntityOptions">{% for item in selector_entities %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}</datalist></div>
       {% endif %}

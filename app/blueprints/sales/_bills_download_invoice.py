@@ -23,6 +23,7 @@ def download_invoice(bill_no):
         return redirect(url_for('view_bill', bill_no=bill_no))
 
     bill_obj = None
+    grn_bd = None
     bill_type = ''
     items = []
 
@@ -273,7 +274,9 @@ def download_invoice(bill_no):
     elif grn:
         bill_obj = grn
         bill_type = 'GRN'
-        grn.amount = calculate_grn_total(grn) + (grn.discount or 0)
+        from app.services.grn_costing import grn_breakdown
+        grn_bd = grn_breakdown(grn)
+        grn.amount = grn_bd['landed_cost_total']
         grn.paid_amount = grn.paid_amount or 0
         items = grn.items
     elif pending:
@@ -319,6 +322,7 @@ def download_invoice(bill_no):
         template_name,
         bill=bill_obj,
         type=bill_type,
+        grn_bd=grn_bd,
         items=items,
         client=client,
         client_balance=client_balance,

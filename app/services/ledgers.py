@@ -643,7 +643,9 @@ def _build_supplier_ledger_rows(supplier):
             'note': (getattr(supplier, 'opening_balance_note', None) or getattr(supplier, 'note', None) or '').strip()
         })
     for g in grns:
-        total = calculate_grn_total(g)
+        # A2: Supplier Ledger credit = material qty x rate ONLY.
+        from app.services.grn_costing import supplier_material_minor
+        total = int(supplier_material_minor(g)) / 100.0
         item_lines = []
         for gi in [i for i in (g.items or []) if not bool(getattr(i, 'is_void', False))]:
             qty_val = float(gi.qty or 0)

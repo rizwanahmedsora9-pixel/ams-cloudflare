@@ -182,6 +182,12 @@ PERMISSION_LEGACY_FALLBACKS = {
 ENDPOINT_PERMISSION_MAP = {
     'index': 'can_view_dashboard',
     'grn': 'can_manage_grn',
+    'accounts.grn_payments': 'can_manage_payments',
+    'accounts.grn_payment_save': 'can_manage_payments',
+    'accounts.grn_payment_void': 'can_manage_payments',
+    'accounts.grn_payment_restore': 'can_manage_payments',
+    'accounts.grn_obligations_api': 'can_view_cash_flow',
+    'accounts.purchase_payables': 'can_view_cash_flow',
     'edit_grn': 'can_manage_grn',
     'export_grn': 'can_manage_grn',
     'bookings_page': 'can_manage_bookings',
@@ -433,6 +439,7 @@ AUTO_BILL_NAMESPACES = {
     'DIRECT_SALE': 'SL',
     'MATERIAL_RETURN': 'RTN',
     'GRN': 'GRN',
+    'GRN_PAYMENT': 'GP',
     'ENTRY': 'EN',
 }
 
