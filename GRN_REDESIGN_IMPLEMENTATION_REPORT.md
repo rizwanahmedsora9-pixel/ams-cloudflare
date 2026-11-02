@@ -137,10 +137,63 @@ All major pages were smoke-tested (HTTP 200): `/grn`, `/edit_grn/<id>`, `/accoun
 
 ---
 
+## 6b. Follow-up fix — the charge grid no longer pre-adds rows (2026-11-02)
+
+**Owner report:** *"it already shows 4 lines of these expenses … we solely made by ourself by click on add charge button so it doesn't auto add these until we do it by ourself."*
+
+The Expenses tab rendered four ready-made blank rows — Vehicle Fare, Loading,
+Unloading, Other Expenses — each with the full Recipient / Payment Status /
+Cost Treatment / Alloc. Basis dropdown set. Nothing had been entered; the
+template invented them (`{% set default_charges = [...] %}` padded any GRN
+with no saved charges up to four rows). On a wide screen that is four rows of
+unrequested fields, and it read as if those costs already existed.
+
+| Before | After |
+|---|---|
+| New GRN: 4 blank charge rows | **0 rows.** One line: *"No charges on this GRN… Press Add charge…"* |
+| Charge / Recipient pre-selected (Vehicle Fare, Transporter) | `Select charge…` / `Select recipient…` — the operator chooses |
+| "Add charge" cloned the first visible row, inheriting its values | Clones an inert `<template>` blueprint → always a blank row |
+| The last row could not be removed (it was only blanked) | Every row is removable; the empty state returns |
+| Edit of a chargeless GRN also grew 4 blanks | Shows exactly the saved charges, nothing else |
+
+Accounting is unchanged: A1 (a GRN never pays) and A2 (supplier credit =
+Σ qty × rate) still hold, and `app/services/grn_costing.py` remains the only
+arithmetic authority. With no charges the landed cost is the supplier
+material alone.
+
+Details worth knowing:
+
+* **`charge_grid_present`** — a hidden sentinel posted even by an empty grid.
+  `/edit_grn` previously synced charges only when a `charge_*[]` field existed,
+  so removing the last row posted nothing and the stored charge survived. The
+  sentinel makes "no charges" distinguishable from "this form has no grid".
+* **`static/grn_charges.js`** — the row behaviour moved out of the template into
+  a testable module (`window.FBMGrnCharges`), matching `grn_consumption.js` /
+  `ledger_live.js`. Choosing a charge fills that row's recipient type
+  (fare→transporter, loading/unloading→labour) unless the operator already
+  picked one; it never adds a row.
+* **Save-time guard** — an untouched blank row is dropped, while a row with an
+  amount but no charge (or a charge with no amount) is refused with a message
+  naming the row, instead of silently saving a costless `OTHER` charge.
+* **Legacy safety** — `UNTRACKED_LEGACY` / `UNSPECIFIED` codes from migration
+  0003 now render as preserved options ("Legacy (untracked)", "Unassigned
+  (legacy charge)"). Previously they were absent from the dropdowns, so
+  re-saving a migrated GRN silently reclassified history as a material cost.
+
+Tests: `tests/test_grn_charge_grid_no_auto_rows.py` (11 cases) and
+`tests/frontend/test_grn_charges_dom.js` (47 checks; also runs against a real
+rendered page via `GRN_PAGE_HTML=…`). Full suite: 484 passed, 6 skipped.
+
+---
+
 ## 7. Manual verification recipe
 
 1. Create a cash account with a balance, a supplier and a material.
-2. **GRN** → select supplier, add 100 bags @ 1,500, add charge rows: Vehicle Fare 5,000 (Rana Transport), Loading 1,000 (Loading Team), Other 500 (Misc Party). Save. Note "Total Actual Cost 156,500 / Avg 1,565" and **Cash Paid 0.00**.
+2. **GRN** → select supplier, add 100 bags @ 1,500. The Expenses tab starts
+   **empty** — press **Add charge** once per cost you actually have: Vehicle
+   Fare 5,000 (Rana Transport), Loading 1,000 (Loading Team), Other 500 (Misc
+   Party). Save. Note "Total Actual Cost 156,500 / Avg 1,565" and **Cash Paid
+   0.00**. A GRN with no extra costs needs no charge rows at all.
 3. Open the Supplier Ledger → **150,000** payable only.
 4. **Accounts → PAY EXISTING GRN** → select the GRN → pay the Vehicle charge 5,000 → verify supplier still 150,000 and Cash Flow has one 5,000 out attributed to Rana Transport.
 5. Pay supplier 50,000, then 100,000 on a later voucher; pay loading 1,000. Verify payment history, remaining 500, and Cash Flow's four separate rows.
