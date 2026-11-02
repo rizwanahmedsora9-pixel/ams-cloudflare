@@ -1,6 +1,7 @@
 """Package split from system.py."""
 from ._common import *  # noqa
 from .settings import *  # noqa
+from .sidebar import *  # noqa
 from .notifications import *  # noqa
 from .extra import *  # noqa
 from .tenants import *  # noqa
