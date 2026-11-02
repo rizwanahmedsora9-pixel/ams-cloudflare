@@ -1,0 +1,315 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+    .sb-page { --sb-border: rgba(148, 163, 184, .28); }
+    .sb-card {
+        border: 1px solid var(--sb-border);
+        border-radius: 14px;
+        background: var(--surface-1, #111827);
+        overflow: hidden;
+    }
+    .sb-card-header {
+        padding: .7rem 1rem;
+        border-bottom: 1px solid var(--sb-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        flex-wrap: wrap;
+    }
+    .sb-scroll {
+        max-height: calc(100vh - 190px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        padding: .65rem;
+    }
+    .sb-left { position: sticky; top: 1rem; }
+
+    .sb-chip {
+        font-size: .64rem;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+        padding: .12rem .45rem;
+        border-radius: 999px;
+        border: 1px solid var(--sb-border);
+        white-space: nowrap;
+    }
+    .sb-chip.on { color: #fbbf24; border-color: rgba(251,191,36,.45); background: rgba(251,191,36,.08); }
+    .sb-chip.off { color: var(--text-muted, #9ca3af); }
+
+    /* ---- draggable option row ---- */
+    .sb-option {
+        display: flex;
+        align-items: center;
+        gap: .55rem;
+        padding: .45rem .55rem;
+        margin-bottom: .35rem;
+        border: 1px solid var(--sb-border);
+        border-radius: 10px;
+        background: var(--surface-2, #0f172a);
+        cursor: grab;
+        transition: border-color .15s ease, background .15s ease;
+    }
+    .sb-option:hover { border-color: rgba(251,191,36,.55); }
+    .sb-option.dragging { opacity: .45; }
+    .sb-option .sb-grip { color: var(--text-muted, #9ca3af); opacity: .7; }
+    .sb-option .sb-name { flex: 1 1 auto; min-width: 0; }
+    .sb-option .sb-name strong {
+        display: block;
+        font-size: .86rem;
+        font-weight: 600;
+        color: var(--text-primary, #e5e7eb);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sb-option .sb-name small {
+        color: var(--text-muted, #9ca3af);
+        font-size: .68rem;
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ---- category card ---- */
+    .sb-cat {
+        border: 1px solid var(--sb-border);
+        border-radius: 12px;
+        background: var(--surface-2, #0f172a);
+        margin-bottom: .75rem;
+        overflow: hidden;
+    }
+    .sb-cat.is-off { opacity: .6; }
+    .sb-cat.drop-active { border-color: #fbbf24; box-shadow: 0 0 0 2px rgba(251,191,36,.2); }
+    .sb-cat-head {
+        display: flex;
+        align-items: center;
+        gap: .45rem;
+        padding: .55rem .7rem;
+        background: rgba(148, 163, 184, .06);
+        border-bottom: 1px solid var(--sb-border);
+        cursor: grab;
+    }
+    .sb-cat-title {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-weight: 700;
+        font-size: .9rem;
+        color: var(--text-primary, #e5e7eb);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .sb-drop {
+        min-height: 58px;
+        padding: .55rem .6rem .25rem;
+        transition: background .15s ease;
+    }
+    .sb-cat.drop-active .sb-drop { background: rgba(251,191,36,.09); }
+    .sb-cat.drop-active .sb-drop::after,
+    .sb-zone.drop-active #sbRootList::after {
+        content: "Drop here";
+        display: block;
+        text-align: center;
+        font-size: .72rem;
+        padding: .3rem;
+        color: #fbbf24;
+    }
+    .sb-empty {
+        border: 1px dashed var(--sb-border);
+        border-radius: 10px;
+        padding: .7rem;
+        text-align: center;
+        font-size: .74rem;
+        color: var(--text-muted, #9ca3af);
+    }
+    .sb-icon-btn {
+        border: 1px solid var(--sb-border);
+        background: transparent;
+        color: var(--text-muted, #9ca3af);
+        border-radius: 8px;
+        line-height: 1;
+        padding: .25rem .4rem;
+        font-size: .78rem;
+        flex-shrink: 0;
+    }
+    .sb-icon-btn:hover { color: #fbbf24; border-color: rgba(251,191,36,.5); }
+    .sb-icon-btn.danger:hover { color: #f87171; border-color: rgba(248,113,113,.5); }
+    .sb-zone {
+        border: 1px dashed var(--sb-border);
+        border-radius: 12px;
+        padding: .55rem;
+        margin-bottom: .85rem;
+        transition: border-color .15s ease, background .15s ease;
+    }
+    .sb-zone.drop-active { border-color: #fbbf24; background: rgba(251,191,36,.06); }
+    #sbAvailableDrop.drop-active { border-color: #f87171; box-shadow: 0 0 0 2px rgba(248,113,113,.18); }
+    .sb-status { font-size: .74rem; }
+    .sb-help { font-size: .74rem; }
+    @media (max-width: 991px) {
+        .sb-left { position: static; }
+        .sb-scroll { max-height: 60vh; }
+    }
+</style>
+
+<div class="sb-page">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+            <h2 class="fw-bold text-warning mb-0"><i class="bi bi-layout-sidebar-inset me-2"></i>Sidebar Settings</h2>
+            <p class="text-white-50 small mb-0">
+                Design your own sidebar — add, rename, reorder or delete categories, then drag the
+                {{ all_links_count }} available options into them. The sidebar follows this layout for every user
+                (permissions still decide which links each user can open).
+            </p>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="badge bg-dark border border-secondary sb-status" id="sbStatus" title="Every change is saved automatically">Layout loaded</span>
+            <button type="button" class="btn btn-outline-light btn-sm fw-bold" id="sbReset">
+                <i class="bi bi-arrow-counterclockwise me-1"></i> Reset to default
+            </button>
+            <a href="{{ url_for('system.settings') }}" class="btn btn-outline-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Back to Settings
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-dark border-secondary py-2 px-3 sb-help d-flex flex-wrap gap-3 align-items-center">
+        <span><i class="bi bi-hand-index-thumb text-warning me-1"></i><strong>Drag</strong> an option into a category, onto <em>Top level</em>, or onto <em>All sidebar options</em> to remove it.</span>
+        <span><i class="bi bi-phone text-warning me-1"></i>On touch screens use the <i class="bi bi-arrow-up"></i> / <i class="bi bi-arrow-down"></i> buttons.</span>
+        <span><i class="bi bi-shield-lock text-warning me-1"></i>Opening a page still needs the matching permission.</span>
+    </div>
+
+    <div class="row g-3">
+        <!-- ================= ALL OPTIONS ================= -->
+        <div class="col-lg-4">
+            <div class="sb-left">
+                <div class="sb-card" id="sbAvailableDrop"
+                     data-drop="unassign"
+                     title="Drop an option here to remove it from the sidebar">
+                    <div class="sb-card-header">
+                        <h6 class="fw-bold text-white mb-0"><i class="bi bi-list-ul me-2 text-warning"></i>All sidebar options</h6>
+                        <span class="badge bg-secondary" id="sbAvailableCount">{{ all_links_count }}</span>
+                    </div>
+                    <div class="px-2 pt-2">
+                        <input type="search" class="form-control form-control-sm bg-dark text-white border-secondary"
+                               id="sbSearch" placeholder="Search options…" autocomplete="off">
+                        <div class="text-white-50 sb-help mt-1 mb-0">
+                            Drop here = <strong class="text-warning">remove from the sidebar</strong>
+                        </div>
+                    </div>
+                    <div class="sb-scroll" id="sbAvailableList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= LAYOUT ================= -->
+        <div class="col-lg-8">
+            <div class="sb-card">
+                <div class="sb-card-header">
+                    <h6 class="fw-bold text-white mb-0"><i class="bi bi-diagram-3 me-2 text-warning"></i>Sidebar layout</h6>
+                    <button type="button" class="btn btn-warning btn-sm fw-bold" id="sbAddCategory">
+                        <i class="bi bi-plus-lg me-1"></i> Add category
+                    </button>
+                </div>
+                <div class="sb-scroll">
+                    <div class="sb-zone" data-drop="root">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-bold text-white"><i class="bi bi-pin-angle me-1 text-warning"></i>Top level links</span>
+                            <span class="badge bg-secondary" id="sbRootCount">0</span>
+                        </div>
+                        <div class="text-white-50 sb-help mb-2">Shown above the categories (like the Dashboard link).</div>
+                        <div id="sbRootList"></div>
+                    </div>
+
+                    <div id="sbCategoryList"></div>
+                    <div class="sb-empty" id="sbNoCategories" style="display:none;">
+                        No categories yet — click <strong>Add category</strong> to create your first one.
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-white-50 sb-help mt-2">
+                <i class="bi bi-info-circle me-1"></i>
+                A category with no visible option is hidden from the sidebar automatically.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ---------- category modal ---------- -->
+<div class="modal fade" id="sbCategoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h6 class="modal-title fw-bold text-white" id="sbCategoryModalTitle">Category</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small text-white-50" for="sbCategoryName">Category name</label>
+                    <input type="text" class="form-control bg-dark text-white border-secondary" id="sbCategoryName" maxlength="120" placeholder="e.g. Yard Operations">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-white-50" for="sbCategoryIcon">Icon</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark text-warning border-secondary"><i class="bi bi-folder2" id="sbCategoryIconPreview"></i></span>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" id="sbCategoryIcon" list="sbIconChoices" placeholder="bi-folder2">
+                    </div>
+                    <div class="form-text text-white-50 sb-help">Bootstrap icon name, e.g. <code>bi-cash-stack</code>.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold" id="sbCategorySave">Save category</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ---------- option modal ---------- -->
+<div class="modal fade" id="sbItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h6 class="modal-title fw-bold text-white" id="sbItemModalTitle">Option</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small text-white-50" for="sbItemLabel">Display name</label>
+                    <input type="text" class="form-control bg-dark text-white border-secondary" id="sbItemLabel" maxlength="120">
+                    <div class="form-text text-white-50 sb-help" id="sbItemDefaultLabel"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-white-50" for="sbItemCategory">Show this option in</label>
+                    <select class="form-select bg-dark text-white border-secondary" id="sbItemCategory"></select>
+                    <div class="form-text text-white-50 sb-help">Handy on touch screens where drag &amp; drop is awkward.</div>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-white-50" for="sbItemIcon">Icon</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark text-warning border-secondary"><i class="bi bi-circle" id="sbItemIconPreview"></i></span>
+                        <input type="text" class="form-control bg-dark text-white border-secondary" id="sbItemIcon" list="sbIconChoices" placeholder="default">
+                    </div>
+                    <div class="form-text text-white-50 sb-help">Leave empty to use the built-in icon.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary justify-content-between">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="sbItemReset">Use defaults</button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning btn-sm fw-bold" id="sbItemSave">Save option</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<datalist id="sbIconChoices">
+    {% for icon in icon_choices %}<option value="{{ icon }}"></option>{% endfor %}
+</datalist>
+
+<script type="application/json" id="sbConfig">{{ sidebar_config_json|tojson }}</script>
+<script src="{{ url_for('static', filename='sidebar_settings.js') }}?v=1"></script>
+{% endblock %}

@@ -774,6 +774,7 @@ def run_smoke_phase(app, client: Http, report: Reporter) -> dict:
         "/financial_details", "/cash_flow", "/cash_flow_differences", "/profit_reports",
         "/unpaid_transactions", "/mixed_transactions", "/daily_transactions",
         "/delivery_rents", "/notifications", "/settings", "/settings/activity",
+        "/settings/sidebar",
         "/inventory/stock_summary", "/stock_summary", "/accounts/", "/accounts/accounts",
         "/accounts/receipts", "/accounts/transfers", "/accounts/expenditures",
         "/accounts/payments/clients", "/accounts/payments/suppliers", "/accounts/audit",

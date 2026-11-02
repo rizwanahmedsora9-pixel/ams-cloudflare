@@ -61,6 +61,23 @@ instance/               Runtime: SQLite DB, secret_key, logs, backups (git-ignor
 
 `utils/module_loader.py` discovers blueprints at startup.
 
+### Custom sidebar
+
+The sidebar is data driven. **Settings → Sidebar Settings** (`/settings/sidebar`)
+lets a manager design it: add / rename / re-icon / reorder / delete categories,
+then drag any of the available options into a category, onto *Top level*, or off
+the sidebar entirely.
+
+* `app/services/sidebar_nav.py` is the registry (`SIDEBAR_LINKS`: label, icon,
+  URL and the permission each link needs) plus the layout resolver.
+* `models/sidebar.py` stores only the *placement* (`sidebar_category` /
+  `sidebar_item`). With no rows the sidebar renders the built-in default, so a
+  fresh database and an un-customised existing one look exactly as before.
+* Permissions are always enforced per user: a custom layout can never reveal a
+  page a user could not otherwise open. A category with no visible link is
+  hidden, and options added to the code later keep their default home.
+* **Reset to default** deletes the stored layout in one click.
+
 ---
 
 ## Getting started
@@ -119,6 +136,7 @@ npm i jsdom
 node tests/frontend/test_grn_consumption_dom.js   # GRN consumption indicator
 node tests/frontend/test_pan_view_dom.js          # table pan / fit behaviour
 node tests/frontend/test_ledger_live_dom.js       # live revision watcher
+node tests/frontend/test_sidebar_settings_dom.js  # sidebar designer (drag & drop)
 ```
 
 Point `GRN_PAGE_HTML` at a saved `/grn` page to run the consumption test against

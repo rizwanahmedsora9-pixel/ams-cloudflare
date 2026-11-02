@@ -354,6 +354,18 @@ def register_hooks(app):
                     cache_obj = {'ts': 0, 'clients': [], 'materials': [],
                                  'services': [], 'delivery_persons': [],
                                  'settings': None}
+            # Sidebar layout edited in Settings → Sidebar Settings.  Building
+            # it must never break a page: a broken layout falls back to the
+            # shipped defaults inside the service, and a hard error still
+            # renders an (empty) sidebar rather than a 500.
+            try:
+                from app.services.sidebar_nav import build_nav
+                sidebar_nav = build_nav(current_user)
+            except Exception:
+                logging.getLogger('app').exception(
+                    "Could not build the custom sidebar navigation; rendering an empty sidebar."
+                )
+                sidebar_nav = {'root_items': [], 'categories': []}
             return dict(
                 clients=cache_obj.get('clients') or [],
                 materials=cache_obj.get('materials') or [],
@@ -361,6 +373,7 @@ def register_hooks(app):
                 delivery_persons=cache_obj.get('delivery_persons') or [],
                 settings=cache_obj.get('settings'),
                 user_can=_user_can,
+                sidebar_nav=sidebar_nav,
                 ui_theme_preference=session.get('ui_theme')
             )
         return dict(ui_theme_preference=session.get('ui_theme'))

@@ -26,7 +26,7 @@ GET_PAGES = [
     "/unpaid_transactions", "/mixed_transactions",
     "/daily_transactions", "/delivery_rents",
     "/notifications", "/notifications/upcoming",
-    "/settings", "/settings/activity",
+    "/settings", "/settings/activity", "/settings/sidebar",
     "/import_export/", "/import_export/history", "/import_export/uploads",
     "/inventory/stock_summary", "/inventory/daily_transactions",
     "/stock_summary",
