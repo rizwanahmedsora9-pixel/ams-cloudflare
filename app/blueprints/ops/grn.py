@@ -1,6 +1,10 @@
 """grn — split from ops.py."""
 from ._common import *  # noqa
 from app.services.grn_consumption import grn_consumption_for_page
+from app.services.grn_costs import (
+    build_grn_costs, grn_cost_supplier_options, normalize_kind,
+    COST_KIND_LABELS, KIND_ORDER,
+)
 from app.services.void_rebuild import hard_delete_transaction
 
 
@@ -292,6 +296,10 @@ def grn():
     sort_by = request.args.get('sort', 'date')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    # Records (default) | Costs — the Costs tab lists every individual purchase
+    # cost (stock / vehicle fare / loading / unloading / other) with its own
+    # supplier and date filters.  Read-only; payments stay in Accounts.
+    active_tab = 'costs' if (request.args.get('tab') or '').strip().lower() == 'costs' else 'records'
 
     query = GRN.query
     if search:
@@ -345,6 +353,21 @@ def grn():
         logging.getLogger('grn').exception('GRN cost breakdown failed')
         grn_breakdowns = {}
 
+    # GRN Costs tab: every individual cost line, filtered by kind / supplier /
+    # date.  Built from the same grn_breakdown projection as the records table.
+    grn_costs = None
+    if active_tab == 'costs':
+        try:
+            grn_costs = build_grn_costs(
+                start=request.args.get('cost_start') or None,
+                end=request.args.get('cost_end') or None,
+                supplier=request.args.get('cost_supplier') or '',
+                kind=normalize_kind(request.args.get('cost_kind')),
+            )
+        except Exception:
+            logging.getLogger('grn').exception('GRN costs projection failed')
+            grn_costs = None
+
     return render_template(
         'grn_wizard.html',
         grns=grns,
@@ -364,7 +387,12 @@ def grn():
         search=search,
         sort=sort_by,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        active_tab=active_tab,
+        grn_costs=grn_costs,
+        cost_suppliers=grn_cost_supplier_options(),
+        cost_kind_labels=COST_KIND_LABELS,
+        cost_kind_order=KIND_ORDER,
     )
 
 

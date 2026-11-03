@@ -46,13 +46,6 @@
                                                 </td>
                                                 <td><input type="text" class="form-control form-control-sm" name="charge_recipient[]" value="{{ (c.recipient_name or '') if c else '' }}" list="grnPartyOptions" placeholder="Person / party name" aria-label="Recipient / person"></td>
                                                 <td>
-                                                    <select class="form-select form-select-sm" name="charge_status[]" aria-label="Payment status">
-                                                        <option value="UNPAID" {{ 'selected' if not c or c.declared_status == 'UNPAID' }}>Unpaid</option>
-                                                        <option value="PAID" {{ 'selected' if c and c.declared_status == 'PAID' }}>Paid (declaration only)</option>
-                                                        <option value="NOT_APPLICABLE" {{ 'selected' if c and c.declared_status == 'NOT_APPLICABLE' }}>Not Applicable</option>
-                                                    </select>
-                                                </td>
-                                                <td>
                                                     <select class="form-select form-select-sm" name="charge_treatment[]" aria-label="Cost treatment">
                                                         {% for code, label in treatment_labels.items() %}
                                                         <option value="{{ code }}" {{ 'selected' if ctreat == code }}>{{ label }}</option>
@@ -338,6 +331,48 @@
     .grn-toolbar-sep { align-self: stretch; width: 1px; margin: 0 .1rem; background: var(--ui-border-strong, #334155); }
     .grn-toolbar .btn { white-space: nowrap; }
 
+    /* ---------- main tab strip: records tab + costs tab ---------- */
+    .grn-main-tabs { border-bottom: 1px solid var(--ui-border-strong, #334155); }
+    .grn-main-tabs .nav-link { font-weight: 700; font-size: .86rem; }
+    .grn-main-tabs .nav-link.active { background: var(--ui-surface-2, #111a33); border-color: var(--ui-border-strong, #334155) var(--ui-border-strong, #334155) transparent; }
+    .grn-records-card { border-top-left-radius: 0; }
+
+    /* ---------- GRN Costs tab ---------- */
+    .grn-costs { display: block; }
+    .grn-costs-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .8rem; }
+    .grn-cost-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: .55rem; margin-bottom: .9rem; }
+    .grn-cost-kpi {
+        display: flex; flex-direction: column; gap: .1rem; padding: .55rem .7rem;
+        border: 1px solid var(--ui-border-strong, #334155); border-radius: 10px;
+        background: var(--ui-surface-2, #111a33); color: inherit; text-decoration: none;
+        transition: border-color .15s ease, transform .15s ease;
+    }
+    a.grn-cost-kpi:hover { border-color: var(--accent, #fbbf24); transform: translateY(-1px); color: inherit; }
+    .grn-cost-kpi.is-active { border-color: var(--accent, #fbbf24); box-shadow: inset 0 0 0 1px var(--accent, #fbbf24); }
+    .grn-cost-kpi-label { font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ui-text-muted, #94a3b8); }
+    .grn-cost-kpi-value { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .grn-cost-kpi-meta { font-size: .64rem; color: var(--ui-text-muted, #94a3b8); }
+    .grn-cost-kpi-total { background: linear-gradient(135deg, #0b3b2e, #1f6b4a); border-color: #1a7f5a; }
+    .grn-costs-filter {
+        display: flex; flex-wrap: wrap; align-items: flex-end; gap: .55rem;
+        padding: .7rem .8rem; margin-bottom: .6rem; border-radius: 10px;
+        border: 1px solid var(--ui-border-strong, #334155); background: var(--ui-surface-2, #111a33);
+    }
+    .grn-costs-field { display: flex; flex-direction: column; gap: .18rem; min-width: 165px; }
+    .grn-costs-field .form-label { font-size: .66rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ui-text-muted, #94a3b8); margin: 0; }
+    .grn-costs-scope { font-size: .78rem; color: var(--ui-text-muted, #94a3b8); margin-bottom: .5rem; }
+    .grn-costs-scope b { color: var(--ui-text, #e2e8f0); }
+    .grn-costs-table { margin-bottom: 0; }
+    .grn-costs-table > thead > tr > th {
+        font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+        white-space: nowrap; color: var(--ui-text-muted, #94a3b8);
+    }
+    .grn-cost-badge.kind-stock { background: #1d4ed8; color: #fff; }
+    .grn-cost-badge.kind-vehicle { background: #b45309; color: #fff; }
+    .grn-cost-badge.kind-loading { background: #0f766e; color: #fff; }
+    .grn-cost-badge.kind-unloading { background: #6d28d9; color: #fff; }
+    .grn-cost-badge.kind-other { background: #475569; color: #fff; }
+
     /* ---------- table ---------- */
     .grn-table { margin-bottom: 0; }
     .grn-table > thead > tr > th {
@@ -484,7 +519,7 @@
 
                     <div id="step1" class="step-section">
 
-                        <h5 class="border-bottom pb-2">Step 1: Select Supplier and Mode of Payment</h5>
+                        <h5 class="border-bottom pb-2">Step 1: Select Supplier, Date &amp; Time</h5>
 
                         <div class="row g-3">
 
@@ -734,8 +769,9 @@
                                 <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
                                     <div class="small text-muted">
                                         <i class="bi bi-truck me-1"></i>Additional material-related costs.
-                                        Paid or unpaid, they are part of the actual purchase cost.
+                                        They are part of the actual purchase cost.
                                         Each charge creates its own payable to its own recipient — never to the supplier.
+                                        No paid/unpaid box here: money is paid only from Accounts.
                                         <strong>No charge is added automatically</strong> — press "Add charge" for each one you actually have.
                                     </div>
                                     <button type="button" class="btn btn-sm btn-outline-info" id="addGrnChargeBtn"><i class="bi bi-plus-lg"></i> Add charge</button>
@@ -754,7 +790,6 @@
                                                 <th style="width:11%">Amount (Rs.)</th>
                                                 <th style="width:14%">Recipient Type</th>
                                                 <th style="width:14%">Recipient / Person</th>
-                                                <th style="width:12%">Payment Status</th>
                                                 <th style="width:13%">Cost Treatment</th>
                                                 <th style="width:9%">Alloc. Basis</th>
                                                 <th style="width:3%"></th>
@@ -779,9 +814,11 @@
                                 </datalist>
                                 <div class="small text-muted mb-2">
                                     <i class="bi bi-info-circle me-1"></i>
-                                    "Payment Status" is an informational declaration only — it does not settle anything.
-                                    Actual paid / remaining amounts come exclusively from Accounts payments.
+                                    This grid records costs only — there is no paid/unpaid option on a GRN.
+                                    Paid, remaining and status come exclusively from Accounts payments
+                                    (<strong>Accounts &rarr; PAY EXISTING GRN</strong>).
                                     "Separate expense" charges are excluded from inventory valuation and never double counted.
+                                    Every line here appears in the <strong>GRN Costs</strong> tab at the top of this page.
                                 </div>
                                 <div class="row g-2 small">
                                     <div class="col-md-3"><span class="text-muted">Supplier Material:</span> <b id="grnSupplierMaterial">0.00</b></div>
@@ -864,8 +901,32 @@
 
     <!-- Records List -->
 
-    <div class="card">
+    {% set costs_tab_active = (active_tab or 'records') == 'costs' %}
+    <ul class="nav nav-tabs grn-main-tabs mb-0" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {{ '' if costs_tab_active else 'active' }}"
+               href="{{ url_for('grn', search=search, sort=sort, start_date=start_date, end_date=end_date) }}"
+               role="tab" aria-selected="{{ 'false' if costs_tab_active else 'true' }}">
+                <i class="bi bi-receipt me-1"></i>Records
+                <span class="grn-count-pill ms-1">{{ grns|length }}</span>
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {{ 'active' if costs_tab_active }}"
+               href="{{ url_for('grn', tab='costs', cost_kind=(grn_costs.kind if grn_costs else 'ALL'),
+                                cost_supplier=(grn_costs.supplier if grn_costs else ''),
+                                cost_start=(grn_costs.start.strftime('%Y-%m-%d') if (grn_costs and grn_costs.start) else ''),
+                                cost_end=(grn_costs.end.strftime('%Y-%m-%d') if (grn_costs and grn_costs.end) else '')) }}"
+               role="tab" aria-selected="{{ 'true' if costs_tab_active else 'false' }}">
+                <i class="bi bi-cash-stack me-1"></i>Costs
+                <span class="grn-count-pill ms-1">{{ grn_costs.grn_count if grn_costs else '' }}</span>
+            </a>
+        </li>
+    </ul>
 
+    <div class="card grn-records-card">
+
+        {% if not costs_tab_active %}
         <div class="card-header grn-records-head">
 
             <span class="grn-records-title">
@@ -911,345 +972,351 @@
             </form>
 
         </div>
+        {% endif %}
 
-        <div class="card-body">
+            <div class="card-body">
+                {% if (active_tab or 'records') != 'costs' %}
 
-            {% if grn_consumption and grn_consumption['items'] %}
-            {% set ov = namespace(received=0, consumed=0, remaining=0, lots=0, complete=0, replay=0) %}
-            {% for lot in grn_consumption['items'].values() %}
-                {% set ov.received = ov.received + (lot.received_value or 0) %}
-                {% set ov.consumed = ov.consumed + (lot.consumed_value or 0) %}
-                {% set ov.remaining = ov.remaining + (lot.remaining_value or 0) %}
-                {% set ov.lots = ov.lots + 1 %}
-                {% if lot.fully_consumed %}{% set ov.complete = ov.complete + 1 %}{% endif %}
-                {% if lot.status == 'reconstructed' %}{% set ov.replay = ov.replay + 1 %}{% endif %}
-            {% endfor %}
-            {% set ov_pct = ((ov.consumed / ov.received * 100) if ov.received else 0) %}
-            {% set ov_level = ('complete' if ov_pct >= 100 else ('critical' if ov_pct >= 75 else ('high' if ov_pct >= 50 else ('moderate' if ov_pct >= 25 else 'low')))) %}
-            <section class="grn-overview level-{{ ov_level }}" id="grnOverallMeter"
-                     data-received="{{ ov.received }}" data-consumed="{{ ov.consumed }}"
-                     title="Overall consumption of the stock received by the GRNs on this screen, valued at cost."
-                     aria-label="Overall stock consumption of the GRNs on this screen">
-                <span class="grn-overview-title">Overall consumption</span>
-                <span class="grn-overview-pct" data-overall-pct>{{ '{:,.1f}'.format(ov_pct) }}%</span>
-                <div class="grn-overview-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
-                     aria-valuenow="{{ '{:,.1f}'.format(ov_pct) }}"
-                     aria-valuetext="{{ '{:,.1f}'.format(ov_pct) }}% of received stock value consumed"
-                     data-overall-bar>
-                    <div class="grn-overview-fill" data-overall-fill style="width: {{ '%.2f'|format(ov_pct) }}%;"></div>
-                </div>
-                <span class="grn-overview-scope">across {{ grns|length }} GRNs &middot; valued at cost</span>
-                <span class="grn-overview-figures">
-                    <span>Received <b data-overall-received>Rs {{ '{:,.0f}'.format(ov.received) }}</b></span>
-                    <span>Consumed <b data-overall-consumed>Rs {{ '{:,.0f}'.format(ov.consumed) }}</b></span>
-                    <span>In hand <b data-overall-remaining>Rs {{ '{:,.0f}'.format(ov.remaining) }}</b></span>
-                </span>
-                <span class="grn-overview-meta">
-                    <span><b data-overall-lots>{{ ov.lots }}</b> lots &middot; <b data-overall-complete>{{ ov.complete }}</b> fully consumed &middot; <b data-overall-replay>{{ ov.replay }}</b> replayed</span>
-                    <span>Stock value <b data-overall-value>Rs {{ '{:,.0f}'.format(ov.remaining) }}</b></span>
-                </span>
-            </section>
-            {% endif %}
+                    {% if grn_consumption and grn_consumption['items'] %}
+                    {% set ov = namespace(received=0, consumed=0, remaining=0, lots=0, complete=0, replay=0) %}
+                    {% for lot in grn_consumption['items'].values() %}
+                        {% set ov.received = ov.received + (lot.received_value or 0) %}
+                        {% set ov.consumed = ov.consumed + (lot.consumed_value or 0) %}
+                        {% set ov.remaining = ov.remaining + (lot.remaining_value or 0) %}
+                        {% set ov.lots = ov.lots + 1 %}
+                        {% if lot.fully_consumed %}{% set ov.complete = ov.complete + 1 %}{% endif %}
+                        {% if lot.status == 'reconstructed' %}{% set ov.replay = ov.replay + 1 %}{% endif %}
+                    {% endfor %}
+                    {% set ov_pct = ((ov.consumed / ov.received * 100) if ov.received else 0) %}
+                    {% set ov_level = ('complete' if ov_pct >= 100 else ('critical' if ov_pct >= 75 else ('high' if ov_pct >= 50 else ('moderate' if ov_pct >= 25 else 'low')))) %}
+                    <section class="grn-overview level-{{ ov_level }}" id="grnOverallMeter"
+                             data-received="{{ ov.received }}" data-consumed="{{ ov.consumed }}"
+                             title="Overall consumption of the stock received by the GRNs on this screen, valued at cost."
+                             aria-label="Overall stock consumption of the GRNs on this screen">
+                        <span class="grn-overview-title">Overall consumption</span>
+                        <span class="grn-overview-pct" data-overall-pct>{{ '{:,.1f}'.format(ov_pct) }}%</span>
+                        <div class="grn-overview-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                             aria-valuenow="{{ '{:,.1f}'.format(ov_pct) }}"
+                             aria-valuetext="{{ '{:,.1f}'.format(ov_pct) }}% of received stock value consumed"
+                             data-overall-bar>
+                            <div class="grn-overview-fill" data-overall-fill style="width: {{ '%.2f'|format(ov_pct) }}%;"></div>
+                        </div>
+                        <span class="grn-overview-scope">across {{ grns|length }} GRNs &middot; valued at cost</span>
+                        <span class="grn-overview-figures">
+                            <span>Received <b data-overall-received>Rs {{ '{:,.0f}'.format(ov.received) }}</b></span>
+                            <span>Consumed <b data-overall-consumed>Rs {{ '{:,.0f}'.format(ov.consumed) }}</b></span>
+                            <span>In hand <b data-overall-remaining>Rs {{ '{:,.0f}'.format(ov.remaining) }}</b></span>
+                        </span>
+                        <span class="grn-overview-meta">
+                            <span><b data-overall-lots>{{ ov.lots }}</b> lots &middot; <b data-overall-complete>{{ ov.complete }}</b> fully consumed &middot; <b data-overall-replay>{{ ov.replay }}</b> replayed</span>
+                            <span>Stock value <b data-overall-value>Rs {{ '{:,.0f}'.format(ov.remaining) }}</b></span>
+                        </span>
+                    </section>
+                    {% endif %}
 
-            <div class="table-responsive">
+                    <div class="table-responsive">
 
-                <table class="table table-hover grn-table">
+                        <table class="table table-hover grn-table">
 
-                    <thead>
+                            <thead>
 
-                        <tr>
+                                <tr>
 
-                            <th class="grn-th-toggle"><span class="visually-hidden">Lot consumption details</span></th>
+                                    <th class="grn-th-toggle"><span class="visually-hidden">Lot consumption details</span></th>
 
-                            <th class="grn-th-star"><i class="bi bi-star text-warning" title="Click star to highlight line"></i></th>
+                                    <th class="grn-th-star"><i class="bi bi-star text-warning" title="Click star to highlight line"></i></th>
 
-                            <th>GRN #</th>
+                                    <th>GRN #</th>
 
-                            <th><a href="{{ url_for('grn', sort='date', search=search, start_date=start_date, end_date=end_date) }}" class="grn-sort-link {{ 'is-active' if sort == 'date' }}">Date &amp; Time <i class="bi bi-arrow-down-up small"></i></a></th>
+                                    <th><a href="{{ url_for('grn', sort='date', search=search, start_date=start_date, end_date=end_date) }}" class="grn-sort-link {{ 'is-active' if sort == 'date' }}">Date &amp; Time <i class="bi bi-arrow-down-up small"></i></a></th>
 
-                            <th><a href="{{ url_for('grn', sort='supplier', search=search, start_date=start_date, end_date=end_date) }}" class="grn-sort-link {{ 'is-active' if sort == 'supplier' }}">Supplier <i class="bi bi-arrow-down-up small"></i></a></th>
+                                    <th><a href="{{ url_for('grn', sort='supplier', search=search, start_date=start_date, end_date=end_date) }}" class="grn-sort-link {{ 'is-active' if sort == 'supplier' }}">Supplier <i class="bi bi-arrow-down-up small"></i></a></th>
 
-                            <th>Items<span class="grn-th-sub">arrow on the left opens each lot's consumption</span></th>
+                                    <th>Items<span class="grn-th-sub">arrow on the left opens each lot's consumption</span></th>
 
-                            <th class="grn-col-num">Total Qty</th>
+                                    <th class="grn-col-num">Total Qty</th>
 
-                            <th class="grn-col-num">Discount</th>
+                                    <th class="grn-col-num">Discount</th>
 
-                            <th class="grn-col-num" title="Supplier material + all material-related charges">Actual Cost</th>
+                                    <th class="grn-col-num" title="Supplier material + all material-related charges">Actual Cost</th>
 
-                            <th class="grn-col-num" title="Money actually paid from Accounts">Cash Paid</th>
+                                    <th class="grn-col-num" title="Money actually paid from Accounts">Cash Paid</th>
 
-                            <th>Payment Status</th>
+                                    <th>Payment Status</th>
 
-                            <th class="text-end grn-actions-cell">Actions</th>
+                                    <th class="text-end grn-actions-cell">Actions</th>
 
-                        </tr>
+                                </tr>
 
-                    </thead>
+                            </thead>
 
-                    <tbody>
+                            <tbody>
 
-                        {% for grn in grns %}
+                                {% for grn in grns %}
 
-                        {% set live_items = grn.items | rejectattr('is_void') | list %}
-                        <tr class="grn-row" data-grn-row="{{ grn.id }}">
+                                {% set live_items = grn.items | rejectattr('is_void') | list %}
+                                <tr class="grn-row" data-grn-row="{{ grn.id }}">
 
-                            <td class="grn-td-toggle">
-                                <button type="button" class="grn-expand-btn" data-grn-expand="grnDetails{{ grn.id }}"
-                                        aria-expanded="false" aria-controls="grnDetails{{ grn.id }}"
-                                        data-label-show="Show lot consumption details" data-label-hide="Hide lot consumption details"
-                                        data-grn-label="GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"
-                                        title="Show lot consumption details"
-                                        aria-label="Show lot consumption details for GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}">
-                                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
-                                </button>
-                            </td>
+                                    <td class="grn-td-toggle">
+                                        <button type="button" class="grn-expand-btn" data-grn-expand="grnDetails{{ grn.id }}"
+                                                aria-expanded="false" aria-controls="grnDetails{{ grn.id }}"
+                                                data-label-show="Show lot consumption details" data-label-hide="Hide lot consumption details"
+                                                data-grn-label="GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"
+                                                title="Show lot consumption details"
+                                                aria-label="Show lot consumption details for GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}">
+                                            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                                        </button>
+                                    </td>
 
-                            <td class="grn-td-star">
-                                <span class="row-star-btn" data-row-id="grn-{{ grn.id }}" title="Highlight entry">
-                                    <i class="bi bi-star"></i>
-                                </span>
-                            </td>
+                                    <td class="grn-td-star">
+                                        <span class="row-star-btn" data-row-id="grn-{{ grn.id }}" title="Highlight entry">
+                                            <i class="bi bi-star"></i>
+                                        </span>
+                                    </td>
 
-                            <td>
-                                {% if grn.auto_bill_no %}<span class="badge bg-info text-dark me-1">{{ grn.auto_bill_no }}</span>{% endif %}
-                                {% if grn.manual_bill_no %}<span class="badge bg-warning text-dark">{{ grn.manual_bill_no }}</span>{% endif %}
-                            </td>
-                            <td>
-                                {% if grn.date_posted %}
-                                    <div class="fw-bold">{{ grn.date_posted.strftime('%d/%b/%Y') }}</div>
-                                    <div class="small text-muted"><i class="bi bi-clock me-1"></i>{{ grn.date_posted.strftime('%I:%M %p') }}</div>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-
-                            <td class="grn-supplier">{{ grn.supplier }}</td>
-
-                            <td class="grn-items-cell">
-                                {% if live_items %}
-                                <span class="grn-items-line" title="{{ live_items | map(attribute='mat_name') | join(' · ') }}">
-                                    {% for item in live_items[:2] %}
-                                        {% if not loop.first %}<span class="grn-item-sep">&middot;</span>{% endif %}<span class="grn-item-name">{{ item.mat_name }}</span> <b>{{ '{:,.2f}'.format(item.qty or 0) }}</b>
-                                    {% endfor %}
-                                    {% if live_items|length > 2 %}<span class="grn-item-sep">&middot;</span><span class="grn-items-more">+{{ live_items|length - 2 }} more</span>{% endif %}
-                                </span>
-                                {% else %}
-                                <span class="grn-items-empty">No active lines</span>
-                                {% endif %}
-                            </td>
-
-                            <td class="grn-col-num">
-                                {% set total_qty = namespace(value=0) %}{% for item in live_items %}{% set total_qty.value = total_qty.value + (item.qty or 0) %}{% endfor %}
-                                <span class="grn-qty">{{ '{:,.2f}'.format(total_qty.value) }}</span>
-                                <span class="grn-qty-label">{{ live_items|length }} line{{ '' if live_items|length == 1 else 's' }}</span>
-                            </td>
-
-                            <td class="grn-col-num">{{ '{:,.2f}'.format(grn.discount or 0) }}</td>
-
-                            {% set bd = (grn_breakdowns or {}).get(grn.id) %}
-                            <td class="grn-col-num">
-                                <b class="text-success">{{ '{:,.2f}'.format(bd.landed_cost_total if bd else (grn.landed_cost_total or 0)) }}</b>
-                                {% if bd and bd.average_actual_rate %}<span class="grn-qty-label">@ {{ '{:,.2f}'.format(bd.average_actual_rate) }}/unit</span>{% endif %}
-                            </td>
-
-                            <td class="grn-col-num">{{ '{:,.2f}'.format(bd.total_cash_paid if bd else 0) }}</td>
-
-                            <td>
-                                {% if bd %}
-                                    {% if bd.total_remaining <= 0 and bd.total_obligations > 0 %}
-                                        <span class="badge bg-success">Fully Paid</span>
-                                    {% elif bd.total_cash_paid > 0 %}
-                                        <span class="badge bg-warning text-dark">Partially Paid</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">Unpaid</span>
-                                    {% endif %}
-                                    <span class="small text-muted d-block">Due {{ '{:,.2f}'.format(bd.total_remaining) }}</span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-
-                            <td class="grn-actions-cell">
-
-                                <div class="grn-row-actions">
-
-                                    <a href="{{ url_for('view_bill', bill_no=grn.manual_bill_no or grn.auto_bill_no, src='grn', src_id=grn.id) }}"
-                                       class="btn btn-sm btn-outline-info"
-                                       title="View this GRN" aria-label="View GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-eye"></i></a>
-
-                                    <a href="{{ url_for('download_invoice', bill_no=grn.manual_bill_no or grn.auto_bill_no, src='grn', src_id=grn.id) }}"
-                                       class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener"
-                                       title="Print this GRN" aria-label="Print GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-printer"></i></a>
-
-                                    <a href="{{ url_for('edit_grn', id=grn.id) }}"
-                                       class="btn btn-sm btn-outline-warning"
-                                       title="Edit this GRN" aria-label="Edit GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-pencil"></i></a>
-
-                                    <button type="button" class="btn btn-sm btn-outline-primary"
-                                            data-bs-toggle="modal" data-bs-target="#shiftGrnModal{{ grn.id }}"
-                                            title="Shift this GRN to another supplier (preserves inventory &amp; sales)"
-                                            aria-label="Shift GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }} to another supplier"><i class="bi bi-arrow-left-right"></i></button>
-
-                                    <form action="{{ url_for('grn') }}" method="POST" class="grn-action-form" onsubmit="return confirm('Are you sure you want to delete this GRN? This will reverse the stock addition.');">
-
-                                        <input type="hidden" name="action" value="delete">
-
-                                        <input type="hidden" name="id" value="{{ grn.id }}">
-
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                title="Delete this GRN" aria-label="Delete GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-trash"></i></button>
-
-                                    </form>
-
-                                </div>
-
-                                <div class="modal fade" id="shiftGrnModal{{ grn.id }}" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <form action="{{ url_for('shift_grn_supplier', id=grn.id) }}" method="POST" class="modal-content bg-dark text-white border-secondary">
-                                            <div class="modal-header border-secondary">
-                                                <h5 class="modal-title text-info"><i class="bi bi-arrow-right-circle me-2"></i>Shift GRN Supplier</h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <p class="text-white-50 small">Move GRN <strong>{{ grn.auto_bill_no or grn.id }}</strong> from <strong>{{ grn.supplier }}</strong> to the correct supplier. Inventory and existing sales are preserved.</p>
-                                                <select name="target_supplier_id" class="form-select bg-dark text-white border-secondary" required>
-                                                    <option value="">-- Select correct supplier --</option>
-                                                    {% for ts in suppliers %}
-                                                    {% if ts.name != grn.supplier %}
-                                                    <option value="{{ ts.id }}">{{ ts.name }}</option>
-                                                    {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </div>
-                                            <div class="modal-footer border-secondary">
-                                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-info btn-sm fw-bold text-dark" onclick="return confirm('Shift this GRN to the selected supplier?');">Shift</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-
-                            </td>
-
-                        </tr>
-
-                        <tr class="grn-details-row" id="grnDetails{{ grn.id }}" hidden>
-                            <td colspan="12">
-                                <div class="grn-details">
-                                    <div class="grn-details-head">
-                                        <span class="grn-details-title"><i class="bi bi-box-seam me-1"></i>Consumption by lot</span>
-                                        <span class="grn-details-note">{{ live_items|length }} line{{ '' if live_items|length == 1 else 's' }} on this GRN &middot; every lot keeps its own purchase rate and FIFO consumption</span>
-                                    </div>
-                                    {% set bd = (grn_breakdowns or {}).get(grn.id) %}
-                                    {% if bd %}
-                                    <div class="grn-cost-panel mb-3 p-2 border border-secondary rounded">
-                                        <div class="d-flex flex-wrap gap-3 small mb-2">
-                                            <span class="fw-bold text-info"><i class="bi bi-receipt me-1"></i>Cost &amp; Payments</span>
-                                            <span>Supplier Material: <b>{{ '{:,.2f}'.format(bd.supplier_material_amount) }}</b></span>
-                                            <span>Vehicle Fare: <b>{{ '{:,.2f}'.format(bd.vehicle_fare) }}</b></span>
-                                            <span>Loading: <b>{{ '{:,.2f}'.format(bd.loading) }}</b></span>
-                                            <span>Unloading: <b>{{ '{:,.2f}'.format(bd.unloading) }}</b></span>
-                                            <span>Other: <b>{{ '{:,.2f}'.format(bd.other_charges) }}</b></span>
-                                            <span>Total Actual Cost: <b class="text-success">{{ '{:,.2f}'.format(bd.landed_cost_total) }}</b></span>
-                                            <span>Avg Actual Rate: <b>{{ '{:,.2f}'.format(bd.average_actual_rate) }}</b></span>
-                                        </div>
-                                        <div class="d-flex flex-wrap gap-3 small mb-2">
-                                            <span>Supplier Paid: <b>{{ '{:,.2f}'.format(bd.supplier_paid) }}</b></span>
-                                            <span>Supplier Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.supplier_remaining) }}</b></span>
-                                            <span>Charges Paid: <b>{{ '{:,.2f}'.format(bd.additional_paid) }}</b></span>
-                                            <span>Charges Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.additional_remaining) }}</b></span>
-                                            <span>Total Cash Actually Paid: <b class="text-success">{{ '{:,.2f}'.format(bd.total_cash_paid) }}</b></span>
-                                            <a class="btn btn-sm btn-outline-info py-0" href="{{ url_for('accounts.grn_payments', grn_id=grn.id) }}"><i class="bi bi-cash-coin"></i> Pay this GRN</a>
-                                        </div>
-                                        <div class="small mb-1">
-                                            <div class="row g-1 fw-bold text-muted border-bottom pb-1">
-                                                <div class="col-md-4">Obligation / Recipient</div>
-                                                <div class="col-md-2 text-end">Original</div>
-                                                <div class="col-md-2 text-end">Paid</div>
-                                                <div class="col-md-2 text-end">Remaining</div>
-                                                <div class="col-md-2">Status / Treatment</div>
-                                            </div>
-                                            {% for ob in bd.obligations %}
-                                            <div class="row g-1 border-bottom py-1">
-                                                <div class="col-md-4">{{ ob.label }}{% if ob.kind == 'CHARGE' %} <span class="text-muted">→ {{ ob.recipient_name or ob.recipient_label }}</span>{% endif %}</div>
-                                                <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.original) }}</div>
-                                                <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.paid) }}</div>
-                                                <div class="col-md-2 text-end fw-bold">{{ '{:,.2f}'.format(ob.remaining) }}</div>
-                                                <div class="col-md-2">{{ ob.status }} <span class="text-muted">/ {{ ob.cost_treatment if ob.cost_treatment else 'Supplier material' }}</span></div>
-                                            </div>
-                                            {% endfor %}
-                                        </div>
-                                        {% if bd.payment_rows %}
-                                        <div class="small fw-bold mt-2"><i class="bi bi-clock-history me-1"></i>Payment history</div>
-                                        <div class="small">
-                                            {% for pay in bd.payment_rows %}
-                                            <div class="row g-1 border-bottom py-1">
-                                                <div class="col-md-2">{{ pay.date_posted.strftime('%d/%b/%Y') if pay.date_posted else '—' }}</div>
-                                                <div class="col-md-3">{{ pay.recipient_name or pay.recipient_type }}</div>
-                                                <div class="col-md-2 text-end">{{ '{:,.2f}'.format(pay.amount) }}</div>
-                                                <div class="col-md-2">{{ pay.method }}</div>
-                                                <div class="col-md-2">{{ pay.reference }}</div>
-                                                <div class="col-md-1">{{ 'Voided' if pay.is_void else ('Posted' if pay.cash_posted else 'Recorded') }}</div>
-                                            </div>
-                                            {% endfor %}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    {% endif %}
-                                    <div class="grn-lot-list">
-                                        {% for item in live_items %}
-                                        {% set lot = (grn_consumption['items'].get(item.id) if grn_consumption else None) %}
-                                        {% set received = lot.received_qty if lot else (item.qty or 0) %}
-                                        {% set consumed = lot.consumed_qty if lot else 0 %}
-                                        {% set remaining = lot.remaining_qty if lot else (item.qty or 0) %}
-                                        {% set pct = lot.consumed_pct if lot else 0 %}
-                                        {% set level = lot.level if lot else 'low' %}
-                                        {% set rate = (lot.rate if lot else (item.price_at_time or 0)) or 0 %}
-                                        {% set unit = (lot.unit if lot else '') or '' %}
-                                        <div class="grn-item-consume" data-grn-scope>
-                                            <div class="grn-consume-head">
-                                                <span class="grn-consume-name">{{ item.mat_name }}</span>
-                                                {% if rate %}<span class="grn-consume-meta">@ Rs {{ '{:,.2f}'.format(rate) }}</span>{% endif %}
-                                                {% if lot and lot.status in ['recorded', 'reconstructed'] %}
-                                                <span class="grn-consume-status {{ 'is-recorded' if lot.status == 'recorded' else 'is-reconstructed' }}"
-                                                      title="{{ 'Consumed through posted FIFO allocations' if lot.status == 'recorded' else 'Consumed through the FIFO movement replay (no posted allocation for this lot)' }}">{{ lot.status }}</span>
-                                                {% endif %}
-                                                {% if lot %}<span class="grn-consume-meta">In hand <b>Rs {{ '{:,.0f}'.format(lot.remaining_value or 0) }}</b></span>{% endif %}
-                                            </div>
-                                            <div class="grn-lot-meter">
-                                                <div class="grn-lot-figures">
-                                                    <span class="fig-received">Received <b data-grn-received>{{ '{:,.2f}'.format(received) }}</b>{% if unit %} {{ unit }}{% endif %}</span>
-                                                    <span class="fig-consumed">Consumed <b data-grn-consumed>{{ '{:,.2f}'.format(consumed) }}</b></span>
-                                                    <span class="fig-remaining">Remaining <b data-grn-remaining>{{ '{:,.2f}'.format(remaining) }}</b></span>
-                                                </div>
-                                                <div class="grn-consume level-{{ level }}" data-grn-consume data-grn-item-id="{{ item.id }}"
-                                                     data-received="{{ received }}" data-consumed="{{ consumed }}" data-percent="{{ pct }}">
-                                                    <div class="grn-consume-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
-                                                         aria-valuenow="{{ pct }}" aria-valuetext="{{ pct }}% consumed"
-                                                         title="{{ '%.2f'|format(consumed) }} of {{ '%.2f'|format(received) }} consumed">
-                                                        <div class="grn-consume-fill level-{{ level }}" style="width: {{ pct }}%;"></div>
-                                                    </div>
-                                                    <span class="grn-consume-pct">{{ '{:,.1f}'.format(pct) }}%</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <td>
+                                        {% if grn.auto_bill_no %}<span class="badge bg-info text-dark me-1">{{ grn.auto_bill_no }}</span>{% endif %}
+                                        {% if grn.manual_bill_no %}<span class="badge bg-warning text-dark">{{ grn.manual_bill_no }}</span>{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if grn.date_posted %}
+                                            <div class="fw-bold">{{ grn.date_posted.strftime('%d/%b/%Y') }}</div>
+                                            <div class="small text-muted"><i class="bi bi-clock me-1"></i>{{ grn.date_posted.strftime('%I:%M %p') }}</div>
                                         {% else %}
-                                        <span class="grn-items-empty">No active lines on this GRN.</span>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
 
-                        {% endfor %}
+                                    <td class="grn-supplier">{{ grn.supplier }}</td>
 
-                    </tbody>
+                                    <td class="grn-items-cell">
+                                        {% if live_items %}
+                                        <span class="grn-items-line" title="{{ live_items | map(attribute='mat_name') | join(' · ') }}">
+                                            {% for item in live_items[:2] %}
+                                                {% if not loop.first %}<span class="grn-item-sep">&middot;</span>{% endif %}<span class="grn-item-name">{{ item.mat_name }}</span> <b>{{ '{:,.2f}'.format(item.qty or 0) }}</b>
+                                            {% endfor %}
+                                            {% if live_items|length > 2 %}<span class="grn-item-sep">&middot;</span><span class="grn-items-more">+{{ live_items|length - 2 }} more</span>{% endif %}
+                                        </span>
+                                        {% else %}
+                                        <span class="grn-items-empty">No active lines</span>
+                                        {% endif %}
+                                    </td>
 
-                </table>
+                                    <td class="grn-col-num">
+                                        {% set total_qty = namespace(value=0) %}{% for item in live_items %}{% set total_qty.value = total_qty.value + (item.qty or 0) %}{% endfor %}
+                                        <span class="grn-qty">{{ '{:,.2f}'.format(total_qty.value) }}</span>
+                                        <span class="grn-qty-label">{{ live_items|length }} line{{ '' if live_items|length == 1 else 's' }}</span>
+                                    </td>
+
+                                    <td class="grn-col-num">{{ '{:,.2f}'.format(grn.discount or 0) }}</td>
+
+                                    {% set bd = (grn_breakdowns or {}).get(grn.id) %}
+                                    <td class="grn-col-num">
+                                        <b class="text-success">{{ '{:,.2f}'.format(bd.landed_cost_total if bd else (grn.landed_cost_total or 0)) }}</b>
+                                        {% if bd and bd.average_actual_rate %}<span class="grn-qty-label">@ {{ '{:,.2f}'.format(bd.average_actual_rate) }}/unit</span>{% endif %}
+                                    </td>
+
+                                    <td class="grn-col-num">{{ '{:,.2f}'.format(bd.total_cash_paid if bd else 0) }}</td>
+
+                                    <td>
+                                        {% if bd %}
+                                            {% if bd.total_remaining <= 0 and bd.total_obligations > 0 %}
+                                                <span class="badge bg-success">Fully Paid</span>
+                                            {% elif bd.total_cash_paid > 0 %}
+                                                <span class="badge bg-warning text-dark">Partially Paid</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Unpaid</span>
+                                            {% endif %}
+                                            <span class="small text-muted d-block">Due {{ '{:,.2f}'.format(bd.total_remaining) }}</span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="grn-actions-cell">
+
+                                        <div class="grn-row-actions">
+
+                                            <a href="{{ url_for('view_bill', bill_no=grn.manual_bill_no or grn.auto_bill_no, src='grn', src_id=grn.id) }}"
+                                               class="btn btn-sm btn-outline-info"
+                                               title="View this GRN" aria-label="View GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-eye"></i></a>
+
+                                            <a href="{{ url_for('download_invoice', bill_no=grn.manual_bill_no or grn.auto_bill_no, src='grn', src_id=grn.id) }}"
+                                               class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener"
+                                               title="Print this GRN" aria-label="Print GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-printer"></i></a>
+
+                                            <a href="{{ url_for('edit_grn', id=grn.id) }}"
+                                               class="btn btn-sm btn-outline-warning"
+                                               title="Edit this GRN" aria-label="Edit GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-pencil"></i></a>
+
+                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                    data-bs-toggle="modal" data-bs-target="#shiftGrnModal{{ grn.id }}"
+                                                    title="Shift this GRN to another supplier (preserves inventory &amp; sales)"
+                                                    aria-label="Shift GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }} to another supplier"><i class="bi bi-arrow-left-right"></i></button>
+
+                                            <form action="{{ url_for('grn') }}" method="POST" class="grn-action-form" onsubmit="return confirm('Are you sure you want to delete this GRN? This will reverse the stock addition.');">
+
+                                                <input type="hidden" name="action" value="delete">
+
+                                                <input type="hidden" name="id" value="{{ grn.id }}">
+
+                                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                        title="Delete this GRN" aria-label="Delete GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-trash"></i></button>
+
+                                            </form>
+
+                                        </div>
+
+                                        <div class="modal fade" id="shiftGrnModal{{ grn.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <form action="{{ url_for('shift_grn_supplier', id=grn.id) }}" method="POST" class="modal-content bg-dark text-white border-secondary">
+                                                    <div class="modal-header border-secondary">
+                                                        <h5 class="modal-title text-info"><i class="bi bi-arrow-right-circle me-2"></i>Shift GRN Supplier</h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p class="text-white-50 small">Move GRN <strong>{{ grn.auto_bill_no or grn.id }}</strong> from <strong>{{ grn.supplier }}</strong> to the correct supplier. Inventory and existing sales are preserved.</p>
+                                                        <select name="target_supplier_id" class="form-select bg-dark text-white border-secondary" required>
+                                                            <option value="">-- Select correct supplier --</option>
+                                                            {% for ts in suppliers %}
+                                                            {% if ts.name != grn.supplier %}
+                                                            <option value="{{ ts.id }}">{{ ts.name }}</option>
+                                                            {% endif %}
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="modal-footer border-secondary">
+                                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-info btn-sm fw-bold text-dark" onclick="return confirm('Shift this GRN to the selected supplier?');">Shift</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                                <tr class="grn-details-row" id="grnDetails{{ grn.id }}" hidden>
+                                    <td colspan="12">
+                                        <div class="grn-details">
+                                            <div class="grn-details-head">
+                                                <span class="grn-details-title"><i class="bi bi-box-seam me-1"></i>Consumption by lot</span>
+                                                <span class="grn-details-note">{{ live_items|length }} line{{ '' if live_items|length == 1 else 's' }} on this GRN &middot; every lot keeps its own purchase rate and FIFO consumption</span>
+                                            </div>
+                                            {% set bd = (grn_breakdowns or {}).get(grn.id) %}
+                                            {% if bd %}
+                                            <div class="grn-cost-panel mb-3 p-2 border border-secondary rounded">
+                                                <div class="d-flex flex-wrap gap-3 small mb-2">
+                                                    <span class="fw-bold text-info"><i class="bi bi-receipt me-1"></i>Cost &amp; Payments</span>
+                                                    <span>Supplier Material: <b>{{ '{:,.2f}'.format(bd.supplier_material_amount) }}</b></span>
+                                                    <span>Vehicle Fare: <b>{{ '{:,.2f}'.format(bd.vehicle_fare) }}</b></span>
+                                                    <span>Loading: <b>{{ '{:,.2f}'.format(bd.loading) }}</b></span>
+                                                    <span>Unloading: <b>{{ '{:,.2f}'.format(bd.unloading) }}</b></span>
+                                                    <span>Other: <b>{{ '{:,.2f}'.format(bd.other_charges) }}</b></span>
+                                                    <span>Total Actual Cost: <b class="text-success">{{ '{:,.2f}'.format(bd.landed_cost_total) }}</b></span>
+                                                    <span>Avg Actual Rate: <b>{{ '{:,.2f}'.format(bd.average_actual_rate) }}</b></span>
+                                                </div>
+                                                <div class="d-flex flex-wrap gap-3 small mb-2">
+                                                    <span>Supplier Paid: <b>{{ '{:,.2f}'.format(bd.supplier_paid) }}</b></span>
+                                                    <span>Supplier Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.supplier_remaining) }}</b></span>
+                                                    <span>Charges Paid: <b>{{ '{:,.2f}'.format(bd.additional_paid) }}</b></span>
+                                                    <span>Charges Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.additional_remaining) }}</b></span>
+                                                    <span>Total Cash Actually Paid: <b class="text-success">{{ '{:,.2f}'.format(bd.total_cash_paid) }}</b></span>
+                                                    <a class="btn btn-sm btn-outline-info py-0" href="{{ url_for('accounts.grn_payments', grn_id=grn.id) }}"><i class="bi bi-cash-coin"></i> Pay this GRN</a>
+                                                </div>
+                                                <div class="small mb-1">
+                                                    <div class="row g-1 fw-bold text-muted border-bottom pb-1">
+                                                        <div class="col-md-4">Obligation / Recipient</div>
+                                                        <div class="col-md-2 text-end">Original</div>
+                                                        <div class="col-md-2 text-end">Paid</div>
+                                                        <div class="col-md-2 text-end">Remaining</div>
+                                                        <div class="col-md-2">Status / Treatment</div>
+                                                    </div>
+                                                    {% for ob in bd.obligations %}
+                                                    <div class="row g-1 border-bottom py-1">
+                                                        <div class="col-md-4">{{ ob.label }}{% if ob.kind == 'CHARGE' %} <span class="text-muted">→ {{ ob.recipient_name or ob.recipient_label }}</span>{% endif %}</div>
+                                                        <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.original) }}</div>
+                                                        <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.paid) }}</div>
+                                                        <div class="col-md-2 text-end fw-bold">{{ '{:,.2f}'.format(ob.remaining) }}</div>
+                                                        <div class="col-md-2">{{ ob.status }} <span class="text-muted">/ {{ ob.cost_treatment if ob.cost_treatment else 'Supplier material' }}</span></div>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                                {% if bd.payment_rows %}
+                                                <div class="small fw-bold mt-2"><i class="bi bi-clock-history me-1"></i>Payment history</div>
+                                                <div class="small">
+                                                    {% for pay in bd.payment_rows %}
+                                                    <div class="row g-1 border-bottom py-1">
+                                                        <div class="col-md-2">{{ pay.date_posted.strftime('%d/%b/%Y') if pay.date_posted else '—' }}</div>
+                                                        <div class="col-md-3">{{ pay.recipient_name or pay.recipient_type }}</div>
+                                                        <div class="col-md-2 text-end">{{ '{:,.2f}'.format(pay.amount) }}</div>
+                                                        <div class="col-md-2">{{ pay.method }}</div>
+                                                        <div class="col-md-2">{{ pay.reference }}</div>
+                                                        <div class="col-md-1">{{ 'Voided' if pay.is_void else ('Posted' if pay.cash_posted else 'Recorded') }}</div>
+                                                    </div>
+                                                    {% endfor %}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+                                            <div class="grn-lot-list">
+                                                {% for item in live_items %}
+                                                {% set lot = (grn_consumption['items'].get(item.id) if grn_consumption else None) %}
+                                                {% set received = lot.received_qty if lot else (item.qty or 0) %}
+                                                {% set consumed = lot.consumed_qty if lot else 0 %}
+                                                {% set remaining = lot.remaining_qty if lot else (item.qty or 0) %}
+                                                {% set pct = lot.consumed_pct if lot else 0 %}
+                                                {% set level = lot.level if lot else 'low' %}
+                                                {% set rate = (lot.rate if lot else (item.price_at_time or 0)) or 0 %}
+                                                {% set unit = (lot.unit if lot else '') or '' %}
+                                                <div class="grn-item-consume" data-grn-scope>
+                                                    <div class="grn-consume-head">
+                                                        <span class="grn-consume-name">{{ item.mat_name }}</span>
+                                                        {% if rate %}<span class="grn-consume-meta">@ Rs {{ '{:,.2f}'.format(rate) }}</span>{% endif %}
+                                                        {% if lot and lot.status in ['recorded', 'reconstructed'] %}
+                                                        <span class="grn-consume-status {{ 'is-recorded' if lot.status == 'recorded' else 'is-reconstructed' }}"
+                                                              title="{{ 'Consumed through posted FIFO allocations' if lot.status == 'recorded' else 'Consumed through the FIFO movement replay (no posted allocation for this lot)' }}">{{ lot.status }}</span>
+                                                        {% endif %}
+                                                        {% if lot %}<span class="grn-consume-meta">In hand <b>Rs {{ '{:,.0f}'.format(lot.remaining_value or 0) }}</b></span>{% endif %}
+                                                    </div>
+                                                    <div class="grn-lot-meter">
+                                                        <div class="grn-lot-figures">
+                                                            <span class="fig-received">Received <b data-grn-received>{{ '{:,.2f}'.format(received) }}</b>{% if unit %} {{ unit }}{% endif %}</span>
+                                                            <span class="fig-consumed">Consumed <b data-grn-consumed>{{ '{:,.2f}'.format(consumed) }}</b></span>
+                                                            <span class="fig-remaining">Remaining <b data-grn-remaining>{{ '{:,.2f}'.format(remaining) }}</b></span>
+                                                        </div>
+                                                        <div class="grn-consume level-{{ level }}" data-grn-consume data-grn-item-id="{{ item.id }}"
+                                                             data-received="{{ received }}" data-consumed="{{ consumed }}" data-percent="{{ pct }}">
+                                                            <div class="grn-consume-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                                                                 aria-valuenow="{{ pct }}" aria-valuetext="{{ pct }}% consumed"
+                                                                 title="{{ '%.2f'|format(consumed) }} of {{ '%.2f'|format(received) }} consumed">
+                                                                <div class="grn-consume-fill level-{{ level }}" style="width: {{ pct }}%;"></div>
+                                                            </div>
+                                                            <span class="grn-consume-pct">{{ '{:,.1f}'.format(pct) }}%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% else %}
+                                                <span class="grn-items-empty">No active lines on this GRN.</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                {% endfor %}
+
+                            </tbody>
+
+                        </table>
 
 
-            </div>
+                </div>
+
+            {% else %}
+            {% include 'grn_costs_tab.html' %}
+            {% endif %}
 
         </div>
 
@@ -1298,7 +1365,7 @@
 
 
 {# Charge-grid behaviour: rows exist only when the operator adds them. #}
-<script src="{{ url_for('static', filename='grn_charges.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='grn_charges.js') }}?v=2"></script>
 <script>
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1686,68 +1753,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-
-    // Toggle Bank Details
-    const paymentTypeSelect = document.getElementById('paymentTypeSelect');
-    const bankDetailsSection = document.getElementById('bankDetailsSection');
-    const paymentAccountSection = document.getElementById('paymentAccountSection');
-    const paymentAccountSelect = document.getElementById('paymentAccountSelect');
-    const bankNameInput = document.getElementById('bankNameInput');
-    const bankAccountHolderInput = document.getElementById('bankAccountHolderInput');
-    const bankAccountNoInput = document.getElementById('bankAccountNoInput');
-
-    function toggleBankDetails() {
-        bankDetailsSection.style.display = (paymentTypeSelect.value === 'Bank Transfer') ? 'flex' : 'none';
-    }
-
-    function togglePaymentAccount() {
-        if (!paymentAccountSection || !paymentAccountSelect || !paymentTypeSelect) return;
-        const pt = (paymentTypeSelect.value || '').trim();
-        const show = (pt === 'Cash' || pt === 'Bank Transfer');
-        paymentAccountSection.style.display = show ? 'flex' : 'none';
-
-        const expected = (pt === 'Cash') ? 'cash' : ((pt === 'Bank Transfer') ? 'bank' : '');
-        for (const opt of paymentAccountSelect.options) {
-            if (!opt.value) continue;
-            const cat = (opt.dataset.category || '').trim().toLowerCase();
-            const ok = !expected || cat === expected;
-            opt.hidden = !ok;
-            opt.disabled = !ok;
-        }
-        const selectedOpt = paymentAccountSelect.options[paymentAccountSelect.selectedIndex];
-        if (selectedOpt && selectedOpt.disabled) {
-            paymentAccountSelect.value = '';
-        }
-        if (!show) {
-            paymentAccountSelect.value = '';
-        }
-    }
-
-    function syncBankFieldsFromAccount() {
-        if (!paymentTypeSelect || !paymentAccountSelect) return;
-        if ((paymentTypeSelect.value || '').trim() !== 'Bank Transfer') return;
-        const opt = paymentAccountSelect.options[paymentAccountSelect.selectedIndex];
-        if (!opt || !opt.value) return;
-        const cat = (opt.dataset.category || '').trim().toLowerCase();
-        if (cat !== 'bank') return;
-        if (bankNameInput) bankNameInput.value = opt.dataset.bank || '';
-        if (bankAccountHolderInput) bankAccountHolderInput.value = opt.dataset.holder || '';
-        if (bankAccountNoInput) bankAccountNoInput.value = opt.dataset.no || '';
-    }
-
-    if (paymentTypeSelect) {
-        paymentTypeSelect.addEventListener('change', function () {
-            toggleBankDetails();
-            togglePaymentAccount();
-            syncBankFieldsFromAccount();
-        });
-        // Initial check is handled by inline style, but this ensures consistency if JS loads late
-    }
-    if (paymentAccountSelect) {
-        paymentAccountSelect.addEventListener('change', syncBankFieldsFromAccount);
-    }
-    togglePaymentAccount();
-    syncBankFieldsFromAccount();
 
     const discountInput = document.getElementById('grnDiscount');
     if (discountInput) {
