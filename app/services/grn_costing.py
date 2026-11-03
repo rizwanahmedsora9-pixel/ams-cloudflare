@@ -504,6 +504,10 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
     amounts = form.getlist('charge_amount[]')
     recipients = form.getlist('charge_recipient_type[]')
     party_names = form.getlist('charge_recipient[]')
+    # A charge carries cost facts only.  There is no paid/unpaid field on the
+    # grid any more (owner: every paid control lives in Accounts), so the old
+    # declaration is gone from the form; a stored value is simply kept as-is
+    # and never influences a cost or a balance.
     statuses = form.getlist('charge_status[]')
     treatments = form.getlist('charge_treatment[]')
     bases = form.getlist('charge_basis[]')
@@ -531,9 +535,17 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
         ctype = at(types, idx, 'OTHER').strip().upper()
         if ctype not in CHARGE_TYPES:
             ctype = 'OTHER'
-        status = at(statuses, idx, 'UNPAID').strip().upper()
-        if status not in DECLARED_STATUSES:
-            status = 'UNPAID'
+        raw_id = at(charge_ids, idx, '')
+        stored_charge = existing.get(int(raw_id)) if str(raw_id).isdigit() else None
+        if statuses:
+            status = at(statuses, idx, 'UNPAID').strip().upper()
+            if status not in DECLARED_STATUSES:
+                status = 'UNPAID'
+        else:
+            # Field removed from the GRN screen: never invent a declaration.
+            status = (getattr(stored_charge, 'declared_status', None) or 'UNPAID').upper()
+            if status not in DECLARED_STATUSES:
+                status = 'UNPAID'
         if status == 'NOT_APPLICABLE':
             amount_minor = 0
         treatment = at(treatments, idx, 'INVENTORY').strip().upper()
@@ -553,10 +565,7 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
             actor=actor,
         ) if party_name and recipient != 'UNSPECIFIED' else None
 
-        raw_id = at(charge_ids, idx, '')
-        charge = None
-        if str(raw_id).isdigit() and int(raw_id) in existing:
-            charge = existing[int(raw_id)]
+        charge = stored_charge
         if charge is None and amount_minor > 0:
             charge = GRNCharge(grn_id=grn.id, created_by=actor)
             db.session.add(charge)

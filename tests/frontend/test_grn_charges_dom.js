@@ -14,10 +14,11 @@
         operator picked by hand is never overwritten;
      4. every row is removable, including the last, and the empty state comes
         back;
-     5. the capitalised preview counts INVENTORY charges only, ignores Not
-        Applicable, and never changes with Paid / Unpaid;
+     5. the capitalised preview counts INVENTORY charges only, and a charge
+        row carries no paid/unpaid field (payments live only in Accounts);
      6. save-time validation drops untouched blank rows, refuses a row with no
         charge or no amount, and keeps the grid honest.
+     7. there is no paid/unpaid control anywhere in the grid.
 
    Run:  npm i jsdom   then   node tests/frontend/test_grn_charges_dom.js
    Against a real rendered screen instead of the fixture:
@@ -61,11 +62,6 @@ function rowMarkup(saved) {
       <option value="OTHER"${sel(c.recipient, "OTHER")}>Other charge recipient</option>
   </select></td>
   <td><input type="text" name="charge_recipient[]" value="${c.party || ""}"></td>
-  <td><select name="charge_status[]">
-      <option value="UNPAID"${sel(c.status || "UNPAID", "UNPAID")}>Unpaid</option>
-      <option value="PAID"${sel(c.status, "PAID")}>Paid (declaration only)</option>
-      <option value="NOT_APPLICABLE"${sel(c.status, "NOT_APPLICABLE")}>Not Applicable</option>
-  </select></td>
   <td><select name="charge_treatment[]">
       <option value="INVENTORY"${sel(c.treatment || "INVENTORY", "INVENTORY")}>Include in material cost</option>
       <option value="EXPENSE"${sel(c.treatment, "EXPENSE")}>Separate expense</option>
@@ -88,7 +84,7 @@ const FIXTURE = `<!doctype html><html><body>
   <div class="table-responsive" id="grnChargesWrap" hidden>
     <table id="grnChargesTable">
       <thead><tr><th>Charge</th><th>Label / Detail</th><th>Amount (Rs.)</th><th>Recipient Type</th>
-        <th>Recipient / Person</th><th>Payment Status</th><th>Cost Treatment</th><th>Alloc. Basis</th><th></th></tr></thead>
+        <th>Recipient / Person</th><th>Cost Treatment</th><th>Alloc. Basis</th><th></th></tr></thead>
       <tbody id="grnChargesBody"></tbody>
     </table>
   </div>
@@ -191,12 +187,12 @@ check("a separate expense is excluded from the capitalised preview", api.capital
 set(third, "charge_treatment[]", "NON_MATERIAL");
 check("a non-material charge is excluded too", api.capitalisedTotal() === 6000, api.capitalisedTotal());
 set(third, "charge_treatment[]", "INVENTORY");
-set(third, "charge_status[]", "NOT_APPLICABLE");
-check("Not Applicable contributes nothing", api.capitalisedTotal() === 6000, api.capitalisedTotal());
-set(third, "charge_status[]", "PAID");
-const paidTotal = api.capitalisedTotal();
-set(third, "charge_status[]", "UNPAID");
-check("Paid / Unpaid never changes the cost", api.capitalisedTotal() === paidTotal && paidTotal === 6500, paidTotal);
+check("an INVENTORY charge is back in the capitalised preview", api.capitalisedTotal() === 6500, api.capitalisedTotal());
+check("a charge row has no paid/unpaid field at all",
+    api.rows().every((row) => !row.querySelector('[name="charge_status[]"]')));
+set(third, "charge_amount[]", "700");
+check("changing the amount is the only thing that moves the cost", api.capitalisedTotal() === 6700, api.capitalisedTotal());
+set(third, "charge_amount[]", "500");
 check("editing a charge triggers a totals repaint", repaints > 0, repaints);
 
 /* ---- 5. every row is removable, including the last -------------------- */
@@ -240,11 +236,11 @@ if (!pagePath) {
     check("a complete charge row saves", api.validate(warn) === true && alerts.length === 0, alerts.join(" | "));
     check("validation fills the recipient type from the charge", val(noType, "charge_recipient_type[]") === "LABOUR");
 
-    /* A Not Applicable row is a legitimate zero: it must not block the save. */
-    set(noType, "charge_amount[]", "");
-    set(noType, "charge_status[]", "NOT_APPLICABLE");
+    /* A stored (already saved) charge may legitimately be zeroed; a brand-new
+       row may not be.  There is no paid/unpaid selector to bypass this. */
+    set(noType, "charge_amount[]", "0");
     alerts.length = 0;
-    check("a Not Applicable charge may be zero", api.validate(warn) === true, alerts.join(" | "));
+    check("a new zero-amount charge is still refused", api.validate(warn) === false, alerts.join(" | "));
 }
 
 console.log("\n" + pass + " passed, " + fail + " failed");

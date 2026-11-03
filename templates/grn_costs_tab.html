@@ -1,0 +1,173 @@
+{# =========================================================================
+   GRN Costs tab — every individual purchase cost, filtered.
+
+   Owner rules:
+     * stock cost is exactly qty x rate (A2);
+     * vehicle fare / transport, loading, unloading and other are separate
+       cost lines with their own recipients;
+     * there is NO paid/unpaid declaration anywhere on this screen.  Money is
+       paid only from Accounts -> PAY EXISTING GRN.
+
+   Numbers come from app/services/grn_costs.py, which reads grn_costing.
+   ========================================================================= #}
+{% set costs = grn_costs %}
+{% if costs %}
+<div class="grn-costs" id="grnCostsTab">
+
+    <div class="grn-costs-head">
+        <span class="grn-records-title">
+            <i class="bi bi-cash-stack text-warning me-1"></i>GRN Costs
+            <span class="grn-count-pill">{{ costs.grn_count }} GRN{{ '' if costs.grn_count == 1 else 's' }}</span>
+            <span class="grn-count-pill">{{ costs.row_count }} line{{ '' if costs.row_count == 1 else 's' }}</span>
+        </span>
+        <a href="{{ url_for('accounts.grn_payments') }}" class="btn btn-sm btn-outline-success ms-auto">
+            <i class="bi bi-cash-coin"></i> Pay from Accounts
+        </a>
+    </div>
+
+    <div class="grn-cost-kpis">
+        {% for card in costs.kinds %}
+        <a class="grn-cost-kpi {{ 'is-active' if costs.kind == card.kind else '' }}"
+           href="{{ url_for('grn', tab='costs', cost_kind=card.kind,
+                            cost_supplier=costs.supplier,
+                            cost_start=(costs.start.strftime('%Y-%m-%d') if costs.start else ''),
+                            cost_end=(costs.end.strftime('%Y-%m-%d') if costs.end else '')) }}"
+           title="Show only {{ card.label }}">
+            <span class="grn-cost-kpi-label">{{ card.label }}</span>
+            <span class="grn-cost-kpi-value">Rs {{ '{:,.2f}'.format(card.total) }}</span>
+            <span class="grn-cost-kpi-meta">{{ card.count }} line{{ '' if card.count == 1 else 's' }}</span>
+        </a>
+        {% endfor %}
+        <div class="grn-cost-kpi grn-cost-kpi-total {{ 'is-active' if costs.kind == 'ALL' else '' }}"
+             title="Every cost on the GRNs in scope">
+            <span class="grn-cost-kpi-label">Total purchase cost</span>
+            <span class="grn-cost-kpi-value">Rs {{ '{:,.2f}'.format(costs.grand_total) }}</span>
+            <span class="grn-cost-kpi-meta">{{ costs.all_row_count }} line{{ '' if costs.all_row_count == 1 else 's' }}</span>
+        </div>
+    </div>
+
+    <form action="{{ url_for('grn') }}" method="GET" class="grn-costs-filter" id="grnCostsFilter">
+        <input type="hidden" name="tab" value="costs">
+
+        <div class="grn-costs-field">
+            <label class="form-label" for="grnCostKind">Cost kind</label>
+            <select name="cost_kind" id="grnCostKind" class="form-select form-select-sm">
+                <option value="ALL" {{ 'selected' if costs.kind == 'ALL' }}>{{ cost_kind_labels['ALL'] }}</option>
+                {% for kind in cost_kind_order %}
+                <option value="{{ kind }}" {{ 'selected' if costs.kind == kind }}>{{ cost_kind_labels[kind] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="grn-costs-field">
+            <label class="form-label" for="grnCostSupplier">Supplier</label>
+            <select name="cost_supplier" id="grnCostSupplier" class="form-select form-select-sm">
+                <option value="">All suppliers</option>
+                {% for name in cost_suppliers %}
+                <option value="{{ name }}" {{ 'selected' if costs.supplier == name }}>{{ name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="grn-costs-field">
+            <label class="form-label" for="grnCostStart">From</label>
+            <input type="date" name="cost_start" id="grnCostStart" class="form-control form-control-sm"
+                   value="{{ costs.start.strftime('%Y-%m-%d') if costs.start else '' }}">
+        </div>
+
+        <div class="grn-costs-field">
+            <label class="form-label" for="grnCostEnd">To</label>
+            <input type="date" name="cost_end" id="grnCostEnd" class="form-control form-control-sm"
+                   value="{{ costs.end.strftime('%Y-%m-%d') if costs.end else '' }}">
+        </div>
+
+        <div class="grn-costs-field grn-costs-actions">
+            <label class="form-label d-none d-md-block">&nbsp;</label>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Apply</button>
+                <a href="{{ url_for('grn', tab='costs') }}" class="btn btn-sm btn-outline-secondary"
+                   title="Clear every filter"><i class="bi bi-x-lg"></i> Clear</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="grn-costs-scope">
+        Showing <b>{{ cost_kind_labels[costs.kind] }}</b>
+        {% if costs.supplier %} for <b>{{ costs.supplier }}</b>{% endif %}
+        {% if costs.start or costs.end %}
+            from <b>{{ costs.start.strftime('%d/%b/%Y') if costs.start else 'the beginning' }}</b>
+            to <b>{{ costs.end.strftime('%d/%b/%Y') if costs.end else 'today' }}</b>
+        {% endif %}
+        &middot; filtered total <b>Rs {{ '{:,.2f}'.format(costs.filtered_total) }}</b>
+        <span class="text-muted">(payments are recorded only in Accounts &rarr; PAY EXISTING GRN)</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover table-sm grn-costs-table" id="grnCostsTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>GRN</th>
+                    <th>Supplier</th>
+                    <th>Cost kind</th>
+                    <th>Detail</th>
+                    <th>Recipient / person</th>
+                    <th class="grn-col-num">Qty</th>
+                    <th class="grn-col-num">Rate</th>
+                    <th class="grn-col-num">Amount (Rs.)</th>
+                    <th>Treatment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in costs.rows %}
+                <tr class="grn-cost-row" data-cost-kind="{{ row.kind }}">
+                    <td class="text-nowrap">
+                        {% if row.grn_date %}
+                        <div class="fw-bold">{{ row.grn_date.strftime('%d/%b/%Y') }}</div>
+                        <div class="small text-muted">{{ row.grn_date.strftime('%I:%M %p') }}</div>
+                        {% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('grn', search=row.bill_ref) }}" class="text-decoration-none">
+                            {{ row.bill_ref }}
+                        </a>
+                    </td>
+                    <td class="grn-supplier">{{ row.supplier or '—' }}</td>
+                    <td><span class="badge grn-cost-badge kind-{{ row.kind|lower }}">{{ row.kind_label }}</span></td>
+                    <td>
+                        <span class="d-block">{{ row.detail }}</span>
+                        {% if row.sub_detail %}<span class="small text-muted">{{ row.sub_detail }}</span>{% endif %}
+                    </td>
+                    <td>{{ row.recipient or '—' }}</td>
+                    <td class="grn-col-num">{{ '{:,.2f}'.format(row.qty) if row.qty else '—' }}</td>
+                    <td class="grn-col-num">{{ '{:,.2f}'.format(row.rate) if row.rate else '—' }}</td>
+                    <td class="grn-col-num fw-bold">{{ '{:,.2f}'.format(row.amount) }}</td>
+                    <td class="small text-muted">{{ row.treatment_label }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-1"></i>
+                        No {{ cost_kind_labels[costs.kind]|lower }} found for this supplier and date range.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% if costs.rows %}
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="8" class="text-end">Filtered total</td>
+                    <td class="grn-col-num">{{ '{:,.2f}'.format(costs.filtered_total) }}</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-danger my-3">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    The GRN costs report could not be built. Please retry; if it keeps failing, check the server log.
+</div>
+{% endif %}

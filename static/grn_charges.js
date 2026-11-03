@@ -14,6 +14,11 @@
      * an empty grid still posts ``charge_grid_present`` so the server can
        tell "no charges" from "this form has no charge grid".
 
+   A charge line carries cost facts only: type, label, amount, recipient,
+   cost treatment and allocation basis.  It deliberately has no paid/unpaid
+   field — payment state belongs to Accounts (PAY EXISTING GRN), never to a
+   receiving document.
+
    This module owns the rows only.  All money arithmetic still comes from
    app/services/grn_costing.py on the server; the live figure here is a
    preview built from the same rule (INVENTORY charges, minus the ones
@@ -93,16 +98,16 @@
         return hasRows;
     }
 
-    /* Capitalised preview: material-cost charges only, and a charge declared
-       Not Applicable never contributes.  Paid/unpaid never changes the cost. */
+    /* Capitalised preview: material-cost charges only.  There is no
+       paid/unpaid field on a charge any more — money moves only in Accounts,
+       so payment state can never change the cost. */
     function capitalisedTotal() {
         var total = 0;
         rows().forEach(function (row) {
             var amount = num(valueOf(row, "charge_amount[]"));
             if (!amount) return;
             var treatment = valueOf(row, "charge_treatment[]") || "INVENTORY";
-            var status = valueOf(row, "charge_status[]");
-            if (treatment === "INVENTORY" && status !== "NOT_APPLICABLE") total += amount;
+            if (treatment === "INVENTORY") total += amount;
         });
         return total;
     }
@@ -214,7 +219,6 @@
             var id = valueOf(row, "charge_id[]");
             var type = valueOf(row, "charge_type[]");
             var amountRaw = valueOf(row, "charge_amount[]");
-            var status = valueOf(row, "charge_status[]");
             if (!type) {
                 warn("Charge row " + (i + 1) + ": select the charge (Vehicle Fare, Transportation, Loading, Unloading, Other Expenses), or remove the row.");
                 var sel = field(row, "charge_type[]");
@@ -222,9 +226,9 @@
                 return false;
             }
             if (!amountRaw || num(amountRaw) <= 0) {
-                /* A stored charge may legitimately be zeroed / marked Not
-                   Applicable; a brand-new row may not be saved costless. */
-                if (status !== "NOT_APPLICABLE" && !id) {
+                /* A stored charge may legitimately be zeroed; a brand-new row
+                   may not be saved costless. */
+                if (!id) {
                     warn("Charge row " + (i + 1) + ": enter the amount, or remove the row.");
                     var amt = field(row, "charge_amount[]");
                     if (amt) amt.focus();
