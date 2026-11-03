@@ -55,7 +55,7 @@
       {{ ui_tile(href=summary_url, label='Total Loss', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries'), cta='Back to summary') }}
     {% else %}
       {{ ui_tile(href=summary_url, label='Sales (Money In)', value=("Rs. " ~ ("{:,.2f}".format(total_revenue))), icon='bi-bag-cash', colour='sky', sub='Earned revenue, net of returns', cta='Back to summary') }}
-      {{ ui_tile(href=summary_url, label='Cost of Goods (Money Out)', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Recognized material + delivery cost', cta='Back to summary') }}
+      {{ ui_tile(href=summary_url, label='COGS / Direct Service Cost', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Goods COGS plus direct service cost; open the summary for the split', cta='Back to summary') }}
       {{ ui_tile(href=summary_url, label='Profit (Money Kept)', value=("Rs. " ~ ("{:,.2f}".format(total_profit))), icon='bi-cash-coin', colour=('green' if total_profit >= 0 else 'red'), sub='Qualified net result', cta='Back to summary') }}
     {% endif %}
   </div>

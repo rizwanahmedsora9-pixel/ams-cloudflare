@@ -39,6 +39,7 @@
   {% if breakdown %}
   <div class="row g-2 mb-3 small">
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Material</div><b>Rs. {{ '{:,.2f}'.format(breakdown.supplier_material_amount) }}</b></div></div></div>
+    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Ledger Bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b><div class="small text-muted">{{ 'Material + GRN costs' if breakdown.include_charges_in_supplier else 'Material only' }}</div></div></div></div>
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Additional Charges</div><b>Rs. {{ '{:,.2f}'.format(breakdown.capitalised_charge_total + breakdown.expense_charge_total) }}</b></div></div></div>
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Total Actual Cost</div><b class="text-success">Rs. {{ '{:,.2f}'.format(breakdown.landed_cost_total) }}</b></div></div></div>
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Avg Actual Rate</div><b>Rs. {{ '{:,.2f}'.format(breakdown.average_actual_rate) }}</b></div></div></div>
@@ -144,8 +145,8 @@
             <button class="btn btn-success w-100 mt-3" {{ 'disabled' if not can_edit }}><i class="bi bi-save"></i> Save payment</button>
           </form>
           <div class="small text-muted mt-2">
-            <i class="bi bi-shield-check me-1"></i>Paying the transporter never reduces the supplier's payable.
-            Each save creates exactly one cash-out row in Cash Flow.
+            <i class="bi bi-shield-check me-1"></i>
+            {% if breakdown.include_charges_in_supplier %}This GRN bills vehicle/loading/unloading/other costs to the supplier. Pay the supplier bill here; those costs do not create a second transporter/labour payable.{% else %}Paying the transporter never reduces the supplier's payable. Each save creates exactly one cash-out row in Cash Flow.{% endif %}
           </div>
         </div>
       </div>

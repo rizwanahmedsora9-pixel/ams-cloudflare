@@ -7,10 +7,10 @@ authority itself):
   business owes/spent on stock and on the incidental costs of receiving it.
   It never shows a paid/unpaid declaration, because every payment lives in
   Accounts (``Accounts -> PAY EXISTING GRN``).
-* A2 — the supplier material amount is exactly ``sum(qty * rate)``.  Vehicle
-  fare, transport, loading, unloading and other charges are separate cost
-  lines with their own recipients, so they are listed here as their own kinds
-  and never folded into the stock figure.
+* The supplier material amount is exactly ``sum(qty * rate)``.  Vehicle
+  fare, transport, loading, unloading and other charges are listed as their
+  own cost kinds.  The GRN billing checkbox decides whether those costs are
+  payable through the supplier ledger or to their own recipients.
 
 Every number comes from ``grn_costing.grn_breakdown`` — this module only
 groups, filters and totals, so no screen can invent its own version of the
@@ -208,12 +208,13 @@ def _charge_rows(grn, breakdown):
             'rate': 0.0,
             'recipient': recipient or (charge.get('recipient_label') or ''),
             'treatment': (charge.get('cost_treatment') or 'INVENTORY').upper(),
-            'treatment_label': {
+            'treatment_label': ({
                 'INVENTORY': 'In material cost',
                 'EXPENSE': 'Separate expense',
                 'NON_MATERIAL': 'Not material cost',
                 'UNTRACKED_LEGACY': 'Legacy (untracked)',
-            }.get((charge.get('cost_treatment') or 'INVENTORY').upper(), ''),
+            }.get((charge.get('cost_treatment') or 'INVENTORY').upper(), '')
+                + (' · billed to supplier' if charge.get('included_in_supplier_bill') else '')),
             'amount': amount,
             'line_landed_cost': 0.0,
         })

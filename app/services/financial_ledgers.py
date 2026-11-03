@@ -56,17 +56,18 @@ from models import (
     WaiveOff,
 )
 from app.services.grn_svc import calculate_grn_total
-from app.services.grn_costing import supplier_material_minor as _grn_supplier_material_minor
+from app.services.grn_costing import supplier_ledger_credit_minor as _grn_supplier_ledger_credit_minor
 
 
 def _grn_supplier_credit(grn) -> Decimal:
-    """Owner rule A2: Supplier Ledger credit = sum(qty x rate) ONLY.
+    """Supplier Ledger credit follows the GRN billing checkbox.
 
-    Freight, loading, unloading, other charges, tax, discount and adjustment
-    are never part of the supplier payable.
+    Unchecked: material qty × rate only.  Checked: material plus applicable
+    vehicle/loading/unloading/other GRN charges.  The same helper drives the
+    supplier ledger, supplier payables overview and Accounts purchase payables.
     """
     try:
-        return Decimal(int(_grn_supplier_material_minor(grn))) / Decimal(100)
+        return Decimal(int(_grn_supplier_ledger_credit_minor(grn))) / Decimal(100)
     except Exception:
         return Decimal("0.00")
 
@@ -1279,7 +1280,7 @@ def _supplier_rows(supplier):
         or_(GRN.supplier_id == supplier.id, func.lower(func.trim(GRN.supplier)) == _norm(supplier.name)),
     ).order_by(GRN.date_posted.asc(), GRN.id.asc()).all()
     for grn in grns:
-        # A2: exactly material quantity x purchase rate, nothing else.
+        # Supplier billing checkbox: material only, or material + GRN costs.
         total = _grn_supplier_credit(grn)
         if total == 0:
             # Keep a zero-value adjustment out of balances, but historical
@@ -1308,6 +1309,21 @@ def _supplier_rows(supplier):
             account=getattr(getattr(grn, "payment_account", None), "name", "") or "",
             source=grn,
         )
+        if bool(getattr(grn, "include_charges_in_supplier", False)):
+            for charge in (getattr(grn, "charges", None) or []):
+                if bool(getattr(charge, "is_void", False)):
+                    continue
+                amount = _decimal(getattr(charge, "amount_minor", 0) or 0) / Decimal(100)
+                treatment = (getattr(charge, "cost_treatment", None) or "INVENTORY").upper()
+                status = (getattr(charge, "declared_status", None) or "UNPAID").upper()
+                if amount <= 0 or status == "NOT_APPLICABLE" or treatment in ("NON_MATERIAL", "UNTRACKED_LEGACY"):
+                    continue
+                item_lines.append({
+                    "name": (getattr(charge, "label", None) or getattr(charge, "charge_type", None) or "GRN cost") + " (billed to supplier)",
+                    "qty": 0.0,
+                    "rate": 0.0,
+                    "amount": _float(amount),
+                })
         row["item_lines"] = item_lines
         row["supplier_invoice_no"] = getattr(grn, "supplier_invoice_no", "") or ""
         rows.append(row)
@@ -1431,7 +1447,7 @@ def build_supplier_payable_overview(suppliers=None):
         for grn in grns:
             if grn.supplier_id != supplier.id and _norm(grn.supplier) != supplier_name:
                 continue
-            grn_total = _grn_supplier_credit(grn)   # A2
+            grn_total = _grn_supplier_credit(grn)
             total_purchase += grn_total
             balance += grn_total
             if grn_total != 0:
@@ -1753,6 +1769,10 @@ def build_party_financial_ledger(party, **filters):
         if amount == 0:
             continue
         grn = db.session.get(GRN, charge.grn_id)
+        if grn is not None and bool(getattr(grn, "include_charges_in_supplier", False)):
+            # Billed through the supplier ledger; do not create a second
+            # payable to the transporter/labour party.
+            continue
         rows.append(_row(
             date_value=getattr(grn, "date_posted", None) if grn else getattr(charge, "created_at", None),
             row_type="CHARGE",
@@ -1823,10 +1843,13 @@ def build_purchase_payables():
             result["total"] += ledger["closing_balance"]
     # Legacy mirrored charges with no named recipient stay visible as an
     # explicit "unassigned" bucket so nothing silently disappears.
-    unassigned_charges = GRNCharge.query.filter(
-        GRNCharge.recipient_party_id.is_(None),
-        GRNCharge.is_void == False,  # noqa: E712
-    ).all()
+    unassigned_charges = [
+        c for c in GRNCharge.query.filter(
+            GRNCharge.recipient_party_id.is_(None),
+            GRNCharge.is_void == False,  # noqa: E712
+        ).all()
+        if not bool(getattr(db.session.get(GRN, c.grn_id), "include_charges_in_supplier", False))
+    ]
     unassigned_paid = sum(
         float(getattr(p, "amount", 0) or 0)
         for p in SupplierPayment.query.filter(

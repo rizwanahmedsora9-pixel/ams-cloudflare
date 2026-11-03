@@ -101,6 +101,17 @@
     /* Capitalised preview: material-cost charges only.  There is no
        paid/unpaid field on a charge any more — money moves only in Accounts,
        so payment state can never change the cost. */
+    function supplierBilledTotal() {
+        var total = 0;
+        rows().forEach(function (row) {
+            var amount = num(valueOf(row, "charge_amount[]"));
+            var treatment = (valueOf(row, "charge_treatment[]") || "INVENTORY").toUpperCase();
+            var status = (valueOf(row, "charge_status[]") || "UNPAID").toUpperCase();
+            if (amount > 0 && status !== "NOT_APPLICABLE" && treatment !== "NON_MATERIAL" && treatment !== "UNTRACKED_LEGACY") total += amount;
+        });
+        return total;
+    }
+
     function capitalisedTotal() {
         var total = 0;
         rows().forEach(function (row) {
@@ -266,6 +277,7 @@
         rows: rows,
         rowCount: rowCount,
         capitalisedTotal: capitalisedTotal,
+        supplierBilledTotal: supplierBilledTotal,
         recipientForCharge: recipientForCharge,
         syncVisibility: syncVisibility,
         validate: validate

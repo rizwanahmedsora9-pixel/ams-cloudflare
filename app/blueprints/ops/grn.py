@@ -159,6 +159,7 @@ def grn():
                 date_posted=date_posted,
                 costing_mode='LANDED',
                 allocation_basis_default=(request.form.get('allocation_basis_default') or 'VALUE').strip().upper(),
+                include_charges_in_supplier=(request.form.get('include_charges_in_supplier') or '').strip().lower() in ('1','true','on','yes'),
                 created_by=current_user.username,
             )
             db.session.add(new_grn)

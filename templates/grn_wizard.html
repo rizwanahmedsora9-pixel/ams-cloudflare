@@ -809,6 +809,11 @@
                                    it an empty grid posts no charge_* field at all and the
                                    edit route cannot tell "no charges" from "no grid". #}
                                 <input type="hidden" name="charge_grid_present" value="1">
+                                <div class="form-check form-switch my-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="grnIncludeChargesInSupplier" name="include_charges_in_supplier" value="1" {{ 'checked' if edit_grn and edit_grn.include_charges_in_supplier else '' }}>
+                                    <label class="form-check-label fw-semibold" for="grnIncludeChargesInSupplier">Add these GRN costs to the supplier ledger</label>
+                                    <div class="small text-muted">Checked: supplier is owed material + vehicle/loading/unloading/other costs. Unchecked: supplier is owed stock value only; costs are paid to their own recipients. Inventory/COGS is unchanged.</div>
+                                </div>
                                 <datalist id="grnPartyOptions">
                                     {% for party in grn_parties or [] %}<option value="{{ party.name }}"></option>{% endfor %}
                                 </datalist>
@@ -822,6 +827,7 @@
                                 </div>
                                 <div class="row g-2 small">
                                     <div class="col-md-3"><span class="text-muted">Supplier Material:</span> <b id="grnSupplierMaterial">0.00</b></div>
+                                    <div class="col-md-3"><span class="text-muted">Supplier Ledger Bill:</span> <b class="text-warning" id="grnSupplierBill">0.00</b></div>
                                     <div class="col-md-3"><span class="text-muted">Capitalised Charges:</span> <b id="grnCapitalisedCharges">0.00</b></div>
                                     <div class="col-md-3"><span class="text-muted">Total Actual Cost:</span> <b class="text-success" id="grnLandedCost">0.00</b></div>
                                     <div class="col-md-3"><span class="text-muted">Avg Actual Rate / Unit:</span> <b class="text-info" id="grnAvgRate">0.00</b></div>
@@ -1392,8 +1398,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateGrnTotal() {
-        // Owner rule A2: supplier material = sum(qty x rate) ONLY.
-        // Owner rule: paid/unpaid status never changes the landed cost.
+        // Supplier material = sum(qty x rate).  The supplier ledger bill may
+        // also include GRN costs when the billing checkbox is selected.
+        // Paid/unpaid status never changes the landed cost.
         let supplierMaterial = 0;
         let totalQty = 0;
         document.querySelectorAll('#grnItemsTable tbody tr').forEach(row => {
@@ -1410,11 +1417,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         const capitalised = window.FBMGrnCharges ? window.FBMGrnCharges.capitalisedTotal() : 0;
+        const includeCharges = document.getElementById('grnIncludeChargesInSupplier');
+        const supplierCharges = (includeCharges && includeCharges.checked && window.FBMGrnCharges)
+            ? window.FBMGrnCharges.supplierBilledTotal() : 0;
 
         const landed = supplierMaterial + capitalised;
         const avg = totalQty > 0 ? (landed / totalQty) : 0;
         const setText = (id, value) => { const el = document.getElementById(id); if (el) el.innerText = formatNumber(value); };
         setText('grnSupplierMaterial', supplierMaterial);
+        setText('grnSupplierBill', supplierMaterial + supplierCharges);
         setText('grnCapitalisedCharges', capitalised);
         setText('grnLandedCost', landed);
         setText('grnAvgRate', avg);
@@ -1428,6 +1439,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (grnCharges) {
         grnCharges.init({ onChange: updateGrnTotal });
     }
+    const includeChargesToggle = document.getElementById('grnIncludeChargesInSupplier');
+    if (includeChargesToggle) includeChargesToggle.addEventListener('change', updateGrnTotal);
 
     document.querySelectorAll('.next-step').forEach(btn => {
 

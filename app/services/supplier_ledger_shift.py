@@ -330,8 +330,8 @@ def preview_supplier_ledger_shift(source, target=None, **options):
 def _grn_total(grn) -> float:
     """A2: only material qty x rate moves with a supplier ledger shift."""
     try:
-        from app.services.grn_costing import supplier_material_minor
-        return _money(int(supplier_material_minor(grn)) / 100.0)
+        from app.services.grn_costing import supplier_ledger_credit_minor
+        return _money(int(supplier_ledger_credit_minor(grn)) / 100.0)
     except Exception:
         return _money(sum(
             _money(getattr(item, 'qty', 0)) * _money(getattr(item, 'price_at_time', 0))

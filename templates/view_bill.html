@@ -544,6 +544,8 @@
         <table class="rcpt-table">
             <tbody>
                 <tr><td colspan="3" class="text-end">Supplier Material Amount</td><td class="text-end">{{ fmt_num(grn_bd.supplier_material_amount) }}</td></tr>
+                <tr><td colspan="3" class="text-end">GRN Costs Billed to Supplier</td><td class="text-end">{{ fmt_num(grn_bd.supplier_billed_charges) }}</td></tr>
+                <tr><td colspan="3" class="text-end"><b>Supplier Ledger Bill</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.supplier_bill_amount) }}</b></td></tr>
                 <tr><td colspan="3" class="text-end">Vehicle Fare</td><td class="text-end">{{ fmt_num(grn_bd.vehicle_fare) }}</td></tr>
                 <tr><td colspan="3" class="text-end">Loading</td><td class="text-end">{{ fmt_num(grn_bd.loading) }}</td></tr>
                 <tr><td colspan="3" class="text-end">Unloading</td><td class="text-end">{{ fmt_num(grn_bd.unloading) }}</td></tr>
