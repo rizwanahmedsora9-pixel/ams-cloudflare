@@ -1,5 +1,6 @@
 """grn — split from ops.py."""
 from ._common import *  # noqa
+from app.services.grn_costing import charge_billed_to_supplier
 from app.services.grn_consumption import grn_consumption_for_page
 from app.services.grn_costs import (
     build_grn_costs, grn_cost_supplier_options, normalize_kind,
@@ -159,7 +160,6 @@ def grn():
                 date_posted=date_posted,
                 costing_mode='LANDED',
                 allocation_basis_default=(request.form.get('allocation_basis_default') or 'VALUE').strip().upper(),
-                include_charges_in_supplier=(request.form.get('include_charges_in_supplier') or '').strip().lower() in ('1','true','on','yes'),
                 created_by=current_user.username,
             )
             db.session.add(new_grn)
@@ -373,6 +373,7 @@ def grn():
         'grn_wizard.html',
         grns=grns,
         grn_breakdowns=grn_breakdowns,
+        charge_billed_to_supplier=charge_billed_to_supplier,
         grn_consumption=grn_consumption,
         materials=materials,
         settings=settings,

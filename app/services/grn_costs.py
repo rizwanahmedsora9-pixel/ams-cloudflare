@@ -9,8 +9,8 @@ authority itself):
   Accounts (``Accounts -> PAY EXISTING GRN``).
 * The supplier material amount is exactly ``sum(qty * rate)``.  Vehicle
   fare, transport, loading, unloading and other charges are listed as their
-  own cost kinds.  The GRN billing checkbox decides whether those costs are
-  payable through the supplier ledger or to their own recipients.
+  own cost kinds.  Each expense's own billing checkbox decides whether it is
+  payable through the supplier ledger or to its own recipient.
 
 Every number comes from ``grn_costing.grn_breakdown`` — this module only
 groups, filters and totals, so no screen can invent its own version of the

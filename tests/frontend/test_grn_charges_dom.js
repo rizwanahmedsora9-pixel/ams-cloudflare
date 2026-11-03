@@ -55,6 +55,8 @@ function rowMarkup(saved) {
   </td>
   <td><input type="text" name="charge_label[]" value="${c.label || ""}"></td>
   <td><input type="number" name="charge_amount[]" step="any" min="0" value="${c.amount === undefined ? "" : c.amount}"></td>
+  <td><input type="hidden" name="charge_row_key[]" value="${c.id ? "saved-" + c.id : ""}">
+    <label><input type="checkbox" name="charge_include_in_supplier[]" value="${c.id ? "saved-" + c.id : ""}"${c.billed ? " checked" : ""}> Add</label></td>
   <td><select name="charge_recipient_type[]">
       <option value=""${sel(c.recipient || "", "")}>Select recipient…</option>
       <option value="TRANSPORTER"${sel(c.recipient, "TRANSPORTER")}>Vehicle / Transporter</option>
@@ -79,12 +81,13 @@ function rowMarkup(saved) {
 const FIXTURE = `<!doctype html><html><body>
 <form id="grnForm">
   <input type="hidden" name="charge_grid_present" value="1">
+  <input type="hidden" name="charge_supplier_billing_present" value="1">
   <button type="button" id="addGrnChargeBtn">Add charge</button>
   <div id="grnChargesEmpty">No charges on this GRN.</div>
   <div class="table-responsive" id="grnChargesWrap" hidden>
     <table id="grnChargesTable">
       <thead><tr><th>Charge</th><th>Label / Detail</th><th>Amount (Rs.)</th><th>Recipient Type</th>
-        <th>Recipient / Person</th><th>Cost Treatment</th><th>Alloc. Basis</th><th></th></tr></thead>
+        <th>Supplier Ledger</th><th>Recipient / Person</th><th>Cost Treatment</th><th>Alloc. Basis</th><th></th></tr></thead>
       <tbody id="grnChargesBody"></tbody>
     </table>
   </div>
@@ -194,6 +197,35 @@ set(third, "charge_amount[]", "700");
 check("changing the amount is the only thing that moves the cost", api.capitalisedTotal() === 6700, api.capitalisedTotal());
 set(third, "charge_amount[]", "500");
 check("editing a charge triggers a totals repaint", repaints > 0, repaints);
+
+/* ---- 4b. supplier billing is an independent choice on each expense ----- */
+const billBox = (row) => row.querySelector('[name="charge_include_in_supplier[]"]');
+const tick = (row, checked) => {
+    billBox(row).checked = checked;
+    billBox(row).dispatchEvent(new w.Event("change", { bubbles: true }));
+};
+check("new expense rows start unchecked", !billBox(first).checked && !billBox(second).checked && !billBox(third).checked);
+check("unchecked expenses contribute nothing to the supplier bill", api.supplierBilledTotal() === 0, api.supplierBilledTotal());
+tick(first, true);
+check("checking one expense adds only that expense", api.supplierBilledTotal() === 5000, api.supplierBilledTotal());
+tick(third, true);
+check("a second expense can be selected independently", api.supplierBilledTotal() === 5500, api.supplierBilledTotal());
+check("supplier selection never changes inventory cost", api.capitalisedTotal() === 6500, api.capitalisedTotal());
+tick(first, false);
+check("unchecking one expense leaves the other selected", api.supplierBilledTotal() === 500 && billBox(third).checked, api.supplierBilledTotal());
+const fourth = api.addRow();
+set(fourth, "charge_type[]", "OTHER");
+set(fourth, "charge_amount[]", "250");
+check("a newly added expense does not inherit another row's checkbox", !billBox(fourth).checked);
+const keys = api.rows().map((row) => val(row, "charge_row_key[]"));
+check("every row has a unique submission key", keys.every(Boolean) && new Set(keys).size === keys.length, keys.join(","));
+api.rows().forEach((row) => { billBox(row).value = val(row, "charge_row_key[]"); });
+const submitted = new w.FormData(d.getElementById("grnForm"));
+const selected = submitted.getAll("charge_include_in_supplier[]");
+check("only selected row keys are submitted", selected.length === 1 && selected[0] === val(third, "charge_row_key[]"), selected.join(","));
+check("all row keys are submitted even when unchecked", submitted.getAll("charge_row_key[]").length === api.rowCount());
+fourth.querySelector(".grn-charge-remove").click();
+tick(third, false);
 
 /* ---- 5. every row is removable, including the last -------------------- */
 third.querySelector(".grn-charge-remove").click();

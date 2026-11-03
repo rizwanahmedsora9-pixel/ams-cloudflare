@@ -15,8 +15,8 @@
        tell "no charges" from "this form has no charge grid".
 
    A charge line carries cost facts only: type, label, amount, recipient,
-   cost treatment and allocation basis.  It deliberately has no paid/unpaid
-   field — payment state belongs to Accounts (PAY EXISTING GRN), never to a
+   cost treatment, allocation basis and its own supplier-billing choice.
+   It deliberately has no paid/unpaid field — payment state belongs to Accounts (PAY EXISTING GRN), never to a
    receiving document.
 
    This module owns the rows only.  All money arithmetic still comes from
@@ -46,6 +46,7 @@
 
     var onChange = null;
     var notifyEnabled = true;
+    var nextRowKey = 1;
 
     function byId(id) {
         return document.getElementById(id);
@@ -72,6 +73,16 @@
     function valueOf(row, name) {
         var el = field(row, name);
         return el ? String(el.value === undefined || el.value === null ? "" : el.value).trim() : "";
+    }
+
+    /* Unchecked boxes submit nothing.  A hidden key travels with every row;
+       selected keys identify exactly which expenses the operator chose. */
+    function ensureRowKey(row) {
+        var keyField = field(row, "charge_row_key[]");
+        var checkbox = field(row, "charge_include_in_supplier[]");
+        if (!keyField) return;
+        if (!keyField.value) keyField.value = "new-" + nextRowKey++;
+        if (checkbox) checkbox.value = keyField.value;
     }
 
     function recipientForCharge(chargeType) {
@@ -107,7 +118,8 @@
             var amount = num(valueOf(row, "charge_amount[]"));
             var treatment = (valueOf(row, "charge_treatment[]") || "INVENTORY").toUpperCase();
             var status = (valueOf(row, "charge_status[]") || "UNPAID").toUpperCase();
-            if (amount > 0 && status !== "NOT_APPLICABLE" && treatment !== "NON_MATERIAL" && treatment !== "UNTRACKED_LEGACY") total += amount;
+            var selected = field(row, "charge_include_in_supplier[]");
+            if (selected && selected.checked && amount > 0 && status !== "NOT_APPLICABLE" && treatment !== "NON_MATERIAL" && treatment !== "UNTRACKED_LEGACY") total += amount;
         });
         return total;
     }
@@ -124,6 +136,7 @@
     }
 
     function bindRow(row) {
+        ensureRowKey(row);
         Array.prototype.forEach.call(row.querySelectorAll("input, select"), function (el) {
             if (el.dataset.grnChargeBound) return;
             el.dataset.grnChargeBound = "1";
@@ -174,11 +187,15 @@
         /* The blueprint is inert, but be explicit: a newly added line carries
            no stored id and no values from any other charge. */
         Array.prototype.forEach.call(clone.querySelectorAll("input"), function (el) {
-            if (el.type !== "checkbox" && el.type !== "radio") el.value = el.defaultValue || "";
+            if (el.type === "checkbox" || el.type === "radio") el.checked = el.defaultChecked;
+            else el.value = el.defaultValue || "";
             el.removeAttribute("data-grn-charge-bound");
         });
         var idField = field(clone, "charge_id[]");
         if (idField) idField.value = "";
+        var keyField = field(clone, "charge_row_key[]");
+        if (keyField) keyField.value = "";
+        ensureRowKey(clone);
         Array.prototype.forEach.call(clone.querySelectorAll("select"), function (sel) {
             sel.removeAttribute("data-grn-charge-bound");
             sel.removeAttribute("data-grn-charge-recipient-bound");

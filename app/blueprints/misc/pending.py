@@ -1,5 +1,6 @@
 """pending — split from misc.py."""
 from ._common import *  # noqa
+from app.services.grn_costing import charge_billed_to_supplier
 from sqlalchemy.exc import IntegrityError
 
 @bp.route('/add_pending_bill', methods=['POST'])
@@ -457,22 +458,6 @@ def edit_grn(id):
             except ValueError:
                 pass
 
-        # Supplier billing checkbox: unchecked = material only; checked =
-        # material + applicable GRN costs in Supplier Ledger / Accounts.
-        if 'charge_grid_present' in request.form or 'include_charges_in_supplier' in request.form:
-            new_include = (request.form.get('include_charges_in_supplier') or '').strip().lower() in ('1','true','on','yes')
-            old_include = bool(getattr(grn_obj, 'include_charges_in_supplier', False))
-            if new_include != old_include:
-                has_payments = SupplierPayment.query.filter(
-                    SupplierPayment.grn_id == grn_obj.id,
-                    SupplierPayment.is_void == False,  # noqa: E712
-                ).first() is not None
-                if has_payments:
-                    db.session.rollback()
-                    flash('This GRN already has Accounts payments. Void those payments before changing whether GRN costs are billed to the supplier.', 'danger')
-                    return redirect(url_for('edit_grn', id=grn_obj.id))
-                grn_obj.include_charges_in_supplier = new_include
-
         if not header_only_edit:
             # 4. Add / update items (preserve GRNItem IDs so linked DirectSaleItem.grn_item_id stays valid)
             item_ids = request.form.getlist('grn_item_id[]')
@@ -548,8 +533,9 @@ def edit_grn(id):
         else:
             edit_skipped_lines = []
 
-        # Charge grid (LANDED) and exact landed-cost recomputation.  A charge
-        # with posted payments cannot be changed silently (see service).
+        # Charge grid (LANDED) and exact landed-cost recomputation.  Each
+        # expense carries its own supplier-billing choice.  A charge or billing
+        # route with posted payments cannot be changed silently (see service).
         # ``charge_grid_present`` is posted by the wizard even when the grid has
         # no rows, so removing the last charge really clears it instead of
         # leaving the stored charges untouched.
@@ -557,6 +543,7 @@ def edit_grn(id):
             'charge_grid_present' in request.form
             or 'charge_type[]' in request.form
             or 'charge_amount[]' in request.form
+            or 'charge_supplier_billing_present' in request.form
         ):
             try:
                 sync_charges_from_form(grn_obj, request.form, actor=current_user.username)
@@ -620,6 +607,7 @@ def edit_grn(id):
         'grn_wizard.html',
         grns=grns,
         grn_breakdowns=grn_breakdowns,
+        charge_billed_to_supplier=charge_billed_to_supplier,
         materials=materials,
         settings=settings,
         clients=clients,

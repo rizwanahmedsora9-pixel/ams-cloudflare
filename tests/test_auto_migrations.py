@@ -219,3 +219,44 @@ def test_list_migration_files_ignores_non_sql(tmp_path):
     (root / "README.md").write_text("hi")
     assert list_migration_files(root) == ["0001_a.sql", "0002_b.sql"]
     assert list_migration_files(tmp_path / "absent") == []
+
+
+def test_0005_preserves_old_whole_grn_choice_on_each_expense(tmp_path):
+    """A checked old GRN keeps every expense; an unchecked one keeps none."""
+    from pathlib import Path
+
+    db = tmp_path / "pre_0005.db"
+    con = sqlite3.connect(str(db))
+    con.executescript("""
+        CREATE TABLE grn (id INTEGER PRIMARY KEY, include_charges_in_supplier BOOLEAN DEFAULT 0);
+        CREATE TABLE grn_charge (
+            id INTEGER PRIMARY KEY, grn_id INTEGER, label TEXT,
+            include_in_supplier BOOLEAN
+        );
+        INSERT INTO grn VALUES (1, 1), (2, 0);
+        INSERT INTO grn_charge VALUES
+            (10, 1, 'Vehicle', NULL), (11, 1, 'Loading', NULL),
+            (20, 2, 'Vehicle', NULL), (21, 2, 'Other', NULL);
+    """)
+    con.commit()
+    con.close()
+    root = Path(__file__).resolve().parents[1] / "app" / "migrations"
+    sql = (root / "0005_grn_per_expense_supplier_billing.sql").read_text()
+    con = sqlite3.connect(str(db))
+    con.executescript(sql)
+    rows = con.execute("SELECT id, include_in_supplier FROM grn_charge ORDER BY id").fetchall()
+    assert rows == [(10, 1), (11, 1), (20, 0), (21, 0)]
+    # An explicit later choice must never be overwritten by a retry.
+    con.execute("UPDATE grn_charge SET include_in_supplier = 0 WHERE id = 10")
+    con.executescript(sql)
+    assert con.execute("SELECT include_in_supplier FROM grn_charge WHERE id = 10").fetchone()[0] == 0
+    con.close()
+
+
+def test_0005_runs_on_application_boot(app):
+    with app.app_context():
+        report = app.config["AMS_MIGRATION_REPORT"]
+        assert report["version"] >= 5
+        from models import db
+        applied = {r[0] for r in db.session.execute(db.text("SELECT filename FROM migration_history"))}
+        assert "0005_grn_per_expense_supplier_billing.sql" in applied

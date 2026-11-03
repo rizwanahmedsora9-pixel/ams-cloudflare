@@ -37,11 +37,12 @@ class GRN(db.Model):
     never creates a cash movement (owner rule A1).  All payments are posted
     from Accounts against the obligations recorded here.
 
-    Supplier Ledger credit is controlled by ``include_charges_in_supplier``:
-    unchecked = material qty × supplier rate only; checked = material plus the
-    GRN's applicable vehicle/loading/unloading/other charges.  The same rule
-    drives Accounts payables and GRN payment obligations.  Landed inventory
-    cost is independent of this billing choice.
+    Supplier Ledger credit is material qty × supplier rate plus only the
+    individual charges whose ``GRNCharge.include_in_supplier`` box is checked.
+    The same rule drives Accounts payables and GRN payment obligations.
+    ``include_charges_in_supplier`` is a legacy, pre-per-charge fallback only;
+    migration 0005 copies it onto the existing charge rows.  Landed inventory
+    cost is independent of every billing choice.
     """
     id = db.Column(db.Integer, primary_key=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), nullable=True)
@@ -90,6 +91,9 @@ class GRN(db.Model):
     expense_charge_total = db.Column(db.Float, default=0)
     expense_charge_total_minor = db.Column(db.BigInteger, nullable=True)
     allocation_basis_default = db.Column(db.String(20), default='VALUE')  # VALUE | QUANTITY | MANUAL
+    # Legacy whole-GRN choice, retained only to preserve old databases/imports
+    # until 0005 copies the choice onto each charge.  New code must use the
+    # per-charge flag through grn_costing.charge_billed_to_supplier().
     include_charges_in_supplier = db.Column(db.Boolean, default=False, nullable=False, server_default='0')
     # --- Audit / cancellation ----------------------------------------------
     revision = db.Column(db.Integer, default=1, nullable=True)
@@ -105,9 +109,10 @@ class GRNCharge(db.Model):
     """One material-related charge / payment obligation on a GRN.
 
     A charge is either capitalised into the GRN lots (INVENTORY) or recognised
-    as a separate operating expense (EXPENSE).  If the parent GRN has
-    ``include_charges_in_supplier`` enabled, the charge is billed through the
-    supplier ledger instead of creating a second recipient payable.
+    as a separate operating expense (EXPENSE).  ``include_in_supplier`` is an
+    independent billing choice for this row: checked bills this charge through
+    the supplier ledger; unchecked leaves it payable to its own recipient.
+    Neither choice changes inventory/COGS or expense recognition.
     ``declared_status`` is display-only: a GRN never settles a charge (A1).
     Balances are derived from Accounts payments.
     """
@@ -123,6 +128,9 @@ class GRNCharge(db.Model):
     recipient_name = db.Column(db.String(160), index=True)
     declared_status = db.Column(db.String(20), default='UNPAID', index=True)  # PAID|UNPAID|NOT_APPLICABLE (display only)
     cost_treatment = db.Column(db.String(30), default='INVENTORY', index=True)  # INVENTORY|EXPENSE|NON_MATERIAL|UNTRACKED_LEGACY
+    # Nullable only for the pre-0005 fallback.  New rows and the wizard always
+    # write an explicit choice; an unchecked box never bills the supplier.
+    include_in_supplier = db.Column(db.Boolean, default=False, nullable=True, server_default='0')
     allocation_basis = db.Column(db.String(20), default='VALUE')  # VALUE|QUANTITY|MANUAL
     allocation_json = db.Column(db.Text)
     is_void = db.Column(db.Boolean, default=False, index=True)
