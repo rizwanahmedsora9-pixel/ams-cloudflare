@@ -238,6 +238,8 @@ Additional behaviour:
 * GRN cancellation is a soft void with reversed quantities and preserved
   payments; a GRN with Accounts payments cannot be purged.
 * Outstanding purchase payables: `/accounts/purchase_payables`.
+* The GRN charge grid starts **empty**: vehicle fare, loading, unloading and
+  other costs are added one at a time with **Add charge**, never pre-filled.
 * Details: `GRN_LANDED_COST_PAYMENTS_PLAN.md` (approved design) and
   `GRN_REDESIGN_IMPLEMENTATION_REPORT.md` (implementation report).
 

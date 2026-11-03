@@ -1,18 +1,75 @@
 {% extends "layout.html" %}
 
-{# ---- GRN landed-cost / charge grid setup (owner rules A1 + A2) ---------- #}
-{% set default_charges = ['VEHICLE_FARE', 'LOADING', 'UNLOADING', 'OTHER'] %}
+{# ---- GRN landed-cost / charge grid setup (owner rules A1 + A2) ----------
+   The grid starts EMPTY.  Vehicle fare / loading / unloading / other are
+   choices in a dropdown, never rows the screen invents on its own: a charge
+   line exists only because the operator pressed "Add charge" (or because it
+   is already saved on this GRN).  The single row markup below is shared by
+   the saved rows and the inert <template> the Add charge button clones, so
+   a hand-added row and a stored row can never drift apart. #}
 {% set charge_labels = {'VEHICLE_FARE': 'Vehicle Fare', 'TRANSPORT': 'Transportation', 'LOADING': 'Loading', 'UNLOADING': 'Unloading', 'OTHER': 'Other Expenses'} %}
+{% set recipient_labels = {'TRANSPORTER': 'Vehicle / Transporter', 'LABOUR': 'Loading / Labour', 'OTHER': 'Other charge recipient'} %}
+{% set treatment_labels = {'INVENTORY': 'Include in material cost', 'EXPENSE': 'Separate expense', 'NON_MATERIAL': 'Not material cost'} %}
 {% set cns = namespace(rows=[]) %}
 {% if edit_grn %}
     {% for c in edit_grn.charges if not c.is_void %}
         {% set _ = cns.rows.append(c) %}
     {% endfor %}
 {% endif %}
-{% if cns.rows|length == 0 %}
-    {% for t in default_charges %}{% set _ = cns.rows.append(none) %}{% endfor %}
-{% endif %}
-{% set charge_count = cns.rows|length %}
+{% set charge_rows = cns.rows %}
+
+{% macro charge_row(c=None) -%}
+{% set ctype = (c.charge_type if c else '') or '' %}
+{% set crec = (c.recipient_type if c else '') or '' %}
+{% set ctreat = (c.cost_treatment if c else '') or 'INVENTORY' %}
+                                            <tr class="grn-charge-row">
+                                                <td>
+                                                    <input type="hidden" name="charge_id[]" value="{{ c.id if c else '' }}">
+                                                    <select class="form-select form-select-sm" name="charge_type[]" aria-label="Charge">
+                                                        <option value="" {{ 'selected' if not ctype }}>Select charge…</option>
+                                                        {% for code, label in charge_labels.items() %}
+                                                        <option value="{{ code }}" {{ 'selected' if ctype == code }}>{{ label }}</option>
+                                                        {% endfor %}
+                                                        {% if ctype and ctype not in charge_labels %}<option value="{{ ctype }}" selected>{{ ctype }}</option>{% endif %}
+                                                    </select>
+                                                </td>
+                                                <td><input type="text" class="form-control form-control-sm" name="charge_label[]" value="{{ (c.label or '') if c else '' }}" placeholder="e.g. Rana Transport" aria-label="Charge label / detail"></td>
+                                                <td><input type="number" class="form-control form-control-sm grn-charge-amount" name="charge_amount[]" step="any" min="0" value="{{ (c.amount or 0) if c else '' }}" placeholder="0.00" aria-label="Amount (Rs.)"></td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_recipient_type[]" aria-label="Recipient type">
+                                                        <option value="" {{ 'selected' if not crec }}>Select recipient…</option>
+                                                        {% for code, label in recipient_labels.items() %}
+                                                        <option value="{{ code }}" {{ 'selected' if crec == code }}>{{ label }}</option>
+                                                        {% endfor %}
+                                                        {% if crec and crec not in recipient_labels %}<option value="{{ crec }}" selected>{{ 'Unassigned (legacy charge)' if crec == 'UNSPECIFIED' else crec }}</option>{% endif %}
+                                                    </select>
+                                                </td>
+                                                <td><input type="text" class="form-control form-control-sm" name="charge_recipient[]" value="{{ (c.recipient_name or '') if c else '' }}" list="grnPartyOptions" placeholder="Person / party name" aria-label="Recipient / person"></td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_status[]" aria-label="Payment status">
+                                                        <option value="UNPAID" {{ 'selected' if not c or c.declared_status == 'UNPAID' }}>Unpaid</option>
+                                                        <option value="PAID" {{ 'selected' if c and c.declared_status == 'PAID' }}>Paid (declaration only)</option>
+                                                        <option value="NOT_APPLICABLE" {{ 'selected' if c and c.declared_status == 'NOT_APPLICABLE' }}>Not Applicable</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_treatment[]" aria-label="Cost treatment">
+                                                        {% for code, label in treatment_labels.items() %}
+                                                        <option value="{{ code }}" {{ 'selected' if ctreat == code }}>{{ label }}</option>
+                                                        {% endfor %}
+                                                        {% if ctreat not in treatment_labels %}<option value="{{ ctreat }}" selected>{{ 'Legacy (untracked)' if ctreat == 'UNTRACKED_LEGACY' else ctreat }}</option>{% endif %}
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select class="form-select form-select-sm" name="charge_basis[]" aria-label="Allocation basis">
+                                                        <option value="VALUE" {{ 'selected' if not c or c.allocation_basis in ['VALUE', none] }}>By value</option>
+                                                        <option value="QUANTITY" {{ 'selected' if c and c.allocation_basis == 'QUANTITY' }}>By quantity</option>
+                                                        <option value="MANUAL" {{ 'selected' if c and c.allocation_basis == 'MANUAL' }}>Manual</option>
+                                                    </select>
+                                                </td>
+                                                <td><button type="button" class="btn btn-sm btn-outline-danger grn-charge-remove" title="Remove charge" aria-label="Remove charge"><i class="bi bi-x"></i></button></td>
+                                            </tr>
+{%- endmacro %}
 
 
 
@@ -679,10 +736,16 @@
                                         <i class="bi bi-truck me-1"></i>Additional material-related costs.
                                         Paid or unpaid, they are part of the actual purchase cost.
                                         Each charge creates its own payable to its own recipient — never to the supplier.
+                                        <strong>No charge is added automatically</strong> — press "Add charge" for each one you actually have.
                                     </div>
                                     <button type="button" class="btn btn-sm btn-outline-info" id="addGrnChargeBtn"><i class="bi bi-plus-lg"></i> Add charge</button>
                                 </div>
-                                <div class="table-responsive">
+                                <div class="alert alert-secondary small py-2 px-3 mb-2" id="grnChargesEmpty" {{ 'hidden' if charge_rows }}>
+                                    <i class="bi bi-inbox me-1"></i>No charges on this GRN.
+                                    The purchase cost is the supplier material only.
+                                    Press <strong>Add charge</strong> to record vehicle fare, loading, unloading or any other expense.
+                                </div>
+                                <div class="table-responsive" id="grnChargesWrap" {{ 'hidden' if not charge_rows }}>
                                     <table class="table table-sm table-dark table-bordered align-middle mb-2" id="grnChargesTable">
                                         <thead class="small text-uppercase text-muted">
                                             <tr>
@@ -697,59 +760,20 @@
                                                 <th style="width:3%"></th>
                                             </tr>
                                         </thead>
-                                        <tbody>
-                                            {% for c in cns.rows %}
-                                            {% set idx0 = loop.index0 %}
-                                            {% set ctype = c.charge_type if c else (default_charges[idx0] if idx0 < 4 else 'OTHER') %}
-                                            {% set crec = c.recipient_type if c else ('TRANSPORTER' if ctype in ['VEHICLE_FARE','TRANSPORT'] else ('LABOUR' if ctype in ['LOADING','UNLOADING'] else 'OTHER')) %}
-                                            <tr class="grn-charge-row">
-                                                <input type="hidden" name="charge_id[]" value="{{ c.id if c else '' }}">
-                                                <td>
-                                                    <select class="form-select form-select-sm" name="charge_type[]">
-                                                        <option value="VEHICLE_FARE" {{ 'selected' if ctype == 'VEHICLE_FARE' }}>Vehicle Fare</option>
-                                                        <option value="TRANSPORT" {{ 'selected' if ctype == 'TRANSPORT' }}>Transportation</option>
-                                                        <option value="LOADING" {{ 'selected' if ctype == 'LOADING' }}>Loading</option>
-                                                        <option value="UNLOADING" {{ 'selected' if ctype == 'UNLOADING' }}>Unloading</option>
-                                                        <option value="OTHER" {{ 'selected' if ctype == 'OTHER' }}>Other Expenses</option>
-                                                    </select>
-                                                </td>
-                                                <td><input type="text" class="form-control form-control-sm" name="charge_label[]" value="{{ (c.label or '') if c else '' }}" placeholder="e.g. Rana Transport"></td>
-                                                <td><input type="number" class="form-control form-control-sm grn-charge-amount" name="charge_amount[]" step="any" min="0" value="{{ (c.amount or 0) if c else '' }}" placeholder="0.00"></td>
-                                                <td>
-                                                    <select class="form-select form-select-sm" name="charge_recipient_type[]">
-                                                        <option value="TRANSPORTER" {{ 'selected' if crec == 'TRANSPORTER' }}>Vehicle / Transporter</option>
-                                                        <option value="LABOUR" {{ 'selected' if crec == 'LABOUR' }}>Loading / Labour</option>
-                                                        <option value="OTHER" {{ 'selected' if crec == 'OTHER' }}>Other charge recipient</option>
-                                                    </select>
-                                                </td>
-                                                <td><input type="text" class="form-control form-control-sm" name="charge_recipient[]" value="{{ (c.recipient_name or '') if c else '' }}" list="grnPartyOptions" placeholder="Person / party name"></td>
-                                                <td>
-                                                    <select class="form-select form-select-sm" name="charge_status[]">
-                                                        <option value="UNPAID" {{ 'selected' if not c or c.declared_status == 'UNPAID' }}>Unpaid</option>
-                                                        <option value="PAID" {{ 'selected' if c and c.declared_status == 'PAID' }}>Paid (declaration only)</option>
-                                                        <option value="NOT_APPLICABLE" {{ 'selected' if c and c.declared_status == 'NOT_APPLICABLE' }}>Not Applicable</option>
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <select class="form-select form-select-sm" name="charge_treatment[]">
-                                                        <option value="INVENTORY" {{ 'selected' if not c or c.cost_treatment in ['INVENTORY', none] }}>Include in material cost</option>
-                                                        <option value="EXPENSE" {{ 'selected' if c and c.cost_treatment == 'EXPENSE' }}>Separate expense</option>
-                                                        <option value="NON_MATERIAL" {{ 'selected' if c and c.cost_treatment == 'NON_MATERIAL' }}>Not material cost</option>
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <select class="form-select form-select-sm" name="charge_basis[]">
-                                                        <option value="VALUE" {{ 'selected' if not c or c.allocation_basis in ['VALUE', none] }}>By value</option>
-                                                        <option value="QUANTITY" {{ 'selected' if c and c.allocation_basis == 'QUANTITY' }}>By quantity</option>
-                                                        <option value="MANUAL" {{ 'selected' if c and c.allocation_basis == 'MANUAL' }}>Manual</option>
-                                                    </select>
-                                                </td>
-                                                <td><button type="button" class="btn btn-sm btn-outline-danger grn-charge-remove" title="Remove charge"><i class="bi bi-x"></i></button></td>
-                                            </tr>
-                                            {% endfor %}
+                                        <tbody id="grnChargesBody">
+                                            {% for c in charge_rows %}{{ charge_row(c) }}{% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
+                                {# Inert blueprint for the Add charge button.  A <template> is
+                                   never rendered, never submitted and never counted by the
+                                   totals, so it cannot become a phantom charge row. #}
+                                <template id="grnChargeRowTemplate">{{ charge_row() }}</template>
+                                {# Posted even when the grid is empty, so saving a GRN whose
+                                   charges were all removed really does clear them.  Without
+                                   it an empty grid posts no charge_* field at all and the
+                                   edit route cannot tell "no charges" from "no grid". #}
+                                <input type="hidden" name="charge_grid_present" value="1">
                                 <datalist id="grnPartyOptions">
                                     {% for party in grn_parties or [] %}<option value="{{ party.name }}"></option>{% endfor %}
                                 </datalist>
@@ -1273,6 +1297,8 @@
 </div>
 
 
+{# Charge-grid behaviour: rows exist only when the operator adds them. #}
+<script src="{{ url_for('static', filename='grn_charges.js') }}?v=1"></script>
 <script>
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1316,17 +1342,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        let capitalised = 0;
-        document.querySelectorAll('#grnChargesTable tbody tr.grn-charge-row').forEach(row => {
-            const amountInput = row.querySelector('input[name="charge_amount[]"]');
-            const treatment = row.querySelector('select[name="charge_treatment[]"]');
-            const status = row.querySelector('select[name="charge_status[]"]');
-            if (!amountInput) return;
-            const amount = parseFloat(amountInput.value) || 0;
-            if (treatment && treatment.value === 'INVENTORY' && (!status || status.value !== 'NOT_APPLICABLE')) {
-                capitalised += amount;
-            }
-        });
+        const capitalised = window.FBMGrnCharges ? window.FBMGrnCharges.capitalisedTotal() : 0;
 
         const landed = supplierMaterial + capitalised;
         const avg = totalQty > 0 ? (landed / totalQty) : 0;
@@ -1338,57 +1354,13 @@ document.addEventListener('DOMContentLoaded', function() {
         setText('grnTotalAmount', landed);
     }
 
-    function bindChargeRows() {
-        document.querySelectorAll('#grnChargesTable tbody tr.grn-charge-row').forEach(row => {
-            row.querySelectorAll('input, select').forEach(el => {
-                if (!el.dataset.grnChargeBound) {
-                    el.dataset.grnChargeBound = '1';
-                    el.addEventListener('input', updateGrnTotal);
-                    el.addEventListener('change', updateGrnTotal);
-                }
-            });
-            const remove = row.querySelector('.grn-charge-remove');
-            if (remove && !remove.dataset.grnChargeBound) {
-                remove.dataset.grnChargeBound = '1';
-                remove.addEventListener('click', () => {
-                    const tbody = document.querySelector('#grnChargesTable tbody');
-                    if (tbody && tbody.querySelectorAll('tr.grn-charge-row').length > 1) {
-                        row.remove();
-                    } else {
-                        row.querySelectorAll('input[type="number"], input[type="text"]').forEach(i => i.value = '');
-                    }
-                    updateGrnTotal();
-                });
-            }
-        });
+    // The charge grid lives in static/grn_charges.js: rows are created only by
+    // the "Add charge" button, and the live totals here ask it for the
+    // capitalised preview instead of walking the rows a second time.
+    const grnCharges = window.FBMGrnCharges;
+    if (grnCharges) {
+        grnCharges.init({ onChange: updateGrnTotal });
     }
-
-    const addChargeBtn = document.getElementById('addGrnChargeBtn');
-    if (addChargeBtn) {
-        addChargeBtn.addEventListener('click', () => {
-            const tbody = document.querySelector('#grnChargesTable tbody');
-            if (!tbody) return;
-            const first = tbody.querySelector('tr.grn-charge-row');
-            if (!first) return;
-            const clone = first.cloneNode(true);
-            clone.querySelectorAll('input').forEach(i => {
-                if (i.type === 'hidden') i.value = '';
-                else i.value = '';
-                i.removeAttribute('data-grn-charge-bound');
-            });
-            clone.querySelectorAll('select').forEach(sel => {
-                sel.selectedIndex = 0;
-                sel.removeAttribute('data-grn-charge-bound');
-            });
-            const rm = clone.querySelector('.grn-charge-remove');
-            if (rm) rm.removeAttribute('data-grn-charge-bound');
-            tbody.appendChild(clone);
-            bindChargeRows();
-            updateGrnTotal();
-        });
-    }
-    bindChargeRows();
-
 
     document.querySelectorAll('.next-step').forEach(btn => {
 
@@ -1597,6 +1569,10 @@ document.addEventListener('DOMContentLoaded', function() {
         grnForm.addEventListener('submit', function(event) {
             if ((document.getElementById('selectedItemName').value || '').trim()
                     && !appendSelectedGrnItem()) {
+                event.preventDefault();
+                return;
+            }
+            if (grnCharges && !grnCharges.validate()) {
                 event.preventDefault();
             }
         });

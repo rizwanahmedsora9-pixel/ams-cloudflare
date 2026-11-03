@@ -532,7 +532,14 @@ def edit_grn(id):
 
         # Charge grid (LANDED) and exact landed-cost recomputation.  A charge
         # with posted payments cannot be changed silently (see service).
-        if 'charge_type[]' in request.form or 'charge_amount[]' in request.form:
+        # ``charge_grid_present`` is posted by the wizard even when the grid has
+        # no rows, so removing the last charge really clears it instead of
+        # leaving the stored charges untouched.
+        if (
+            'charge_grid_present' in request.form
+            or 'charge_type[]' in request.form
+            or 'charge_amount[]' in request.form
+        ):
             try:
                 sync_charges_from_form(grn_obj, request.form, actor=current_user.username)
                 mirror_legacy_charge_columns(grn_obj)
