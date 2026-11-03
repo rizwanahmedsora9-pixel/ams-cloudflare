@@ -1,0 +1,17 @@
+{# Shared bits for the grouped Delivery Rent screen. #}
+
+{% macro money(value, symbol='') -%}
+{{ symbol }}{{ "{:,.2f}".format(value or 0) }}
+{%- endmacro %}
+
+{% macro status_pill(group) -%}
+{% if group.status == 'settled' %}
+<span class="badge rounded-pill rent-pill rent-pill-clear">Settled</span>
+{% elif group.status == 'inactive' %}
+<span class="badge rounded-pill rent-pill rent-pill-off">Inactive</span>
+{% elif group.due > 0 %}
+<span class="badge rounded-pill rent-pill rent-pill-due">Due</span>
+{% else %}
+<span class="badge rounded-pill rent-pill rent-pill-off">No rent</span>
+{% endif %}
+{%- endmacro %}

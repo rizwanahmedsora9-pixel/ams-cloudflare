@@ -1,200 +1,321 @@
 {% extends "layout.html" %}
 {% block content %}
+{# Delivery Rent — one row per delivery person instead of one row per trip.
+   Each summary row shows how much the person earned, how much has been paid
+   and what is still owed; the arrow expands their trip-by-trip detail. #}
+{% from 'ops/_delivery_rent_macros.html' import money, status_pill %}
+
+<style>
+    .rent-toolbar .form-label { font-size: .72rem; letter-spacing: .04em; }
+    .rent-card { background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; }
+    .rent-kpi-label { color: #94a3b8; font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; }
+    .rent-kpi-value { font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
+
+    /* ---- summary (driver) rows ------------------------------------- */
+    .rent-group-row { cursor: pointer; background: #1e293b; border-color: #334155 !important; }
+    .rent-group-row:hover { background: #24344b; }
+    .rent-group-row.is-open { background: #24344b; box-shadow: inset 3px 0 0 #fbbf24; }
+    .rent-group-row > td { padding-top: .8rem; padding-bottom: .8rem; }
+    .rent-chevron {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+        background: #0f172a; border: 1px solid #475569; color: #fbbf24;
+        transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .rent-group-row:hover .rent-chevron { border-color: #fbbf24; }
+    .rent-group-row.is-open .rent-chevron { transform: rotate(90deg); background: #fbbf24; color: #0f172a; border-color: #fbbf24; }
+    .rent-driver-name { font-weight: 700; color: #e2e8f0; }
+    .rent-group-row.is-open .rent-driver-name { color: #fbbf24; }
+    .rent-driver-meta { color: #94a3b8; font-size: .72rem; }
+    .rent-amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rent-amount-due { color: #f87171; }
+    .rent-amount-paid { color: #4ade80; }
+    .rent-amount-rent { color: #fbbf24; }
+    .rent-pill { font-size: .66rem; font-weight: 700; padding: .28em .6em; letter-spacing: .03em; }
+    .rent-pill-due { background: rgba(248, 113, 113, .16); color: #fca5a5; border: 1px solid rgba(248, 113, 113, .4); }
+    .rent-pill-clear { background: rgba(74, 222, 128, .14); color: #86efac; border: 1px solid rgba(74, 222, 128, .35); }
+    .rent-pill-off { background: rgba(148, 163, 184, .14); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, .3); }
+
+    /* ---- expanded detail ------------------------------------------- */
+    .rent-detail-row > td { padding: 0 !important; background: #0f172a; border-top: 0 !important; }
+    .rent-detail-wrap { padding: .55rem .75rem .85rem 3.1rem; }
+    .rent-detail-table { --bs-table-bg: transparent; color: #e2e8f0; font-size: .83rem; }
+    .rent-detail-table thead th {
+        color: #94a3b8; font-size: .68rem; font-weight: 700; letter-spacing: .05em;
+        text-transform: uppercase; border-bottom: 1px solid #334155; background: transparent;
+    }
+    .rent-detail-table tbody td { border-color: rgba(51, 65, 85, .65); }
+    .rent-detail-table tbody tr:hover { background: rgba(148, 163, 184, .06); }
+    .rent-detail-foot td { border-top: 1px solid #475569 !important; border-bottom: 0 !important; background: rgba(15, 23, 42, .6); }
+    .rent-bill-link { color: #93c5fd; text-decoration: none; font-weight: 600; }
+    .rent-bill-link:hover { color: #bfdbfe; text-decoration: underline; }
+    .rent-payment-row > td { border-top: 0 !important; padding-top: 0 !important; }
+    .rent-payment-list, .rent-unallocated { display: flex; flex-direction: column; gap: .15rem; }
+    .rent-payment-item { font-size: .76rem; color: #cbd5e1; padding-left: .25rem; border-left: 2px solid rgba(74, 222, 128, .45); padding-left: .55rem; }
+    .rent-link-btn { padding: 0 0 0 .35rem; font-size: .72rem; color: #fca5a5; text-decoration: none; vertical-align: baseline; }
+    .rent-link-btn:hover { color: #fecaca; text-decoration: underline; }
+    .rent-icon-btn { padding: .05rem .4rem; }
+    .rent-detail-note { color: #94a3b8; font-size: .78rem; }
+    .rent-detail-empty { color: #94a3b8; font-size: .82rem; padding: .6rem .25rem; }
+    .rent-unallocated { margin-top: .5rem; padding: .5rem .75rem; border-radius: 10px; background: rgba(148, 163, 184, .07); }
+    .rent-unallocated-title { font-size: .74rem; color: #cbd5e1; font-weight: 700; margin-bottom: .2rem; }
+    .rent-detail-loading { color: #94a3b8; font-size: .8rem; padding: .8rem .25rem; }
+
+    .rent-driver-actions .btn { white-space: nowrap; }
+    @media (max-width: 767.98px) {
+        .rent-summary-cols { display: none; }
+        .rent-detail-wrap { padding-left: .75rem; }
+    }
+</style>
+
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-    <h2 class="fw-bold text-warning mb-0"><i class="bi bi-truck me-2"></i>Delivery Person Rent</h2>
+    <div>
+        <h2 class="fw-bold text-warning mb-1"><i class="bi bi-truck me-2"></i>Delivery Person Rent</h2>
+        <div class="text-white-50 small">
+            Every delivery person on one line — earned, paid and still owed. Use the arrow to see each trip.
+        </div>
+    </div>
     <div class="d-flex gap-2 flex-wrap">
+        <a href="/delivery_persons" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-people me-1"></i> Delivery Persons</a>
         <a href="/direct_sales" class="btn btn-outline-light btn-sm fw-bold"><i class="bi bi-arrow-left me-1"></i> Sales</a>
     </div>
 </div>
 
-<div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
-    <div class="card-body">
+{# ---- filters ------------------------------------------------------- #}
+<div class="card rent-card mb-4">
+    <div class="card-body rent-toolbar">
         <form method="GET" action="{{ url_for('delivery_rents_page') }}" class="row g-2 align-items-end">
-            <div class="col-md-3">
-                <label class="text-white-50 small fw-bold mb-1">FROM DATE</label>
-                <input type="date" name="date_from" class="form-control bg-dark text-white border-secondary" value="{{ date_from }}">
+            <div class="col-6 col-md-2">
+                <label class="form-label text-white-50 fw-bold mb-1">FROM DATE</label>
+                <input type="date" name="date_from" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ date_from }}">
             </div>
-            <div class="col-md-3">
-                <label class="text-white-50 small fw-bold mb-1">TO DATE</label>
-                <input type="date" name="date_to" class="form-control bg-dark text-white border-secondary" value="{{ date_to }}">
+            <div class="col-6 col-md-2">
+                <label class="form-label text-white-50 fw-bold mb-1">TO DATE</label>
+                <input type="date" name="date_to" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ date_to }}">
             </div>
-            <div class="col-md-3">
-                <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON</label>
-                <select name="driver" class="form-select bg-dark text-white border-secondary">
-                    <option value="">All Drivers</option>
+            <div class="col-12 col-md-2">
+                <label class="form-label text-white-50 fw-bold mb-1">DELIVERY PERSON</label>
+                <select name="driver" class="form-select form-select-sm bg-dark text-white border-secondary">
+                    <option value="">All delivery persons</option>
                     {% for n in driver_names %}
                     <option value="{{ n }}" {{ 'selected' if driver_filter == n }}>{{ n }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-1">
-                <label class="text-white-50 small fw-bold mb-1">ROWS</label>
-                <select name="per_page" class="form-select bg-dark text-white border-secondary">
-                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
-                    <option value="30" {% if per_page == 30 %}selected{% endif %}>30</option>
-                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+            <div class="col-6 col-md-2">
+                <label class="form-label text-white-50 fw-bold mb-1">FIND</label>
+                <input type="search" name="q" value="{{ search_query }}" class="form-control form-control-sm bg-dark text-white border-secondary" placeholder="Bill, client, note…">
+            </div>
+            <div class="col-3 col-md-1">
+                <label class="form-label text-white-50 fw-bold mb-1">VIEW</label>
+                <select name="group_by" class="form-select form-select-sm bg-dark text-white border-secondary">
+                    <option value="person" {{ 'selected' if group_by == 'person' }}>By person</option>
+                    <option value="day" {{ 'selected' if group_by == 'day' }}>By day</option>
                 </select>
             </div>
-            <div class="col-md-2 d-grid">
-                <button class="btn btn-warning text-dark fw-bold">Apply</button>
+            <div class="col-3 col-md-1">
+                <label class="form-label text-white-50 fw-bold mb-1">SORT</label>
+                <select name="sort" class="form-select form-select-sm bg-dark text-white border-secondary">
+                    <option value="due" {{ 'selected' if sort == 'due' }}>Most due</option>
+                    <option value="oldest" {{ 'selected' if sort == 'oldest' }}>Oldest unpaid</option>
+                    <option value="rent" {{ 'selected' if sort == 'rent' }}>Highest rent</option>
+                    <option value="paid" {{ 'selected' if sort == 'paid' }}>Most paid</option>
+                    <option value="name" {{ 'selected' if sort == 'name' }}>Name</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2 d-flex gap-2">
+                <button class="btn btn-warning text-dark fw-bold btn-sm flex-grow-1"><i class="bi bi-funnel me-1"></i>Apply</button>
+                <a href="{{ url_for('delivery_rents_page') }}" class="btn btn-outline-light btn-sm" title="Clear filters"><i class="bi bi-x-lg"></i></a>
             </div>
         </form>
     </div>
 </div>
 
+{# ---- period totals ------------------------------------------------- #}
 <div class="row g-3 mb-4">
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
-            <div class="card-body text-center">
-                <div class="text-white-50 small">Total Bill-Linked Rent</div>
-                <div class="text-warning fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_rent) }}</div>
-            </div>
-        </div>
+    <div class="col-6 col-lg-3">
+        <div class="card rent-card h-100"><div class="card-body py-3">
+            <div class="rent-kpi-label">Rent earned</div>
+            <div class="rent-kpi-value rent-amount-rent">{{ money(totals.rent, currency_symbol) }}</div>
+            <div class="text-white-50 small">{{ totals.entries }} trip{{ '' if totals.entries == 1 else 's' }}</div>
+        </div></div>
     </div>
-    <div class="col-md-6">
-        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
-            <div class="card-body">
-                <div class="text-white-50 small mb-2">By Driver</div>
-                {% for name, amt in totals_by_driver %}
-                <div class="d-flex justify-content-between">
-                    <span class="text-info">{{ name }}</span>
-                    <span class="text-warning fw-bold">{{ currency_symbol }}{{ "%.2f"|format(amt or 0) }}</span>
-                </div>
-                {% else %}
-                <div class="text-white-50">No data</div>
-                {% endfor %}
+    <div class="col-6 col-lg-3">
+        <div class="card rent-card h-100"><div class="card-body py-3">
+            <div class="rent-kpi-label">Paid</div>
+            <div class="rent-kpi-value rent-amount-paid">{{ money(totals.paid, currency_symbol) }}</div>
+            <div class="text-white-50 small">
+                {% if totals.waived %}{{ money(totals.waived, currency_symbol) }} waived · {% endif %}{{ totals.payments }} payment{{ '' if totals.payments == 1 else 's' }}
             </div>
-        </div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card rent-card h-100"><div class="card-body py-3">
+            <div class="rent-kpi-label">Remaining</div>
+            <div class="rent-kpi-value rent-amount-due">{{ money(totals.due, currency_symbol) }}</div>
+            <div class="text-white-50 small">Still owed to delivery persons</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card rent-card h-100"><div class="card-body py-3">
+            <div class="rent-kpi-label">Delivery persons</div>
+            <div class="rent-kpi-value text-white">{{ totals.groups }}</div>
+            <div class="text-white-50 small">{{ 'One line per day' if group_by == 'day' else 'One line per person' }}</div>
+        </div></div>
     </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
-            <div class="card-body text-center">
-                <div class="text-white-50 small">Total Paid</div>
-                <div class="text-success fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_paid or 0) }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
-            <div class="card-body text-center">
-                <div class="text-white-50 small">Total Waive-Off (Profit)</div>
-                <div class="text-info fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_waived or 0) }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
-            <div class="card-body text-center">
-                <div class="text-white-50 small">Total Due</div>
-                <div class="text-danger fw-bold fs-4">{{ currency_symbol }}{{ "%.2f"|format(total_due or 0) }}</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="card border-0 shadow-sm" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px; overflow: hidden;">
-    <div class="px-4 py-2 border-bottom border-secondary d-flex justify-content-between align-items-center">
+{# ---- grouped table ------------------------------------------------- #}
+<div class="card rent-card" style="overflow: hidden;">
+    <div class="px-4 py-2 border-bottom border-secondary d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div class="small text-white-50">
-            Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 if pagination.total else 0 }} -
-            {{ ((pagination.page - 1) * pagination.per_page) + (rows|length) if pagination.total else 0 }}
-            of {{ pagination.total }}
+            <i class="bi bi-chevron-right me-1"></i>Tap a name (or its arrow) to see every trip behind that line.
+            {% if truncated %}<span class="text-warning ms-2"><i class="bi bi-exclamation-triangle me-1"></i>Showing the first groups only — narrow the dates for the rest.</span>{% endif %}
         </div>
-        <div class="small text-white-50">Page {{ pagination.page }} / {{ pagination.pages or 1 }}</div>
+        <div class="small text-white-50">
+            {% if date_from or date_to %}
+            {{ date_from or 'beginning' }} → {{ date_to or 'today' }}
+            {% else %}
+            All dates
+            {% endif %}
+            {% if driver_filter %} · {{ driver_filter }}{% endif %}
+        </div>
     </div>
     <div class="table-responsive">
-        <table class="table table-dark table-hover align-middle mb-0">
+        <table class="table align-middle mb-0" id="rentGroupTable" style="color: #e2e8f0;"
+                   data-csrf-token="{{ csrf_token or '' }}"
+                   data-base-url="{{ url_for('delivery_rents_page') }}"
+                   data-currency="{{ currency_symbol }}">
             <thead style="background: #0f172a;">
                 <tr>
-                    <th class="py-3 ps-4 text-white-50">Date</th>
-                    <th class="py-3 text-white-50">Bill</th>
-                    <th class="py-3 text-white-50">Driver</th>
-                    <th class="py-3 text-white-50">Client</th>
-                    <th class="py-3 text-white-50">Bags</th>
-                    <th class="py-3 text-white-50">Rent</th>
-                    <th class="py-3 text-white-50">Paid</th>
-                    <th class="py-3 text-white-50">Due</th>
+                    <th class="py-3 ps-4 text-white-50" style="width: 42%;">
+                        {{ 'Date' if group_by == 'day' else 'Delivery Person' }}
+                    </th>
+                    <th class="py-3 text-end text-white-50 rent-summary-cols">Rent</th>
+                    <th class="py-3 text-end text-white-50 rent-summary-cols">Paid</th>
+                    <th class="py-3 text-end text-white-50">Remaining</th>
+                    <th class="py-3 text-end text-white-50 rent-summary-cols">Trips</th>
                     <th class="py-3 pe-4 text-end text-white-50">Action</th>
                 </tr>
             </thead>
             <tbody>
-                {% for r in rows %}
-                <tr>
-                    <td class="ps-4">{{ (r.created_at or r.sale.date_posted).strftime('%Y-%m-%d') if (r.created_at or (r.sale and r.sale.date_posted)) else '' }}</td>
-                    <td>
-                        {% if r.sale %}
-                            {{ r.sale.manual_bill_no or (r.sale.invoice.invoice_no if r.sale.invoice else '') or r.sale.auto_bill_no or ('DS-' ~ r.sale.id) }}
-                        {% else %}
-                            -
-                        {% endif %}
+                {% for group in groups %}
+                {% set detail_id = 'rentDetail_' ~ loop.index %}
+                <tr class="rent-group-row" data-group-key="{{ group.key }}" data-target="{{ detail_id }}"
+                    data-loaded="{{ '1' if render_all_details else '0' }}" tabindex="0"
+                    aria-expanded="false" aria-controls="{{ detail_id }}">
+                    <td class="ps-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="rent-chevron" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+                            <span class="min-w-0">
+                                <span class="rent-driver-name d-block text-truncate">
+                                    {% if group.kind == 'day' %}
+                                    <i class="bi bi-calendar3 me-1 text-white-50"></i>{{ group.name }}
+                                    {% else %}
+                                    {{ group.name }}
+                                    {% endif %}
+                                </span>
+                                <span class="rent-driver-meta">
+                                    {{ group.entry_count }} trip{{ '' if group.entry_count == 1 else 's' }}
+                                    {% if group.payment_count %} · {{ group.payment_count }} payment{{ '' if group.payment_count == 1 else 's' }}{% endif %}
+                                    {% if group.kind == 'person' and group.phone %} · {{ group.phone }}{% endif %}
+                                    {% if group.kind == 'person' and group.last_date %} · last {{ group.last_date }}{% endif %}
+                                </span>
+                            </span>
+                        </div>
                     </td>
-                    <td class="text-info fw-bold">{{ r.delivery_person.name if r.delivery_person else '-' }}</td>
-                    <td>{{ r.sale.client_name if r.sale else '-' }}</td>
-                    <td class="text-white-50">{{ r.bags_delivered or 0 }}</td>
-                    <td class="text-warning fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.rent_amount or 0) }}</td>
-                    <td class="text-success fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.paid_total or 0) }}</td>
-                    <td class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.due_total or 0) }}</td>
-                    <td class="text-end pe-4">
-                        {% if current_user.can_manage_sales or current_user.role == 'admin' %}
-                        <button class="btn btn-outline-success btn-sm me-1" data-bs-toggle="modal" data-bs-target="#payRentModal{{ r.id }}">Pay Now</button>
-                        <form method="POST" action="{{ url_for('void_delivery_rent', id=r.id) }}" class="d-inline">
-                            <button class="btn btn-outline-danger btn-sm" onclick="return confirm('Permanently delete this rent entry?')">Delete</button>
-                        </form>
-                        {% else %}
-                        <span class="text-white-50 small">-</span>
+                    <td class="text-end rent-amount rent-amount-rent rent-summary-cols">{{ money(group.rent, currency_symbol) }}</td>
+                    <td class="text-end rent-amount rent-amount-paid rent-summary-cols">{{ money(group.paid, currency_symbol) }}</td>
+                    <td class="text-end rent-amount">
+                        <span class="{{ 'rent-amount-due fw-bold' if group.due else 'text-white-50' }}">{{ money(group.due, currency_symbol) }}</span>
+                        <div class="mt-1">{{ status_pill(group) }}</div>
+                    </td>
+                    <td class="text-end text-white-50 rent-summary-cols">{{ group.entry_count }}</td>
+                    <td class="text-end pe-4 rent-driver-actions">
+                        {% if can_pay and group.kind == 'person' and group.delivery_person_id and group.due > 0 %}
+                        <button type="button" class="btn btn-success btn-sm rent-pay-driver"
+                                data-person-id="{{ group.delivery_person_id }}"
+                                data-person="{{ group.name|e }}"
+                                data-due="{{ '%.2f'|format(group.due) }}"
+                                data-trips="{{ group.entry_count }}">
+                            <i class="bi bi-cash-coin me-1"></i>Pay
+                        </button>
+                        {% endif %}
+                        {% if group.kind == 'person' and group.ledger_url %}
+                        <a href="{{ group.ledger_url }}" class="btn btn-outline-info btn-sm" title="Full ledger for {{ group.name }}"
+                           onclick="event.stopPropagation();"><i class="bi bi-journal-text"></i></a>
                         {% endif %}
                     </td>
                 </tr>
+                <tr class="rent-detail-row" id="{{ detail_id }}" data-group-key="{{ group.key }}" hidden>
+                    <td colspan="6">
+                        <div class="rent-detail-wrap">
+                            {% if render_all_details %}
+                                {% include 'ops/_delivery_rent_group_rows.html' %}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
                 {% else %}
-                <tr><td colspan="9" class="text-center py-4 text-white-50">No delivery rent entries found.</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-white-50">
+                        <i class="bi bi-inbox d-block fs-3 mb-2"></i>
+                        No delivery rent entries found for these filters.
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
+            {% if groups %}
+            <tfoot style="background: #0f172a;">
+                <tr class="fw-bold">
+                    <td class="ps-4 py-3 text-white-50">
+                        {{ totals.groups }} line{{ '' if totals.groups == 1 else 's' }} · {{ totals.entries }} trip{{ '' if totals.entries == 1 else 's' }}
+                    </td>
+                    <td class="text-end rent-amount rent-amount-rent rent-summary-cols">{{ money(totals.rent, currency_symbol) }}</td>
+                    <td class="text-end rent-amount rent-amount-paid rent-summary-cols">{{ money(totals.paid, currency_symbol) }}</td>
+                    <td class="text-end rent-amount rent-amount-due">{{ money(totals.due, currency_symbol) }}</td>
+                    <td class="rent-summary-cols"></td>
+                    <td></td>
+                </tr>
+            </tfoot>
+            {% endif %}
         </table>
     </div>
 </div>
 
-{% if pagination.pages > 1 %}
-<nav class="mt-3">
-    <ul class="pagination pagination-sm justify-content-center mb-0">
-        {% if pagination.has_prev %}
-        <li class="page-item">
-            <a class="page-link bg-dark border-secondary text-warning"
-               href="{{ url_for('delivery_rents_page', page=pagination.prev_num, per_page=per_page, date_from=date_from, date_to=date_to, driver=driver_filter) }}">Previous</a>
-        </li>
-        {% endif %}
-        <li class="page-item active">
-            <span class="page-link bg-warning border-warning text-dark">{{ pagination.page }}</span>
-        </li>
-        {% if pagination.has_next %}
-        <li class="page-item">
-            <a class="page-link bg-dark border-secondary text-warning"
-               href="{{ url_for('delivery_rents_page', page=pagination.next_num, per_page=per_page, date_from=date_from, date_to=date_to, driver=driver_filter) }}">Next</a>
-        </li>
-        {% endif %}
-    </ul>
-</nav>
+{% if orphan_payments %}
+<div class="card rent-card mt-3">
+    <div class="card-body">
+        <div class="rent-unallocated-title mb-2"><i class="bi bi-wallet2 me-1"></i>Payments not linked to any trip in this view</div>
+        <div class="text-white-50 small mb-2">These are recorded against the driver, not a specific trip. They are included in the paid and remaining totals.</div>
+        {% for payment in orphan_payments %}
+        <div class="rent-payment-item">
+            <span class="text-success fw-semibold">{{ money(payment.amount_paid, currency_symbol) }}</span>
+            {% if payment.waive_off_amount %}<span class="text-info">+ {{ money(payment.waive_off_amount, currency_symbol) }} waived</span>{% endif %}
+            <span class="text-white-50">· {{ payment.date_display or '—' }}{% if payment.method %} · {{ payment.method }}{% endif %}{% if payment.reference %} · ref {{ payment.reference }}{% endif %}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
 {% endif %}
 
-{% for r in rows %}
-<div class="modal fade" id="payRentModal{{ r.id }}" tabindex="-1">
+{# ---- pay-per-trip modal (opened from a detail row) ----------------- #}
+<div class="modal fade" id="rentEntryPayModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <form class="modal-content border-secondary" style="background: #1e293b;" method="POST" action="{{ url_for('pay_delivery_rent', alloc_id=r.id) }}">
+        <form class="modal-content border-secondary" style="background: #1e293b;" method="POST" id="rentEntryPayForm" action="#">
             <div class="modal-header border-0">
-                <h5 class="text-warning fw-bold">Pay Delivery Rent</h5>
+                <h5 class="text-warning fw-bold mb-0"><i class="bi bi-cash-coin me-2"></i>Pay Delivery Rent</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-2 text-white-50 small">Driver: <span class="text-info">{{ r.delivery_person.name if r.delivery_person else '-' }}</span></div>
-                <div class="mb-2 text-white-50 small">Bill: <span class="text-white">{{ r.sale.manual_bill_no or (r.sale.invoice.invoice_no if r.sale and r.sale.invoice else '') or r.sale.auto_bill_no or ('DS-' ~ r.sale.id) if r.sale else '-' }}</span></div>
-                <div class="mb-3 text-white-50 small">Due Now: <span class="text-danger fw-bold">{{ currency_symbol }}{{ "%.2f"|format(r.due_total or 0) }}</span></div>
+                <div class="mb-2 text-white-50 small">Delivery person: <span class="text-info fw-semibold" id="rentEntryPayPerson">—</span></div>
+                <div class="mb-2 text-white-50 small">Bill: <span class="text-white" id="rentEntryPayBill">—</span></div>
+                <div class="mb-3 text-white-50 small">Remaining on this trip: <span class="text-danger fw-bold" id="rentEntryPayDue">—</span></div>
 
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="text-white-50 small fw-bold mb-1">PAID AMOUNT</label>
-                        <input type="number" step="any" min="0" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="0">
+                        <input type="number" step="any" min="0" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="0" required>
                     </div>
                     <div class="col-6">
                         <label class="text-white-50 small fw-bold mb-1">WAIVE-OFF (PROFIT)</label>
@@ -216,10 +337,10 @@
                         <select name="payment_account_id" class="form-select bg-dark text-white border-secondary rent-account">
                             <option value="">Select account…</option>
                             {% for a in payment_accounts %}
-                            <option value="{{ a.id }}" data-category="{{ (a.category or '')|lower }}">[{{ (a.category or 'cash')|upper }}] {{ a.name }} (Rs. {{ "%.2f"|format(a.balance or 0) }})</option>
+                            <option value="{{ a.id }}" data-category="{{ (a.category or '')|lower }}">[{{ (a.category or 'cash')|upper }}] {{ a.name }} ({{ money(a.balance, currency_symbol) }})</option>
                             {% endfor %}
                         </select>
-                        <div class="form-text text-white-50 small">Money leaves this account. Not required for a waive-off only.</div>
+                        <div class="form-text text-white-50 small">Money leaves this account. Not needed for a waive-off only.</div>
                     </div>
                 </div>
                 <div class="mt-3">
@@ -234,7 +355,8 @@
                     <label class="text-white-50 small fw-bold mb-1">NOTE (OPTIONAL)</label>
                     <input type="text" name="note" class="form-control bg-dark text-white border-secondary" placeholder="Reason or remark">
                 </div>
-                <input type="hidden" name="idempotency_key" value="rent-{{ r.id }}-{{ submission_token }}">
+                <input type="hidden" name="idempotency_key" value="rent-entry-{{ submission_token }}">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
             </div>
             <div class="modal-footer border-0">
                 <button type="submit" class="btn btn-warning text-dark fw-bold w-100 py-2 rounded-pill">Save Payment</button>
@@ -242,34 +364,76 @@
         </form>
     </div>
 </div>
-{% endfor %}
 
-<script>
-// Keep the selectable account list consistent with the chosen method, and stop
-// an impatient second click from posting the same form twice.  Server-side
-// idempotency remains the real guard.
-document.querySelectorAll('#content form, form').forEach(function (form) {
-  var method = form.querySelector('.rent-method');
-  var account = form.querySelector('.rent-account');
-  if (method && account) {
-    var sync = function () {
-      var want = method.value === 'Cash' ? 'cash' : 'bank';
-      Array.prototype.forEach.call(account.options, function (opt) {
-        if (!opt.value) { return; }
-        var ok = opt.dataset.category === want;
-        opt.hidden = !ok;
-        opt.disabled = !ok;
-      });
-      var sel = account.selectedOptions[0];
-      if (sel && sel.value && sel.disabled) { account.value = ''; }
-    };
-    method.addEventListener('change', sync);
-    sync();
-  }
-  form.addEventListener('submit', function () {
-    var btn = form.querySelector('button[type="submit"]');
-    if (btn) { setTimeout(function () { btn.disabled = true; }, 0); }
-  });
-});
-</script>
+{# ---- pay-all-for-one-driver modal ---------------------------------- #}
+<div class="modal fade" id="rentDriverPayModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content border-secondary" style="background: #1e293b;" method="POST" id="rentDriverPayForm" action="#">
+            <div class="modal-header border-0">
+                <h5 class="text-warning fw-bold mb-0"><i class="bi bi-person-check me-2"></i>Pay Delivery Person</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2 text-white-50 small">Delivery person: <span class="text-info fw-semibold" id="rentDriverPayPerson">—</span></div>
+                <div class="mb-3 text-white-50 small">
+                    Due in this period: <span class="text-danger fw-bold" id="rentDriverPayDue">—</span>
+                    <span class="text-white-50">(<span id="rentDriverPayTrips">0</span> trip<span id="rentDriverPayTripPlural">s</span>)</span>
+                </div>
+                <div class="alert alert-dark border-secondary py-2 px-3 small mb-3">
+                    The amount is applied to that person's oldest unpaid trips first, so every trip stays fully accounted for.
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">PAID AMOUNT</label>
+                        <input type="number" step="any" min="0" name="paid_amount" class="form-control bg-dark text-white border-secondary" value="0" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">WAIVE-OFF (PROFIT)</label>
+                        <input type="number" step="any" min="0" name="waive_off_amount" class="form-control bg-dark text-white border-secondary" value="0">
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">PAYMENT METHOD</label>
+                        <select name="method" class="form-select bg-dark text-white border-secondary rent-method">
+                            <option value="Cash">Cash</option>
+                            <option value="Bank">Bank</option>
+                            <option value="Check">Check</option>
+                            <option value="Online">Online</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="text-white-50 small fw-bold mb-1">PAY FROM ACCOUNT</label>
+                        <select name="payment_account_id" class="form-select bg-dark text-white border-secondary rent-account">
+                            <option value="">Select account…</option>
+                            {% for a in payment_accounts %}
+                            <option value="{{ a.id }}" data-category="{{ (a.category or '')|lower }}">[{{ (a.category or 'cash')|upper }}] {{ a.name }} ({{ money(a.balance, currency_symbol) }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text text-white-50 small">Money leaves this account. Not needed for a waive-off only.</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="text-white-50 small fw-bold mb-1">DATE</label>
+                    <input type="date" name="date" class="form-control bg-dark text-white border-secondary">
+                </div>
+                <div class="mt-3">
+                    <label class="text-white-50 small fw-bold mb-1">REFERENCE (OPTIONAL)</label>
+                    <input type="text" name="reference" class="form-control bg-dark text-white border-secondary" placeholder="Voucher / slip no.">
+                </div>
+                <div class="mt-3">
+                    <label class="text-white-50 small fw-bold mb-1">NOTE (OPTIONAL)</label>
+                    <input type="text" name="note" class="form-control bg-dark text-white border-secondary" placeholder="Reason or remark">
+                </div>
+                <input type="hidden" name="idempotency_key" value="rent-driver-{{ submission_token }}">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+            </div>
+            <div class="modal-footer border-0">
+                <button type="submit" class="btn btn-success fw-bold w-100 py-2 rounded-pill">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='delivery_rents.js') }}?v=1"></script>
 {% endblock %}
