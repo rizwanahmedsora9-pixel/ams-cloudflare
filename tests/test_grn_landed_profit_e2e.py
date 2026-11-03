@@ -55,7 +55,8 @@ def seed(client):
 
 
 def receive(client, *, bill="E2E-GRN", date="2026-10-20", qty=100, rate=1500,
-            charges=None, edit_id=None, include_charges_in_supplier=False):
+            charges=None, edit_id=None, include_charges_in_supplier=False,
+            supplier_charge_indices=None):
     charges = charges if charges is not None else [
         ("VEHICLE_FARE", "Vehicle rent", 5000, "TRANSPORTER", "Transport Person"),
         ("LOADING", "Loading", 1000, "LABOUR", "Loading Team"),
@@ -78,6 +79,10 @@ def receive(client, *, bill="E2E-GRN", date="2026-10-20", qty=100, rate=1500,
     }
     if include_charges_in_supplier:
         data["include_charges_in_supplier"] = "1"
+    if supplier_charge_indices is not None:
+        data["charge_supplier_billing_present"] = "1"
+        data["charge_row_key[]"] = [f"row-{i}" for i in range(len(charges))]
+        data["charge_include_in_supplier[]"] = [f"row-{i}" for i in supplier_charge_indices]
     url = f"/edit_grn/{edit_id}" if edit_id else "/grn"
     if edit_id:
         data.update({"grn_item_id[]": [str(edit_id)]})
@@ -88,6 +93,10 @@ def receive(client, *, bill="E2E-GRN", date="2026-10-20", qty=100, rate=1500,
         with client.application.app_context():
             charge_ids = [c.id for c in GRNCharge.query.filter_by(grn_id=edit_id, is_void=False).order_by(GRNCharge.id).all()]
         data["charge_id[]"] = [str(charge_ids[i]) if i < len(charge_ids) else "" for i in range(len(charges))]
+        if supplier_charge_indices is not None:
+            # Use the same stable keys the browser renders for saved rows.
+            data["charge_row_key[]"] = [f"saved-{cid}" if cid else f"row-{i}" for i, cid in enumerate(data["charge_id[]"])]
+            data["charge_include_in_supplier[]"] = [data["charge_row_key[]"][i] for i in supplier_charge_indices]
     response = client.post(url, data=data, follow_redirects=True)
     assert response.status_code == 200
     assert b"already has payments" not in response.data
@@ -372,10 +381,10 @@ def test_fractional_landed_cost_reconciles_to_the_paisa(shop):
     assert bridge["matches"]
 
 
-def test_supplier_billing_checkbox_moves_grn_costs_into_supplier_ledger_and_accounts(shop):
+def test_selecting_every_expense_moves_all_grn_costs_into_supplier_ledger_and_accounts(shop):
     app, client = shop
     seed(client)
-    receive(client, include_charges_in_supplier=True)
+    receive(client, supplier_charge_indices=[0, 1, 2])
     with app.app_context():
         grn = GRN.query.one()
         gid = grn.id
@@ -415,10 +424,155 @@ def test_supplier_billing_checkbox_moves_grn_costs_into_supplier_ledger_and_acco
 def test_unchecked_grn_keeps_costs_out_of_supplier_ledger(shop):
     app, client = shop
     seed(client)
-    receive(client, include_charges_in_supplier=False)
+    receive(client, supplier_charge_indices=[])
     with app.app_context():
         bd = grn_breakdown(GRN.query.one())
         assert bd["supplier_bill_amount"] == 150000
         assert bd["total_obligations"] == 156500
         assert len(bd["obligations"]) == 4
         assert build_supplier_financial_ledger(Supplier.query.one())["closing_balance"] == 150000
+
+
+def test_mixed_expense_selection_splits_supplier_and_recipient_payables_exactly(shop):
+    """Only the two ticked rows reach the supplier; the other two stay with their payees."""
+    app, client = shop
+    seed(client)
+    receive(client, supplier_charge_indices=[0, 2], charges=[
+        ("VEHICLE_FARE", "Vehicle rent", 5000, "TRANSPORTER", "Transport Person"),
+        ("LOADING", "Loading", 1000, "LABOUR", "Loading Team"),
+        ("UNLOADING", "Unloading", 500, "LABOUR", "Unloading Team"),
+        ("OTHER", "Site tea", 700, "OTHER", "Tea Shop", "EXPENSE"),
+    ])
+    with app.app_context():
+        grn = GRN.query.one()
+        gid = grn.id
+        bd = grn_breakdown(grn)
+        assert bd["supplier_material_amount"] == 150000
+        assert bd["supplier_billed_charges"] == 5500
+        assert bd["supplier_billed_charge_count"] == 2
+        assert bd["supplier_bill_amount"] == 155500
+        assert [c["included_in_supplier_bill"] for c in bd["charges"]] == [True, False, True, False]
+        assert bd["capitalised_charge_total"] == 6500
+        assert bd["expense_charge_total"] == 700
+        assert bd["landed_cost_total"] == 156500
+        assert bd["total_obligations"] == 157200
+        assert len(bd["obligations"]) == 3
+        assert {o["kind"] for o in bd["obligations"]} == {"SUPPLIER", "CHARGE"}
+        assert bd["additional_remaining"] == 1700
+
+        from app.services.financial_ledgers import (
+            build_party_financial_ledger, build_purchase_payables,
+        )
+        from models import CashFlowParty
+        supplier_ledger = build_supplier_financial_ledger(Supplier.query.one())
+        assert supplier_ledger["closing_balance"] == 155500
+        item_names = [line["name"] for line in supplier_ledger["rows"][0]["item_lines"]]
+        assert any("Vehicle rent" in name for name in item_names)
+        assert any("Unloading" in name for name in item_names)
+        assert not any("Loading" in name or "Site tea" in name for name in item_names)
+        party_balances = {p.name: build_party_financial_ledger(p)["closing_balance"]
+                          for p in CashFlowParty.query.all()}
+        assert party_balances == {
+            "Transport Person": 0, "Loading Team": 1000,
+            "Unloading Team": 0, "Tea Shop": 700,
+        }
+        payables = build_purchase_payables()
+        assert payables["suppliers"][0]["outstanding"] == 155500
+        assert {p["name"]: p["outstanding"] for p in payables["parties"]} == {
+            "Loading Team": 1000, "Tea Shop": 700,
+        }
+        assert payables["total"] == 157200
+
+    sell(client)
+    rep = report(app)
+    assert rep["summary"]["total_goods_cogs"] == 62600
+    assert rep["summary"]["total_grn_expenses"] == 700
+    assert rep["summary"]["total_profit"] == 8700
+    pay_obligations(client, gid)
+    with app.app_context():
+        bd = grn_breakdown(db.session.get(GRN, gid))
+        assert bd["total_remaining"] == 0
+        assert bd["supplier_paid"] == 155500
+        assert bd["additional_paid"] == 1700
+        assert bd["total_cash_paid"] == 157200
+        assert AccountTransaction.query.count() == 3
+        assert build_supplier_financial_ledger(Supplier.query.one())["closing_balance"] == 0
+    assert report(app)["summary"] == rep["summary"]
+
+
+def test_editing_one_checkbox_changes_only_that_expenses_payable_route(shop):
+    app, client = shop
+    seed(client)
+    receive(client, supplier_charge_indices=[0])
+    with app.app_context():
+        gid = GRN.query.one().id
+        before = grn_breakdown(db.session.get(GRN, gid))
+    response = receive(client, edit_id=gid, supplier_charge_indices=[1])
+    assert b"GRN updated successfully" in response.data
+    with app.app_context():
+        grn = db.session.get(GRN, gid)
+        after = grn_breakdown(grn)
+        assert [c["included_in_supplier_bill"] for c in after["charges"]] == [False, True, False]
+        assert after["supplier_bill_amount"] == 151000
+        assert after["additional_remaining"] == 5500
+        assert after["landed_cost_total"] == before["landed_cost_total"]
+        assert after["capitalised_charge_total"] == before["capitalised_charge_total"]
+        assert build_supplier_financial_ledger(Supplier.query.one())["closing_balance"] == 151000
+    html = client.get(f"/edit_grn/{gid}").get_data(as_text=True)
+    assert 'name="include_charges_in_supplier"' not in html
+    assert html.count('name="charge_include_in_supplier[]"') == 4  # three saved rows plus inert template
+    assert html.count('class="form-check-input grn-charge-supplier-bill"') == 4
+
+
+def test_billing_selection_cannot_change_after_accounts_payment(shop):
+    app, client = shop
+    seed(client)
+    receive(client, supplier_charge_indices=[0])
+    with app.app_context():
+        gid = GRN.query.one().id
+        account_id = Account.query.filter_by(name="E2E Cash").one().id
+    response = client.post("/accounts/grn_payments/save", data={
+        "grn_id": str(gid), "obligation_key": f"SUPPLIER:{gid}",
+        "amount": "1000", "method": "Cash", "payment_account_id": str(account_id),
+        "date_posted": "2026-11-03",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    # The normal helper asserts success, so post the edit directly to inspect refusal.
+    with app.app_context():
+        from models import GRNCharge
+        charges = GRNCharge.query.filter_by(grn_id=gid, is_void=False).order_by(GRNCharge.id).all()
+        cids = [c.id for c in charges]
+    data = {
+        "supplier": "Cement Supplier", "supplier_id": "1",
+        "date": "2026-10-20", "time": "09:00", "manual_bill_no": "E2E-GRN",
+        "mat_name[]": ["Cement"], "qty[]": ["100"], "price[]": ["1500"],
+        "grn_item_id[]": [str(i) for i in GRNItemIds(app, gid)],
+        "charge_grid_present": "1", "charge_supplier_billing_present": "1",
+        "charge_id[]": [str(i) for i in cids],
+        "charge_row_key[]": [f"saved-{i}" for i in cids],
+        "charge_include_in_supplier[]": [f"saved-{cids[1]}"],
+        "charge_type[]": ["VEHICLE_FARE", "LOADING", "UNLOADING"],
+        "charge_label[]": ["Vehicle rent", "Loading", "Unloading"],
+        "charge_amount[]": ["5000", "1000", "500"],
+        "charge_recipient_type[]": ["TRANSPORTER", "LABOUR", "LABOUR"],
+        "charge_recipient[]": ["Transport Person", "Loading Team", "Unloading Team"],
+        "charge_treatment[]": ["INVENTORY", "INVENTORY", "INVENTORY"],
+        "charge_basis[]": ["VALUE", "VALUE", "VALUE"],
+    }
+    response = client.post(f"/edit_grn/{gid}", data=data, follow_redirects=True)
+    assert b"already has Accounts payments" in response.data
+    with app.app_context():
+        bd = grn_breakdown(db.session.get(GRN, gid))
+        assert [c["included_in_supplier_bill"] for c in bd["charges"]] == [True, False, False]
+        assert bd["supplier_bill_amount"] == 155000
+
+
+def test_legacy_whole_grn_checked_form_still_bills_all_expenses(shop):
+    """Older programmatic clients keep working, but the wizard no longer posts this field."""
+    app, client = shop
+    seed(client)
+    receive(client, include_charges_in_supplier=True)
+    with app.app_context():
+        bd = grn_breakdown(GRN.query.one())
+        assert bd["supplier_bill_amount"] == 156500
+        assert all(c["include_in_supplier"] for c in bd["charges"])

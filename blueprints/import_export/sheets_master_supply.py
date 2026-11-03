@@ -95,8 +95,11 @@ def _process_grn_charges(df, strategy, report):
     )
     from utils.money import to_minor, from_minor
     for _, row in df.iterrows():
-        manual_bill = str(row.get('grn_manual_bill_no', '') or '').strip()
-        auto_bill = str(row.get('grn_auto_bill_no', '') or '').strip()
+        # Current master exports use "GRN Manual Bill" / "GRN Auto Bill";
+        # older payloads used the *_no names.  Accept both so a round trip
+        # preserves the expense and its independent supplier-billing choice.
+        manual_bill = str(row.get('grn_manual_bill_no', '') or row.get('grn_manual_bill', '') or '').strip()
+        auto_bill = str(row.get('grn_auto_bill_no', '') or row.get('grn_auto_bill', '') or '').strip()
         grn = None
         if manual_bill:
             grn = GRN.query.filter_by(manual_bill_no=manual_bill).first()
@@ -136,6 +139,11 @@ def _process_grn_charges(df, strategy, report):
         if existing:
             report['skipped'] += 1
             continue
+        # New exports carry an explicit choice for every expense.  Older
+        # exports predate the column and keep the historical material-only
+        # default rather than silently billing every recipient to the supplier.
+        raw_billing = str(row.get('include_in_supplier', '') or '').strip().lower()
+        include_in_supplier = raw_billing in ('1', 'true', 'yes', 'on', 'y')
         db.session.add(GRNCharge(
             grn_id=grn.id,
             charge_type=ctype,
@@ -147,6 +155,7 @@ def _process_grn_charges(df, strategy, report):
             recipient_name=party.name if party else name,
             declared_status=status,
             cost_treatment=treatment,
+            include_in_supplier=include_in_supplier,
             allocation_basis=basis,
             is_void=bool(row.get('is_void', False)),
         ))

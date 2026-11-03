@@ -1,7 +1,7 @@
 """GRN payment posting — the ONLY place purchase money moves (owner rule A1).
 
 A payment targets exactly one obligation of one GRN:
-  * SUPPLIER  -> the supplier's material amount (Σ qty × rate)
+  * SUPPLIER  -> material (Σ qty × rate) plus individually selected expenses
   * CHARGE    -> one GRNCharge (vehicle / loading / unloading / other recipient)
 
 One ``SupplierPayment`` row (the existing payment table, extended), exactly one

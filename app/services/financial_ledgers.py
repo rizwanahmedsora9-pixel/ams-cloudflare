@@ -56,15 +56,19 @@ from models import (
     WaiveOff,
 )
 from app.services.grn_svc import calculate_grn_total
-from app.services.grn_costing import supplier_ledger_credit_minor as _grn_supplier_ledger_credit_minor
+from app.services.grn_costing import (
+    supplier_ledger_credit_minor as _grn_supplier_ledger_credit_minor,
+    charge_supplier_billed_minor,
+    charge_effective_minor,
+    active_charges,
+)
 
 
 def _grn_supplier_credit(grn) -> Decimal:
-    """Supplier Ledger credit follows the GRN billing checkbox.
+    """Supplier Ledger credit follows each expense's billing checkbox.
 
-    Unchecked: material qty × rate only.  Checked: material plus applicable
-    vehicle/loading/unloading/other GRN charges.  The same helper drives the
-    supplier ledger, supplier payables overview and Accounts purchase payables.
+    Material qty × rate plus only selected applicable GRN charges.  The same
+    helper drives the supplier ledger, payables overview and Accounts.
     """
     try:
         return Decimal(int(_grn_supplier_ledger_credit_minor(grn))) / Decimal(100)
@@ -1280,7 +1284,7 @@ def _supplier_rows(supplier):
         or_(GRN.supplier_id == supplier.id, func.lower(func.trim(GRN.supplier)) == _norm(supplier.name)),
     ).order_by(GRN.date_posted.asc(), GRN.id.asc()).all()
     for grn in grns:
-        # Supplier billing checkbox: material only, or material + GRN costs.
+        # Supplier billing: material plus only individually selected expenses.
         total = _grn_supplier_credit(grn)
         if total == 0:
             # Keep a zero-value adjustment out of balances, but historical
@@ -1309,21 +1313,16 @@ def _supplier_rows(supplier):
             account=getattr(getattr(grn, "payment_account", None), "name", "") or "",
             source=grn,
         )
-        if bool(getattr(grn, "include_charges_in_supplier", False)):
-            for charge in (getattr(grn, "charges", None) or []):
-                if bool(getattr(charge, "is_void", False)):
-                    continue
-                amount = _decimal(getattr(charge, "amount_minor", 0) or 0) / Decimal(100)
-                treatment = (getattr(charge, "cost_treatment", None) or "INVENTORY").upper()
-                status = (getattr(charge, "declared_status", None) or "UNPAID").upper()
-                if amount <= 0 or status == "NOT_APPLICABLE" or treatment in ("NON_MATERIAL", "UNTRACKED_LEGACY"):
-                    continue
-                item_lines.append({
-                    "name": (getattr(charge, "label", None) or getattr(charge, "charge_type", None) or "GRN cost") + " (billed to supplier)",
-                    "qty": 0.0,
-                    "rate": 0.0,
-                    "amount": _float(amount),
-                })
+        for charge in active_charges(grn):
+            billed_minor = charge_supplier_billed_minor(charge, grn)
+            if billed_minor <= 0:
+                continue
+            item_lines.append({
+                "name": (getattr(charge, "label", None) or getattr(charge, "charge_type", None) or "GRN cost") + " (billed to supplier)",
+                "qty": 0.0,
+                "rate": 0.0,
+                "amount": _float(Decimal(billed_minor) / Decimal(100)),
+            })
         row["item_lines"] = item_lines
         row["supplier_invoice_no"] = getattr(grn, "supplier_invoice_no", "") or ""
         rows.append(row)
@@ -1765,13 +1764,13 @@ def build_party_financial_ledger(party, **filters):
         GRNCharge.is_void == False,  # noqa: E712
     ).order_by(GRNCharge.created_at.asc(), GRNCharge.id.asc()).all()
     for charge in charges:
-        amount = _decimal(getattr(charge, "amount_minor", 0) or 0) / Decimal(100)
+        amount = _decimal(charge_effective_minor(charge)) / Decimal(100)
         if amount == 0:
             continue
         grn = db.session.get(GRN, charge.grn_id)
-        if grn is not None and bool(getattr(grn, "include_charges_in_supplier", False)):
-            # Billed through the supplier ledger; do not create a second
-            # payable to the transporter/labour party.
+        if grn is not None and charge_supplier_billed_minor(charge, grn) > 0:
+            # This selected expense is billed through the supplier ledger;
+            # unselected rows on the same GRN still reach this party ledger.
             continue
         rows.append(_row(
             date_value=getattr(grn, "date_posted", None) if grn else getattr(charge, "created_at", None),
@@ -1848,7 +1847,7 @@ def build_purchase_payables():
             GRNCharge.recipient_party_id.is_(None),
             GRNCharge.is_void == False,  # noqa: E712
         ).all()
-        if not bool(getattr(db.session.get(GRN, c.grn_id), "include_charges_in_supplier", False))
+        if charge_supplier_billed_minor(c, db.session.get(GRN, c.grn_id)) <= 0
     ]
     unassigned_paid = sum(
         float(getattr(p, "amount", 0) or 0)
@@ -1858,7 +1857,7 @@ def build_purchase_payables():
             SupplierPayment.is_void == False,  # noqa: E712
         ).all()
     )
-    unassigned = sum(float(getattr(c, "amount", 0) or 0) for c in unassigned_charges) - unassigned_paid
+    unassigned = sum(charge_effective_minor(c) for c in unassigned_charges) / 100.0 - unassigned_paid
     result["unassigned_legacy_charges"] = max(0.0, unassigned)
     result["total"] += result["unassigned_legacy_charges"]
     return result

@@ -72,6 +72,13 @@ helper function.
 
   New ORM columns are added automatically by `schema._ensure_model_columns()`.
   No table rebuild, no destructive DDL, and no historical money row is
-  rewritten.  `0004_*.sql` is the next file name.
+  rewritten.  `0004_grn_supplier_charge_billing.sql` records the retired whole-GRN
+  supplier-billing choice, defaulting existing GRNs to material-only.
 
-The next schema change should ship as `0004_*.sql`.
+- `0005_grn_per_expense_supplier_billing.sql` copies that old choice onto each
+  existing `grn_charge.include_in_supplier` value.  From then on every expense
+  has its own checkbox; unselected expenses stay with their own recipients.
+  The migration only fills NULL values, so explicit choices are never reset.
+  Inventory/COGS and payment history are untouched.
+
+The next schema change should ship as `0006_*.sql`.

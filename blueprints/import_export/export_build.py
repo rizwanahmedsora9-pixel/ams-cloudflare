@@ -1,5 +1,6 @@
 """export_build — split from import_export.py."""
 from ._common import *  # noqa
+from app.services.grn_costing import charge_billed_to_supplier
 
 def _build_template_attachment(dataset, fmt):
     fmt = (fmt or 'excel').lower()
@@ -210,13 +211,14 @@ def _build_master_export_bytes(scope_ctx=None):
                     'Recipient Name': c.recipient_name or '',
                     'Declared Status': c.declared_status or '',
                     'Cost Treatment': c.cost_treatment or '',
+                    'Include In Supplier': charge_billed_to_supplier(c, g),
                     'Allocation Basis': c.allocation_basis or '',
                     'Is Void': bool(c.is_void),
                 })
         pd.DataFrame(grn_charge_rows or [], columns=[
             'GRN Manual Bill', 'GRN Auto Bill', 'Charge Type', 'Label', 'Amount',
             'Recipient Type', 'Recipient Name', 'Declared Status',
-            'Cost Treatment', 'Allocation Basis', 'Is Void',
+            'Cost Treatment', 'Include In Supplier', 'Allocation Basis', 'Is Void',
         ]).to_excel(writer, sheet_name='GRNCharges', index=False)
 
         delivery_persons = _scoped_model_query(DeliveryPerson, scope_ctx).order_by(DeliveryPerson.name.asc()).all()

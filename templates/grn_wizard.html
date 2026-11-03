@@ -19,6 +19,7 @@
 {% set charge_rows = cns.rows %}
 
 {% macro charge_row(c=None) -%}
+{% set rkey = ('saved-' ~ c.id) if c else '' %}
 {% set ctype = (c.charge_type if c else '') or '' %}
 {% set crec = (c.recipient_type if c else '') or '' %}
 {% set ctreat = (c.cost_treatment if c else '') or 'INVENTORY' %}
@@ -35,6 +36,13 @@
                                                 </td>
                                                 <td><input type="text" class="form-control form-control-sm" name="charge_label[]" value="{{ (c.label or '') if c else '' }}" placeholder="e.g. Rana Transport" aria-label="Charge label / detail"></td>
                                                 <td><input type="number" class="form-control form-control-sm grn-charge-amount" name="charge_amount[]" step="any" min="0" value="{{ (c.amount or 0) if c else '' }}" placeholder="0.00" aria-label="Amount (Rs.)"></td>
+                                                <td class="text-center">
+                                                    <input type="hidden" name="charge_row_key[]" value="{{ rkey }}">
+                                                    <label class="grn-supplier-bill-choice" title="Add only this expense to the supplier ledger">
+                                                        <input class="form-check-input grn-charge-supplier-bill" type="checkbox" name="charge_include_in_supplier[]" value="{{ rkey }}" aria-label="Add this expense to the supplier ledger" {{ 'checked' if c and charge_billed_to_supplier(c, edit_grn) else '' }}>
+                                                        <span class="small">Add</span>
+                                                    </label>
+                                                </td>
                                                 <td>
                                                     <select class="form-select form-select-sm" name="charge_recipient_type[]" aria-label="Recipient type">
                                                         <option value="" {{ 'selected' if not crec }}>Select recipient…</option>
@@ -87,6 +95,15 @@
         border-color: #41c28a;
         box-shadow: 0 0 0 0.2rem rgba(65, 194, 138, 0.25);
     }
+
+    .grn-supplier-bill-choice {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .grn-supplier-bill-choice .form-check-input { float: none; margin: 0; }
 
     .entry-highlighted {
         background-color: rgba(234, 179, 8, 0.22) !important;
@@ -770,7 +787,7 @@
                                     <div class="small text-muted">
                                         <i class="bi bi-truck me-1"></i>Additional material-related costs.
                                         They are part of the actual purchase cost.
-                                        Each charge creates its own payable to its own recipient — never to the supplier.
+                                        Use <strong>Add</strong> beside an expense to bill that expense to the supplier; leave it unchecked to pay its own recipient.
                                         No paid/unpaid box here: money is paid only from Accounts.
                                         <strong>No charge is added automatically</strong> — press "Add charge" for each one you actually have.
                                     </div>
@@ -788,6 +805,7 @@
                                                 <th style="width:14%">Charge</th>
                                                 <th style="width:13%">Label / Detail</th>
                                                 <th style="width:11%">Amount (Rs.)</th>
+                                                <th style="width:10%" class="text-center">Supplier Ledger</th>
                                                 <th style="width:14%">Recipient Type</th>
                                                 <th style="width:14%">Recipient / Person</th>
                                                 <th style="width:13%">Cost Treatment</th>
@@ -809,10 +827,12 @@
                                    it an empty grid posts no charge_* field at all and the
                                    edit route cannot tell "no charges" from "no grid". #}
                                 <input type="hidden" name="charge_grid_present" value="1">
-                                <div class="form-check form-switch my-2">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="grnIncludeChargesInSupplier" name="include_charges_in_supplier" value="1" {{ 'checked' if edit_grn and edit_grn.include_charges_in_supplier else '' }}>
-                                    <label class="form-check-label fw-semibold" for="grnIncludeChargesInSupplier">Add these GRN costs to the supplier ledger</label>
-                                    <div class="small text-muted">Checked: supplier is owed material + vehicle/loading/unloading/other costs. Unchecked: supplier is owed stock value only; costs are paid to their own recipients. Inventory/COGS is unchanged.</div>
+                                {# Always posted, even when every expense is unchecked or the grid is empty. #}
+                                <input type="hidden" name="charge_supplier_billing_present" value="1">
+                                <div class="small text-muted my-2" id="grnSupplierBillingHelp">
+                                    <strong>Supplier ledger — choose each expense separately.</strong>
+                                    Checked: supplier is owed material + that expense. Unchecked: that expense is paid to its own recipient and does not increase the supplier ledger.
+                                    Inventory/COGS is unchanged.
                                 </div>
                                 <datalist id="grnPartyOptions">
                                     {% for party in grn_parties or [] %}<option value="{{ party.name }}"></option>{% endfor %}
@@ -1371,7 +1391,7 @@
 
 
 {# Charge-grid behaviour: rows exist only when the operator adds them. #}
-<script src="{{ url_for('static', filename='grn_charges.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='grn_charges.js') }}?v=3"></script>
 <script>
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1398,8 +1418,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateGrnTotal() {
-        // Supplier material = sum(qty x rate).  The supplier ledger bill may
-        // also include GRN costs when the billing checkbox is selected.
+        // Supplier material = sum(qty x rate), plus only expenses whose own
+        // supplier-billing checkbox is selected.
         // Paid/unpaid status never changes the landed cost.
         let supplierMaterial = 0;
         let totalQty = 0;
@@ -1417,8 +1437,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         const capitalised = window.FBMGrnCharges ? window.FBMGrnCharges.capitalisedTotal() : 0;
-        const includeCharges = document.getElementById('grnIncludeChargesInSupplier');
-        const supplierCharges = (includeCharges && includeCharges.checked && window.FBMGrnCharges)
+        const supplierCharges = window.FBMGrnCharges
             ? window.FBMGrnCharges.supplierBilledTotal() : 0;
 
         const landed = supplierMaterial + capitalised;
@@ -1439,8 +1458,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (grnCharges) {
         grnCharges.init({ onChange: updateGrnTotal });
     }
-    const includeChargesToggle = document.getElementById('grnIncludeChargesInSupplier');
-    if (includeChargesToggle) includeChargesToggle.addEventListener('change', updateGrnTotal);
 
     document.querySelectorAll('.next-step').forEach(btn => {
 

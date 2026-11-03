@@ -6,10 +6,12 @@ A1  A GRN NEVER pays.  It records material received, purchase costs, charge
     details and payment obligations only.  No payment/settlement/cash row is
     created here.  All money is paid from Accounts -> PAY EXISTING GRN.
 
-A2  Supplier Ledger credit for a GRN is EXACTLY
-    ``sum(GRNItem.qty * GRNItem.price_at_time)`` and nothing else: no vehicle
-    fare / loading / unloading / transport / other charge, no tax, no discount,
-    no adjustment.  Each charge belongs to its own non-supplier recipient.
+A2  Supplier Ledger credit for a GRN is material
+    ``sum(GRNItem.qty * GRNItem.price_at_time)`` plus only the individual
+    applicable charges whose supplier-billing checkbox is selected.  An
+    unselected charge belongs to its own non-supplier recipient.  Tax,
+    discount and adjustment are never added.  Billing choices do not change
+    inventory, COGS or expense recognition.
 
 Everything else (landed FIFO cost, COGS, expense recognition, payables, cash
 actually paid, GRN detail screens) is derived from this module so no screen can
@@ -190,9 +192,14 @@ def lot_cost_components(item, qty, total_amount):
 
 
 def landed_cost_signature(grn):
-    """Snapshot cost-affecting facts before an edit (no database writes)."""
+    """Snapshot cost-affecting facts before an edit (no database writes).
+
+    The receipt date is deliberately excluded: moving a locked lot's header
+    date/time must stay possible and does not rewrite the frozen sale COGS.
+    Quantities, supplier rates, landed line totals and capitalised charges are
+    the facts that would change material cost.
+    """
     return {
-        'date': grn.date_posted,
         'items': [(i.id, float(i.qty or 0), float(i.price_at_time or 0),
                    int(i.line_landed_cost_minor or 0)) for i in active_items(grn)],
         'charges': [(c.id, c.charge_type, charge_effective_minor(c), c.cost_treatment,
@@ -246,26 +253,43 @@ def supplier_material_minor(grn):
     return sum(_line_minor(i) for i in active_items(grn))
 
 
+def charge_billed_to_supplier(charge, grn=None):
+    """The billing choice on this expense row, independent of all other rows.
+
+    NULL means a pre-0005 row whose old whole-GRN choice has not been copied
+    yet.  Once migrated (and for every new row) the choice is explicit.  The
+    fallback keeps balances intact during a rolling deployment; it is never
+    used to override an explicit unchecked row.
+    """
+    choice = getattr(charge, 'include_in_supplier', None)
+    if choice is not None:
+        return bool(choice)
+    parent = grn if grn is not None else getattr(charge, 'grn', None)
+    return bool(getattr(parent, 'include_charges_in_supplier', False))
+
+
+def charge_supplier_billed_minor(charge, grn=None):
+    """This row's contribution to the supplier bill; never a cost calculation."""
+    treatment = (getattr(charge, 'cost_treatment', None) or 'INVENTORY').upper()
+    amount = charge_effective_minor(charge)
+    if (not charge_billed_to_supplier(charge, grn) or amount <= 0
+            or treatment in ('NON_MATERIAL', 'UNTRACKED_LEGACY')):
+        return 0
+    return amount
+
+
 def charges_billed_to_supplier(grn):
-    """Owner checkbox: bill the GRN's applicable costs through the supplier."""
-    return bool(getattr(grn, 'include_charges_in_supplier', False))
+    """Whether at least one applicable expense is selected for supplier billing."""
+    return any(charge_supplier_billed_minor(c, grn) > 0 for c in active_charges(grn))
 
 
 def supplier_billed_charge_minor(grn):
-    """Applicable charge amount included in the supplier ledger when checked.
+    """Sum of selected applicable expenses, in whole paisa.
 
     This is a billing/payable choice only.  It does not change whether a
     charge is capitalised into inventory or recognised as an operating expense.
     """
-    if not charges_billed_to_supplier(grn):
-        return 0
-    total = 0
-    for c in active_charges(grn):
-        amount = charge_effective_minor(c)
-        treatment = (getattr(c, 'cost_treatment', None) or 'INVENTORY').upper()
-        if amount > 0 and treatment not in ('NON_MATERIAL', 'UNTRACKED_LEGACY'):
-            total += amount
-    return total
+    return sum(charge_supplier_billed_minor(c, grn) for c in active_charges(grn))
 
 
 def supplier_ledger_credit_minor(grn):
@@ -377,9 +401,10 @@ def grn_breakdown(grn):
             'status': ('Paid' if paid >= amount and amount > 0 else
                        ('Partially Paid' if paid > 0 else 'Unpaid')),
             'applicable': applicable,
-            'included_in_supplier_bill': include_charges and applicable,
+            'include_in_supplier': charge_billed_to_supplier(c, grn),
+            'included_in_supplier_bill': charge_supplier_billed_minor(c, grn) > 0,
         })
-        if include_charges and applicable:
+        if charge_rows[-1]['included_in_supplier_bill']:
             charge_rows[-1]['remaining'] = 0.0
             charge_rows[-1]['remaining_minor'] = 0
             charge_rows[-1]['status'] = 'Included in supplier bill'
@@ -412,7 +437,7 @@ def grn_breakdown(grn):
         'key': f'SUPPLIER:{grn_id}',
         'kind': 'SUPPLIER',
         'charge_id': None,
-        'label': ('Supplier bill (material + GRN costs)' if include_charges else 'Supplier material amount'),
+        'label': ('Supplier bill (material + selected GRN costs)' if include_charges else 'Supplier material amount'),
         'recipient_type': 'SUPPLIER',
         'recipient_label': 'Supplier',
         'recipient_name': getattr(grn, 'supplier', '') or '',
@@ -480,6 +505,7 @@ def grn_breakdown(grn):
         'include_charges_in_supplier': include_charges,
         'supplier_billed_charges': _f(billed_charge_minor),
         'supplier_billed_charges_minor': billed_charge_minor,
+        'supplier_billed_charge_count': sum(r['included_in_supplier_bill'] for r in charge_rows),
         'supplier_bill_amount': _f(supplier_bill_minor),
         'supplier_bill_amount_minor': supplier_bill_minor,
         'charges': charge_rows,
@@ -639,12 +665,66 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
     treatments = form.getlist('charge_treatment[]')
     bases = form.getlist('charge_basis[]')
     charge_ids = form.getlist('charge_id[]')
+    row_keys = form.getlist('charge_row_key[]')
+    selected_keys = set(form.getlist('charge_include_in_supplier[]'))
+    per_row_billing = 'charge_supplier_billing_present' in form
+    legacy_billing = 'include_charges_in_supplier' in form
+    legacy_include = (form.get('include_charges_in_supplier') or '').strip().lower() in ('1', 'true', 'on', 'yes')
+    row_count = max(len(types), len(amounts), len(labels), len(row_keys) if per_row_billing else 0)
 
     def at(seq, idx, default=''):
         return (seq[idx] if idx < len(seq) else default) or default
 
+    def row_key(idx):
+        return at(row_keys, idx, f'row-{idx}').strip()
+
+    def billing_choice(idx, stored=None):
+        if per_row_billing:
+            return row_key(idx) in selected_keys
+        if legacy_billing:
+            # Compatibility with callers using the retired whole-GRN form.
+            return legacy_include
+        if stored is not None:
+            return charge_billed_to_supplier(stored, grn)
+        return False
+
+    if per_row_billing:
+        keys = [row_key(idx) for idx in range(row_count)]
+        if len(set(keys)) != len(keys):
+            raise ValueError('Each GRN expense must have a unique row key. Reload the GRN and try again.')
+        unknown = selected_keys - set(keys)
+        if unknown:
+            raise ValueError('A supplier-billing selection does not match an expense row. Reload the GRN and try again.')
+
     existing = {int(c.id): c for c in (grn.charges or [])}
     keep = set()
+
+    # Refuse a billing-route change before writing any row if Accounts has
+    # already settled any part of this GRN.  The route rolls back on ValueError.
+    billing_changed = False
+    submitted_ids = set()
+    for idx in range(row_count):
+        raw_id = at(charge_ids, idx, '')
+        stored = existing.get(int(raw_id)) if str(raw_id).isdigit() else None
+        if stored is not None and not stored.is_void:
+            submitted_ids.add(int(stored.id))
+            if billing_choice(idx, stored) != charge_billed_to_supplier(stored, grn):
+                billing_changed = True
+    # A removed selected expense also changes the supplier bill.
+    for cid, stored in existing.items():
+        if (cid not in submitted_ids and not stored.is_void and not stored.is_legacy_mirror
+                and charge_billed_to_supplier(stored, grn)):
+            billing_changed = True
+    if billing_changed:
+        has_payments = SupplierPayment.query.filter(
+            SupplierPayment.grn_id == grn.id,
+            SupplierPayment.is_void == False,  # noqa: E712
+        ).first() is not None
+        if has_payments:
+            raise ValueError(
+                'This GRN already has Accounts payments. Void those payments before '
+                'changing which expenses are billed to the supplier.'
+            )
 
     def _paid_minor_for(charge_id):
         rows = SupplierPayment.query.filter(
@@ -653,7 +733,7 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
         ).all()
         return sum(int(getattr(r, 'amount_minor', None) if getattr(r, 'amount_minor', None) is not None
                        else _minor(getattr(r, 'amount', 0))) for r in rows)
-    for idx in range(max(len(types), len(amounts), len(labels))):
+    for idx in range(row_count):
         raw_amount = at(amounts, idx, '0')
         try:
             amount_minor = _minor(float(str(raw_amount).replace(',', '').strip() or 0), field='Charge amount')
@@ -726,6 +806,7 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
         charge.recipient_name = party.name if party else party_name
         charge.declared_status = status
         charge.cost_treatment = treatment
+        charge.include_in_supplier = billing_choice(idx, stored_charge)
         charge.allocation_basis = basis
         charge.is_void = False
         charge.is_legacy_mirror = False
@@ -774,7 +855,8 @@ __all__ = [
     'DEFAULT_RECIPIENT_BY_CHARGE', 'COST_TREATMENTS', 'DECLARED_STATUSES',
     'ALLOCATION_BASES', 'active_items', 'active_charges', 'lot_cost_rate',
     'charge_effective_minor', 'lot_cost_components', 'landed_cost_signature', 'grn_has_consumed_quantity',
-    'get_or_create_party', 'supplier_material_minor', 'charges_billed_to_supplier',
+    'get_or_create_party', 'supplier_material_minor', 'charge_billed_to_supplier',
+    'charge_supplier_billed_minor', 'charges_billed_to_supplier',
     'supplier_billed_charge_minor', 'supplier_ledger_credit_minor', 'grn_breakdown',
     'recompute_landed_costs', 'mirror_legacy_charge_columns',
     'sync_charges_from_form', 'calculate_grn_total',
