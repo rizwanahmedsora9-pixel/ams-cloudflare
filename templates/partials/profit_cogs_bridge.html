@@ -1,0 +1,47 @@
+{# Shared server-rendered COGS explanation: dashboard, PDF and Excel use the
+   same breakdown model. No cost is recalculated in a template. #}
+{% set bridge = breakdown.cogs_bridge %}
+<section class="ui-card pl-cogs-bridge" id="pl-cogs-bridge" aria-labelledby="pl-cogs-title">
+  <div class="ui-card-header">
+    <h5 id="pl-cogs-title"><i class="bi bi-box-seam"></i> COGS — Cost of Goods Sold</h5>
+    <span class="small text-muted">Delivered stock only · landed FIFO cost</span>
+  </div>
+  <div class="ui-card-body">
+    <p class="section-note mb-3">Supplier ledger follows the GRN billing checkbox: unchecked = quantity × supplier rate only; checked = material + applicable GRN costs. Vehicle rent, loading, unloading and other costs marked <strong>Include in material cost</strong> increase the lot’s landed rate either way. Their share enters COGS <strong>only when that stock is delivered</strong>, whether or not the bill has been paid.</p>
+    <div class="ui-table-wrap">
+      <table class="ui-table pl-table">
+        <thead><tr><th>From goods sales to gross profit</th><th class="num">Amount (Rs.)</th><th>What is included</th></tr></thead>
+        <tbody>
+          <tr><td>Delivered goods sales</td><td class="num fw-bold">{{ '{:,.2f}'.format(bridge.goods_sales) }}</td><td class="small text-muted">Net of discounts and returned goods; excludes service income.</td></tr>
+          <tr><td>Supplier material cost in goods sold</td><td class="num">{{ '{:,.2f}'.format(bridge.supplier_material_cost) }}</td><td class="small text-muted">The supplier-rate portion of the actual FIFO lots delivered.</td></tr>
+          <tr><td>Capitalised purchase costs in goods sold</td><td class="num">{{ '{:,.2f}'.format(bridge.landed_charge_cost) }}</td><td class="small text-muted">Freight and handling allocated to those same delivered units.{% for charge in bridge.charge_components %}<br>{{ charge.label }}: Rs. {{ '{:,.2f}'.format(charge.amount) }}{% endfor %}</td></tr>
+          {% if bridge.unattributed_material_cost %}<tr><td>Other recognised material cost</td><td class="num">{{ '{:,.2f}'.format(bridge.unattributed_material_cost) }}</td><td class="small text-warning">Frozen or estimated cost without a supplier/charge split. Not silently assigned to freight.</td></tr>{% endif %}
+          <tr class="table-subtotal"><td><strong>COGS — cost of goods sold</strong></td><td class="num"><strong>{{ '{:,.2f}'.format(bridge.goods_cogs) }}</strong></td><td class="small">Supplier material + capitalised purchase costs + disclosed other material cost.</td></tr>
+          <tr class="table-subtotal"><td><strong>Gross profit on goods</strong></td><td class="num"><strong class="{{ 'pos' if bridge.gross_profit >= 0 else 'neg' }}">{{ '{:,.2f}'.format(bridge.gross_profit) }}</strong></td><td class="small">Delivered goods sales − COGS. Before operating expenses.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pl-mini-grid mt-3">
+      <div class="pl-mini"><span>Direct service costs — not goods COGS</span><strong>Rs. {{ '{:,.2f}'.format(bridge.direct_service_costs) }}</strong></div>
+      <div class="pl-mini"><span>Separate GRN operating expenses — not COGS</span><strong>Rs. {{ '{:,.2f}'.format(bridge.grn_operating_expenses) }}</strong></div>
+      <div class="pl-mini"><span>All operating expenses</span><strong>Rs. {{ '{:,.2f}'.format(bridge.operating_expenses) }}</strong></div>
+      <div class="pl-mini"><span>Net profit / loss</span><strong class="{{ 'pos' if bridge.net_profit >= 0 else 'neg' }}">Rs. {{ '{:,.2f}'.format(bridge.net_profit) }}</strong></div>
+    </div>
+    {% if breakdown.grn_section %}
+    {% set stock = breakdown.grn_section %}
+    <div class="pl-purchase-stock mt-3">
+      <h6 class="fw-bold">Purchase cost is not the same as COGS</h6>
+      <div class="ui-table-wrap"><table class="ui-table pl-table">
+        <thead><tr><th>Inventory cost view</th><th class="num">Supplier material</th><th class="num">Capitalised costs</th><th class="num">Total landed value</th></tr></thead>
+        <tbody>
+          <tr><td>Received in selected period</td><td class="num">{{ '{:,.2f}'.format(stock.purchase_value) }}</td><td class="num">{{ '{:,.2f}'.format(stock.capitalised_purchase_charges) }}</td><td class="num fw-bold">{{ '{:,.2f}'.format(stock.landed_purchase_value) }}</td></tr>
+          <tr><td>Still unsold now (matching item/supplier/GRN filters)</td><td class="num">{{ '{:,.2f}'.format(stock.remaining_supplier_cost) }}</td><td class="num">{{ '{:,.2f}'.format(stock.remaining_landed_charges) }}</td><td class="num fw-bold">{{ '{:,.2f}'.format(stock.remaining_supplier_cost + stock.remaining_landed_charges) }}</td></tr>
+        </tbody>
+      </table></div>
+      <p class="section-note mb-0">Unsold landed cost stays in inventory; it is not deducted from today’s profit. Receipt and sale periods can differ, so received cost need not equal current-period COGS plus current stock. Each GRN lot keeps its own rate; a sale spanning lots uses each lot’s cost, not the latest purchase average.</p>
+    </div>
+    {% endif %}
+    <p class="section-note mt-3 mb-0"><i class="bi bi-wallet2"></i> Supplier, transporter and labour payments settle payables. They do not create a second expense or change COGS. A cost marked <strong>Separate expense</strong> is recognised once at receipt, outside COGS.</p>
+    {% if not bridge.matches %}<p class="small text-warning mt-2 mb-0">COGS component reconciliation needs review; the authoritative transaction total remains unchanged.</p>{% endif %}
+  </div>
+</section>

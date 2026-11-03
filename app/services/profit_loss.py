@@ -87,7 +87,7 @@ from app.services.profit_loss_breakdown import (
     build_breakdown,
 )
 from app.services.grn_consumption import build_grn_consumption
-from app.services.grn_costing import lot_cost_rate
+from app.services.grn_costing import lot_cost_rate, lot_cost_components, charge_effective_minor
 from app.services import pricing as _pricing
 from app.services.lookups import is_rent_like_name
 from app.services.sales_core import _direct_sale_default_bill_ref, normalize_sale_category
@@ -308,6 +308,10 @@ def _base_row(**kwargs):
         "delivery_revenue": 0.0,
         "other_income": 0.0,
         "material_cost": 0.0,
+        "supplier_material_cost": 0.0,
+        "landed_charge_cost": 0.0,
+        "unattributed_material_cost": 0.0,
+        "landed_charge_components": [],
         "delivery_cost": 0.0,
         "expense": 0.0,
         "other_gain": 0.0,
@@ -2179,7 +2183,8 @@ class _Projection:
         # (they live in the landed FIFO lot cost instead), and GRN Payment
         # transactions above are skipped, so nothing is double counted.
         for charge in GRNCharge.query.order_by(GRNCharge.id.asc()).all():
-            if not _active(charge) or _f(charge.amount) <= 0:
+            amount = _pricing.cents_to_float(charge_effective_minor(charge))
+            if amount <= 0:
                 continue
             if (charge.cost_treatment or "INVENTORY").upper() != "EXPENSE":
                 continue
@@ -2195,7 +2200,8 @@ class _Projection:
                 reference=f"GRNCH-{charge.id}",
                 document_type="GRNCharge", document_id=charge.id,
                 source_type="GRNCharge", source_id=charge.id,
-                material="Expense", expense=_f(charge.amount),
+                material="Expense", expense=amount,
+                supplier=grn.supplier or "", grn_ids=[grn.id],
                 note=(f"GRN #{charge.grn_id} · {charge.recipient_name or ''}").strip(),
                 cost_basis="Separately expensed purchase charge; excluded from inventory valuation",
             ))
@@ -2292,6 +2298,41 @@ class _Projection:
                 unfulfilled, _f(booking.paid_amount) - self.booking_recognized_revenue.get(booking.id, 0.0)
             ))
 
+    def _attach_cost_components(self):
+        """Disclose the composition of frozen COGS without revaluing a sale.
+
+        Every landed source is split at its own immutable supplier rate.  The
+        residual is the capitalised cost frozen in that allocation, not today's
+        potentially different charge total.  Costs without lot evidence remain
+        explicitly unattributed; they are never silently labelled freight.
+        """
+        charge_buckets = {}
+        for row in self.rows:
+            if not row.get("include_in_net") or not abs(_f(row.get("material_cost"))) > EPS:
+                continue
+            supplier_cost = landed_cost = 0.0
+            charge_buckets = {}
+            for source in row.get("cost_sources") or []:
+                item = self.grn_item_by_id.get(source.get("grn_item_id"))
+                components = lot_cost_components(item, _f(source.get("qty")), _f(source.get("amount")))
+                source["supplier_cost"] = components["supplier_amount"]
+                source["landed_charge_cost"] = components["landed_charge_amount"]
+                source["charge_components"] = components["charges"]
+                supplier_cost += components["supplier_amount"]
+                landed_cost += components["landed_charge_amount"]
+                for charge in components["charges"]:
+                    key = (charge.get("id"), charge.get("type"), charge.get("label"))
+                    charge_buckets[key] = charge_buckets.get(key, 0.0) + charge["amount"]
+            row["supplier_material_cost"] = _pricing.money_float(supplier_cost)
+            row["landed_charge_cost"] = _pricing.money_float(landed_cost)
+            row["unattributed_material_cost"] = _pricing.money_float(
+                _pricing.money_float(row["material_cost"]) - supplier_cost - landed_cost
+            )
+            row["landed_charge_components"] = [
+                {"id": key[0], "type": key[1], "label": key[2], "amount": _pricing.money_float(value)}
+                for key, value in charge_buckets.items() if abs(value) > EPS
+            ]
+
     def build(self):
         self.add_direct_chargeable()
         self.add_booking_supply()
@@ -2299,6 +2340,7 @@ class _Projection:
         self.add_returns()
         self.add_other_events()
         self.finish_bookings()
+        self._attach_cost_components()
         self.rows.sort(key=lambda row: (_as_dt(row["date"]) or datetime.min, row["document_id"] or 0, row["source_id"] or 0))
         return self
 
@@ -2449,6 +2491,11 @@ def summarize_rows(rows):
         "total_revenue": total_revenue,
         "total_gross_revenue": total_gross_revenue,
         "total_material_cost": _sum(included, "material_cost"),
+        "total_goods_cogs": _sum(included, "material_cost"),
+        "total_supplier_material_cost": _sum(included, "supplier_material_cost"),
+        "total_landed_charge_cost": _sum(included, "landed_charge_cost"),
+        "total_unattributed_material_cost": _sum(included, "unattributed_material_cost"),
+        "total_grn_expenses": _sum([row for row in included if row.get("source") == "GRNCharge"], "expense"),
         "actual_material_cost": actual_material_cost,
         "estimated_material_cost": estimated_material_cost,
         "total_delivery_cost": _sum(included, "delivery_cost"),
@@ -2939,7 +2986,7 @@ def build_transaction_detail(document_type, document_id, *, start_date=None, end
         "DirectSale": DirectSale, "Booking": Booking, "MaterialReturn": MaterialReturn,
         "Entry": Entry, "AccountTransaction": AccountTransaction, "WaiveOff": WaiveOff,
         "Payment": Payment, "DeliveryPersonPayment": DeliveryPersonPayment,
-        "FbmCashDrawerEntry": FbmCashDrawerEntry,
+        "FbmCashDrawerEntry": FbmCashDrawerEntry, "GRNCharge": GRNCharge,
     }
     model = model_map.get(document_type)
     if model is None:
@@ -2979,6 +3026,9 @@ def build_transaction_detail(document_type, document_id, *, start_date=None, end
         reference = _return_ref(source)
         original_bill_type = "MaterialReturn"
         client_code, client_name = context.client_info(source.client_name)
+    elif document_type == "GRNCharge":
+        grn = context.grn_by_id.get(source.grn_id)
+        reference = f"{_grn_ref(grn)} / {source.label or source.charge_type}" if grn else f"GRNCH-{document_id}"
     elif document_type == "Entry":
         reference = _ref(source, "OUT")
         client_code, client_name = context.client_info(source.client, source.client_code)

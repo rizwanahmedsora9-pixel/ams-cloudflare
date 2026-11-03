@@ -36,6 +36,7 @@ from app.services.financial_ledgers import (
 )
 from app.services import pricing as _pricing
 from app.services.grn_consumption import build_grn_consumption
+from app.services.grn_costing import lot_cost_components, lot_cost_rate
 from app.services.time_money import pk_today
 
 EPS = 1e-6
@@ -280,7 +281,8 @@ def _group_rows(rows, key_fn):
 def _bucket():
     return {
         "revenue": 0.0, "material_revenue": 0.0, "service_revenue": 0.0,
-        "cogs": 0.0, "material_cost": 0.0, "service_cost": 0.0,
+        "cogs": 0.0, "material_cost": 0.0, "supplier_material_cost": 0.0,
+        "landed_charge_cost": 0.0, "unattributed_material_cost": 0.0, "service_cost": 0.0,
         "expenses": 0.0, "other_income": 0.0, "other_gain": 0.0, "other_loss": 0.0,
         "profit": 0.0, "qty": 0.0, "rows": 0,
     }
@@ -292,6 +294,9 @@ def _add(bucket, row):
     bucket["service_revenue"] += _f(row.get("delivery_revenue"))
     bucket["cogs"] += _f(row.get("cogs"))
     bucket["material_cost"] += _f(row.get("material_cost"))
+    bucket["supplier_material_cost"] += _f(row.get("supplier_material_cost"))
+    bucket["landed_charge_cost"] += _f(row.get("landed_charge_cost"))
+    bucket["unattributed_material_cost"] += _f(row.get("unattributed_material_cost"))
     bucket["service_cost"] += _f(row.get("delivery_cost"))
     bucket["expenses"] += _f(row.get("expense"))
     bucket["other_income"] += _f(row.get("other_income"))
@@ -321,6 +326,10 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
 
     goods_sales = 0.0
     goods_cost = 0.0
+    supplier_cost = 0.0
+    landed_cost = 0.0
+    unattributed_cost = 0.0
+    charge_components = {}
     services_revenue = 0.0
     services_cost = 0.0
     other_income = 0.0
@@ -332,6 +341,12 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
         if group in {GROUP_GOODS, GROUP_RETURNS}:
             goods_sales += _f(row.get("material_revenue"))
             goods_cost += _f(row.get("material_cost"))
+            supplier_cost += _f(row.get("supplier_material_cost"))
+            landed_cost += _f(row.get("landed_charge_cost"))
+            unattributed_cost += _f(row.get("unattributed_material_cost"))
+            for charge in row.get("landed_charge_components") or []:
+                key = (charge.get("type"), charge.get("label"))
+                charge_components[key] = charge_components.get(key, 0.0) + _f(charge.get("amount"))
         if group in {GROUP_SERVICES, GROUP_RETURNS}:
             services_revenue += _f(row.get("delivery_revenue"))
             services_cost += _f(row.get("delivery_cost"))
@@ -490,7 +505,8 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
 
     MONEY_KEYS = (
         "revenue", "material_revenue", "service_revenue", "cogs",
-        "material_cost", "service_cost", "expenses", "other_income",
+        "material_cost", "supplier_material_cost", "landed_charge_cost",
+        "unattributed_material_cost", "service_cost", "expenses", "other_income",
         "other_gain", "other_loss", "profit", "cost",
     )
 
@@ -546,6 +562,27 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
     day_rows = sorted((_finalise(bucket) for bucket in by_day.values()), key=lambda row: row["day"])
 
     direct_service_cost_total = services_cost
+    grn_expenses = sum(_f(row.get("expense")) for row in included if row.get("source") == "GRNCharge")
+    cogs_bridge = {
+        "supplier_material_cost": float(_pricing.round_money(supplier_cost)),
+        "landed_charge_cost": float(_pricing.round_money(landed_cost)),
+        "unattributed_material_cost": float(_pricing.round_money(unattributed_cost)),
+        "goods_cogs": float(_pricing.round_money(goods_cost)),
+        "goods_sales": float(_pricing.round_money(goods_sales)),
+        "gross_profit": float(_pricing.round_money(gross_profit)),
+        "direct_service_costs": float(_pricing.round_money(services_cost)),
+        "grn_operating_expenses": float(_pricing.round_money(grn_expenses)),
+        "operating_expenses": float(_pricing.round_money(expenses)),
+        "net_profit": float(_pricing.round_money(net_profit)),
+        "charge_components": [
+            {"type": key[0], "label": key[1], "amount": float(_pricing.round_money(value))}
+            for key, value in sorted(charge_components.items()) if abs(value) > EPS
+        ],
+    }
+    cogs_bridge["matches"] = abs(
+        cogs_bridge["supplier_material_cost"] + cogs_bridge["landed_charge_cost"]
+        + cogs_bridge["unattributed_material_cost"] - cogs_bridge["goods_cogs"]
+    ) < 0.01
     delivery_cost_rows = [
         {
             "reference": row.get("reference"), "date": row.get("date"),
@@ -598,9 +635,9 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
             "realized": True,
         },
         {
-            "key": "cogs_fifo", "label": "Cost of Goods Sold (FIFO)",
+            "key": "cogs_fifo", "label": "COGS — Cost of Goods Sold (FIFO)",
             "value": goods_cost, "icon": "bi-box-seam", "colour": "amber",
-            "sub": "Actual FIFO cost of the lots dispatched (oldest GRN lot first)",
+            "sub": "Supplier material + capitalised freight/handling in delivered lots; excludes unsold stock",
             "realized": True,
         },
         {
@@ -612,7 +649,7 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
         {
             "key": "gross_profit", "label": "Gross Profit",
             "value": gross_profit, "icon": "bi-graph-up-arrow", "colour": "green",
-            "sub": "Delivered goods sales − FIFO cost of goods sold",
+            "sub": "Delivered goods sales − landed COGS; before service costs and operating expenses",
             "realized": True, "primary": True,
         },
         {
@@ -725,6 +762,7 @@ def build_breakdown(context, rows, *, start_date=None, end_date=None, filters=No
         },
         "grn_section": grn_section,
         "reconcile": reconcile,
+        "cogs_bridge": cogs_bridge,
         "notes": notes,
         "unresolved_rows": len(excluded),
         "unresolved_revenue": sum(max(0.0, _f(row.get("revenue"))) for row in excluded),
@@ -766,18 +804,41 @@ def _grn_section(context, inventory, *, start_date=None, end_date=None, filters=
                 "qty": _f(item.qty),
                 "rate": _f(item.price_at_time),
                 "amount": _f(item.qty) * _f(item.price_at_time),
+                "landed_rate": lot_cost_rate(item),
+                "landed_amount": float(_pricing.round_money(_f(item.qty) * lot_cost_rate(item))),
+                "allocated_charges": float(_pricing.round_money(_f(item.qty) * lot_cost_rate(item) - _f(item.qty) * _f(item.price_at_time))),
                 "consumption": (inventory or {}).get("items", {}).get(item.id),
             })
     purchase_rows.sort(key=lambda row: row["date"] or datetime.min, reverse=True)
     inventory = inventory or {}
+    remaining_supplier = remaining_landed = 0.0
+    for lot in (inventory.get("items") or {}).values():
+        item = getattr(context, "grn_item_by_id", {}).get(lot.get("grn_item_id"))
+        if item is None:
+            continue
+        grn = context.grn_by_id.get(item.grn_id)
+        if grn_filter and item.grn_id != grn_filter:
+            continue
+        if supplier_filter and supplier_filter not in _norm(grn.supplier):
+            continue
+        if material_filter and material_filter not in _norm(item.mat_name):
+            continue
+        qty = _f(lot.get("remaining_qty"))
+        components = lot_cost_components(item, qty, qty * lot_cost_rate(item))
+        remaining_supplier += components["supplier_amount"]
+        remaining_landed += components["landed_charge_amount"]
     return {
         "purchase_rows": purchase_rows,
         "purchase_value": sum(row["amount"] for row in purchase_rows),
         "purchase_qty": sum(row["qty"] for row in purchase_rows),
         "purchase_count": len(purchase_rows),
+        "landed_purchase_value": float(_pricing.round_money(sum(row["landed_amount"] for row in purchase_rows))),
+        "capitalised_purchase_charges": float(_pricing.round_money(sum(row["allocated_charges"] for row in purchase_rows))),
         "inventory": inventory.get("inventory", {}),
         "inventory_by_material": inventory.get("by_material", []),
         "lot_count": inventory.get("inventory", {}).get("lot_count", 0),
+        "remaining_supplier_cost": float(_pricing.round_money(remaining_supplier)),
+        "remaining_landed_charges": float(_pricing.round_money(remaining_landed)),
         "reconstructed_lot_count": inventory.get("reconstructed_lot_count", 0),
         "recorded_lot_count": inventory.get("recorded_lot_count", 0),
         "warnings": inventory.get("warnings", [])[:20],

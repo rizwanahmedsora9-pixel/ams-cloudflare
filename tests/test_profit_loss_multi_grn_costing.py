@@ -212,7 +212,7 @@ def test_detail_dashboard_and_excel_exports_reconcile(multi_app):
         tx_sheet = workbook["Transactions"]
         headers = {cell.value: cell.column for cell in tx_sheet[1]}
         material_cost_total = sum(
-            float(tx_sheet.cell(row, headers["Material Cost"]).value or 0)
+            float(tx_sheet.cell(row, headers["Goods COGS"]).value or 0)
             for row in range(2, tx_sheet.max_row + 1)
         )
         assert material_cost_total == pytest.approx(EXPECTED_COGS)
@@ -223,7 +223,7 @@ def test_detail_dashboard_and_excel_exports_reconcile(multi_app):
         assert net_profit_total == pytest.approx(52_000 - EXPECTED_COGS)
         summary_sheet = workbook["Summary"]
         labels = {summary_sheet.cell(row, 1).value: row for row in range(1, summary_sheet.max_row + 1)}
-        assert summary_sheet.cell(labels["Cost of Goods (Money Out)"], 2).value == pytest.approx(EXPECTED_COGS)
+        assert summary_sheet.cell(labels["COGS + Direct Service Cost"], 2).value == pytest.approx(EXPECTED_COGS)
 
         # Every exported cost line carries its source GRN, quantity and rate.
         assert "Source GRNs" in headers and "GRN Cost Layers" in headers

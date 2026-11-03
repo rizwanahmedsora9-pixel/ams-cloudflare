@@ -124,6 +124,93 @@ def lot_cost_rate(item):
     return float(getattr(item, 'price_at_time', 0) or 0)
 
 
+def charge_effective_minor(charge):
+    """Cost/obligation value of a charge; a non-applicable line is zero.
+
+    Keep the stored amount for audit, but use this value consistently in
+    capitalisation, payables and expense recognition.
+    """
+    if bool(getattr(charge, 'is_void', False)):
+        return 0
+    if (getattr(charge, 'declared_status', None) or '').upper() == 'NOT_APPLICABLE':
+        return 0
+    return _charge_minor(charge)
+
+
+def lot_cost_components(item, qty, total_amount):
+    """Split an already-costed FIFO layer into supplier cost and landed costs.
+
+    This is reporting arithmetic only: it never changes a frozen sale cost.
+    The supplier component uses the immutable purchase rate.  The remainder
+    is the capitalised cost actually recognised by that sale.  Charge types
+    are split in whole paisa using the lot's saved allocation, so the detail
+    adds back to COGS exactly.  Legacy/frozen costs without a landed lot are
+    supplier/unattributed cost, never an invented freight allocation.
+    """
+    from app.services.pricing import money_float, to_cents, cents_to_float
+
+    amount = money_float(total_amount)
+    grn = getattr(item, 'grn', None)
+    landed = item is not None and (getattr(grn, 'costing_mode', '') or '').upper() == 'LANDED'
+    if not landed:
+        base = money_float(float(qty or 0) * float(getattr(item, 'price_at_time', 0) or 0))
+        # A legacy frozen amount may already contain old freight.  Without a
+        # landed-cost record we cannot honestly label that difference supplier
+        # material; leave it in the explicit unattributed residual instead.
+        supplier = amount if abs(amount - base) < 0.005 else 0.0
+        return {'supplier_amount': supplier, 'landed_charge_amount': 0.0, 'charges': []}
+    supplier = money_float(float(qty or 0) * float(getattr(item, 'price_at_time', 0) or 0))
+    extra_minor = to_cents(amount) - to_cents(supplier)
+    weights, charges = [], []
+    for charge in active_charges(grn):
+        treatment = (getattr(charge, 'cost_treatment', None) or 'INVENTORY').upper()
+        if treatment != 'INVENTORY' or charge_effective_minor(charge) <= 0:
+            continue
+        try:
+            allocation = json.loads(getattr(charge, 'allocation_json', None) or '{}')
+            weight = int(allocation.get(str(item.id), 0) or 0)
+        except (TypeError, ValueError, AttributeError):
+            weight = 0
+        if weight > 0:
+            weights.append(weight)
+            charges.append(charge)
+    shares = allocate_cents(extra_minor, weights) if weights else []
+    if not weights and extra_minor:
+        # Historical landed lots may lack the allocation JSON.  Disclose the
+        # amount as capitalised, but do not guess which charge supplied it.
+        details = [{'id': None, 'type': 'OTHER', 'label': 'Unattributed landed cost', 'amount': cents_to_float(extra_minor)}]
+    else:
+        details = [
+            {'id': charge.id, 'type': charge.charge_type,
+             'label': charge.label or CHARGE_TYPE_LABELS.get(charge.charge_type, charge.charge_type),
+             'amount': cents_to_float(share)}
+            for charge, share in zip(charges, shares) if share
+        ]
+    return {'supplier_amount': supplier, 'landed_charge_amount': cents_to_float(extra_minor), 'charges': details}
+
+
+def landed_cost_signature(grn):
+    """Snapshot cost-affecting facts before an edit (no database writes)."""
+    return {
+        'date': grn.date_posted,
+        'items': [(i.id, float(i.qty or 0), float(i.price_at_time or 0),
+                   int(i.line_landed_cost_minor or 0)) for i in active_items(grn)],
+        'charges': [(c.id, c.charge_type, charge_effective_minor(c), c.cost_treatment,
+                     c.allocation_basis, c.allocation_json) for c in active_charges(grn)
+                    if (c.cost_treatment or 'INVENTORY').upper() == 'INVENTORY'],
+    }
+
+
+def grn_has_consumed_quantity(grn):
+    """Include booking/legacy dispatch consumption, not only allocation locks."""
+    if any(bool(i.is_locked) for i in active_items(grn)):
+        return True
+    from app.services.grn_consumption import build_grn_consumption
+    view = build_grn_consumption(grn_ids=[grn.id])
+    return any(float(row.get('consumed_qty') or 0) > 0.000001
+               for row in (view.get('items') or {}).values())
+
+
 def get_or_create_party(name, role='other', actor=None):
     """Reuse the existing CashFlowParty master for non-supplier recipients."""
     clean = (name or '').strip()
@@ -155,8 +242,35 @@ def _line_minor(item):
 
 
 def supplier_material_minor(grn):
-    """A2: gross material amount only.  Never tax/discount/adjustment/charges."""
+    """Gross material amount only (qty × supplier rate)."""
     return sum(_line_minor(i) for i in active_items(grn))
+
+
+def charges_billed_to_supplier(grn):
+    """Owner checkbox: bill the GRN's applicable costs through the supplier."""
+    return bool(getattr(grn, 'include_charges_in_supplier', False))
+
+
+def supplier_billed_charge_minor(grn):
+    """Applicable charge amount included in the supplier ledger when checked.
+
+    This is a billing/payable choice only.  It does not change whether a
+    charge is capitalised into inventory or recognised as an operating expense.
+    """
+    if not charges_billed_to_supplier(grn):
+        return 0
+    total = 0
+    for c in active_charges(grn):
+        amount = charge_effective_minor(c)
+        treatment = (getattr(c, 'cost_treatment', None) or 'INVENTORY').upper()
+        if amount > 0 and treatment not in ('NON_MATERIAL', 'UNTRACKED_LEGACY'):
+            total += amount
+    return total
+
+
+def supplier_ledger_credit_minor(grn):
+    """Single source of truth for Supplier Ledger / Accounts payable credit."""
+    return supplier_material_minor(grn) + supplier_billed_charge_minor(grn)
 
 
 def _charge_minor(charge):
@@ -219,12 +333,15 @@ def grn_breakdown(grn):
 
     line_minors = [_line_minor(i) for i in items]
     supplier_minor = sum(line_minors)
+    billed_charge_minor = supplier_billed_charge_minor(grn)
+    supplier_bill_minor = supplier_minor + billed_charge_minor
+    include_charges = charges_billed_to_supplier(grn)
 
     charge_rows = []
     capitalised_minor = 0
     expense_minor = 0
     for c in charges:
-        amount = _charge_minor(c)
+        amount = charge_effective_minor(c)
         treatment = (getattr(c, 'cost_treatment', None) or 'INVENTORY').upper()
         status = (getattr(c, 'declared_status', None) or 'UNPAID').upper()
         if treatment == 'INVENTORY' and amount > 0:
@@ -260,7 +377,12 @@ def grn_breakdown(grn):
             'status': ('Paid' if paid >= amount and amount > 0 else
                        ('Partially Paid' if paid > 0 else 'Unpaid')),
             'applicable': applicable,
+            'included_in_supplier_bill': include_charges and applicable,
         })
+        if include_charges and applicable:
+            charge_rows[-1]['remaining'] = 0.0
+            charge_rows[-1]['remaining_minor'] = 0
+            charge_rows[-1]['status'] = 'Included in supplier bill'
 
     supplier_paid = sum(
         int(getattr(p, 'amount_minor', None) if getattr(p, 'amount_minor', None) is not None
@@ -290,22 +412,22 @@ def grn_breakdown(grn):
         'key': f'SUPPLIER:{grn_id}',
         'kind': 'SUPPLIER',
         'charge_id': None,
-        'label': 'Supplier material amount',
+        'label': ('Supplier bill (material + GRN costs)' if include_charges else 'Supplier material amount'),
         'recipient_type': 'SUPPLIER',
         'recipient_label': 'Supplier',
         'recipient_name': getattr(grn, 'supplier', '') or '',
         'recipient_party_id': None,
-        'original': _f(supplier_minor),
-        'original_minor': supplier_minor,
+        'original': _f(supplier_bill_minor),
+        'original_minor': supplier_bill_minor,
         'paid': _f(supplier_paid),
         'paid_minor': supplier_paid,
-        'remaining': _f(max(0, supplier_minor - supplier_paid)),
-        'remaining_minor': max(0, supplier_minor - supplier_paid),
-        'status': ('Paid' if supplier_paid >= supplier_minor and supplier_minor > 0 else
+        'remaining': _f(max(0, supplier_bill_minor - supplier_paid)),
+        'remaining_minor': max(0, supplier_bill_minor - supplier_paid),
+        'status': ('Paid' if supplier_paid >= supplier_bill_minor and supplier_bill_minor > 0 else
                    ('Partially Paid' if supplier_paid > 0 else 'Unpaid')),
     }]
     for row in charge_rows:
-        if not row['applicable'] or row['amount_minor'] <= 0:
+        if not row['applicable'] or row['amount_minor'] <= 0 or row['included_in_supplier_bill']:
             continue
         obligations.append({
             'key': f'CHARGE:{row["id"]}',
@@ -339,11 +461,11 @@ def grn_breakdown(grn):
             'line_landed_cost': _f(int(getattr(item, 'line_landed_cost_minor', 0) or 0)),
         })
 
-    total_obligations = supplier_minor + sum(
-        r['amount_minor'] for r in charge_rows if r['applicable']
+    total_obligations = supplier_bill_minor + sum(
+        r['amount_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill']
     )
-    total_remaining = max(0, supplier_minor - supplier_paid) + sum(
-        r['remaining_minor'] for r in charge_rows if r['applicable']
+    total_remaining = max(0, supplier_bill_minor - supplier_paid) + sum(
+        r['remaining_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill']
     )
 
     return {
@@ -355,6 +477,11 @@ def grn_breakdown(grn):
         'costing_mode': (getattr(grn, 'costing_mode', 'LEGACY') or 'LEGACY'),
         'supplier_material_amount': _f(supplier_minor),
         'supplier_material_amount_minor': supplier_minor,
+        'include_charges_in_supplier': include_charges,
+        'supplier_billed_charges': _f(billed_charge_minor),
+        'supplier_billed_charges_minor': billed_charge_minor,
+        'supplier_bill_amount': _f(supplier_bill_minor),
+        'supplier_bill_amount_minor': supplier_bill_minor,
         'charges': charge_rows,
         'vehicle_fare': _f(sum(r['amount_minor'] for r in charge_rows if r['charge_type'] in ('VEHICLE_FARE', 'TRANSPORT'))),
         'loading': _f(sum(r['amount_minor'] for r in charge_rows if r['charge_type'] == 'LOADING')),
@@ -372,9 +499,9 @@ def grn_breakdown(grn):
         'per_line': per_line,
         'supplier_paid': _f(supplier_paid),
         'supplier_paid_minor': supplier_paid,
-        'supplier_remaining': _f(max(0, supplier_minor - supplier_paid)),
+        'supplier_remaining': _f(max(0, supplier_bill_minor - supplier_paid)),
         'additional_paid': _f(charge_paid),
-        'additional_remaining': _f(sum(r['remaining_minor'] for r in charge_rows if r['applicable'])),
+        'additional_remaining': _f(sum(r['remaining_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill'])),
         'total_obligations': _f(total_obligations),
         'total_remaining': _f(total_remaining),
         'total_cash_paid': _f(cash_paid_minor),
@@ -434,7 +561,7 @@ def recompute_landed_costs(grn, *, actor=None):
     capitalised = 0
     expense_total = 0
     for c in charges:
-        amount = _charge_minor(c)
+        amount = charge_effective_minor(c)
         treatment = (getattr(c, 'cost_treatment', None) or 'INVENTORY').upper()
         status = (getattr(c, 'declared_status', None) or 'UNPAID').upper()
         if amount <= 0 or status == 'NOT_APPLICABLE' or treatment in ('NON_MATERIAL', 'UNTRACKED_LEGACY'):
@@ -646,7 +773,9 @@ __all__ = [
     'CHARGE_TYPES', 'CHARGE_TYPE_LABELS', 'RECIPIENT_TYPES', 'RECIPIENT_LABELS',
     'DEFAULT_RECIPIENT_BY_CHARGE', 'COST_TREATMENTS', 'DECLARED_STATUSES',
     'ALLOCATION_BASES', 'active_items', 'active_charges', 'lot_cost_rate',
-    'get_or_create_party', 'supplier_material_minor', 'grn_breakdown',
+    'charge_effective_minor', 'lot_cost_components', 'landed_cost_signature', 'grn_has_consumed_quantity',
+    'get_or_create_party', 'supplier_material_minor', 'charges_billed_to_supplier',
+    'supplier_billed_charge_minor', 'supplier_ledger_credit_minor', 'grn_breakdown',
     'recompute_landed_costs', 'mirror_legacy_charge_columns',
     'sync_charges_from_form', 'calculate_grn_total',
 ]

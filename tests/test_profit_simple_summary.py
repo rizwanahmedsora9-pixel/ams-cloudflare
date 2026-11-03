@@ -148,7 +148,7 @@ def test_profit_summary_uses_plain_language(app, client):
     body = _get(client, "/profit_reports?start_date=2026-01-01&end_date=2026-01-31")
 
     # Readable headlines.
-    for label in ["Profit Summary", "Sales (Money In)", "Cost of Goods (Money Out)",
+    for label in ["Profit Summary", "Sales (Money In)", "COGS + Direct Service Cost",
                   "Money Received", "Sales by Customer", "Sales by Item"]:
         assert label in body, label
 
@@ -160,7 +160,7 @@ def test_profit_summary_uses_plain_language(app, client):
     assert "View All Transactions" in body
     assert "Read the result in three steps" in body
     assert "FIFO assigns the GRN cost" in body
-    assert "is the sum of loss rows" in body
+    assert "sums loss rows" in body
 
 
 def test_profit_summary_hides_accounting_jargon(app, client):
@@ -178,8 +178,8 @@ def test_profit_and_loss_cards_link_to_list_pages(app, client):
     _seed(app)
     body = _get(client, "/profit_reports?start_date=2026-01-01&end_date=2026-01-31")
 
-    assert "Total Profit" in body
-    assert "Total Loss" in body
+    assert "Profitable Entries Total" in body
+    assert "Loss-making Entries Total" in body
     assert "View profit entries" in body
     assert "View loss entries" in body
 
@@ -258,10 +258,10 @@ def test_rent_sale_is_one_entry(app, client):
 
     summary = _text(_get(client, "/profit_reports?start_date=2026-02-01&end_date=2026-02-28"))
     assert "Sales (Money In) Rs. 500.00" in summary
-    assert "Cost of Goods (Money Out) Rs. 600.00" in summary
+    assert "COGS + Direct Service Cost Rs. 600.00" in summary
     assert "Profit (Money Kept) Rs. -100.00" in summary
-    assert "Total Loss Rs. 100.00" in summary
-    assert "Total Profit Rs. 0.00" in summary
+    assert "Loss-making Entries Total Rs. 100.00" in summary
+    assert "Profitable Entries Total Rs. 0.00" in summary
 
 
 def test_rent_sale_profitable_is_one_profit_entry(app, client):
@@ -271,8 +271,8 @@ def test_rent_sale_profitable_is_one_profit_entry(app, client):
 
     summary = _text(_get(client, "/profit_reports?start_date=2026-02-01&end_date=2026-02-28"))
     assert "Profit (Money Kept) Rs. 100.00" in summary
-    assert "Total Profit Rs. 100.00" in summary
-    assert "Total Loss Rs. 0.00" in summary
+    assert "Profitable Entries Total Rs. 100.00" in summary
+    assert "Loss-making Entries Total Rs. 0.00" in summary
 
     body = _text(_get(client, "/profit_reports?view=entries&start_date=2026-02-01&end_date=2026-02-28"))
     assert "1 entries" in body

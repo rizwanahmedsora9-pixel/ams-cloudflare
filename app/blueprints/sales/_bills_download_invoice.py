@@ -276,8 +276,8 @@ def download_invoice(bill_no):
         bill_type = 'GRN'
         from app.services.grn_costing import grn_breakdown
         grn_bd = grn_breakdown(grn)
-        grn.amount = grn_bd['landed_cost_total']
-        grn.paid_amount = grn.paid_amount or 0
+        grn.amount = grn_bd['supplier_bill_amount']
+        grn.paid_amount = grn_bd['supplier_paid']
         items = grn.items
     elif pending:
         bill_obj = SimpleNamespace(

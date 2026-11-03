@@ -302,8 +302,8 @@ def view_bill(bill_no):
     if grn:
         from app.services.grn_costing import grn_breakdown
         grn_bd = grn_breakdown(grn)
-        grn.amount = grn_bd['landed_cost_total']
-        grn.paid_amount = grn.paid_amount or 0
+        grn.amount = grn_bd['supplier_bill_amount']
+        grn.paid_amount = grn_bd['supplier_paid']
         tx_code, tx_label, tx_note = _resolve_transaction_type('GRN', grn, entry_hint_id=entry_hint_id)
         return render_template('view_bill.html', bill=grn, type='GRN', grn_bd=grn_bd, items=grn.items, client=None, client_balance=0, previous_balance=0, recent_deliveries=[], material_ledger_recent=[], material_stock_summary=[], clients=all_clients, materials=all_materials, transaction_type_code=tx_code, transaction_type_label=tx_label, transaction_type_note=tx_note, pk_now=pk_now)
     if pending:

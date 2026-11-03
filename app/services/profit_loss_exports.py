@@ -100,7 +100,12 @@ def build_profit_loss_excel(report):
         ("Actual Recorded Material Cost", "actual_material_cost"),
         ("Estimated Material Cost", "estimated_material_cost"),
         ("Direct Delivery Cost", "total_delivery_cost"),
-        ("Cost of Goods (Money Out)", "total_cogs"),
+        ("COGS — Cost of Goods Sold", "total_goods_cogs"),
+        ("Supplier material in COGS", "total_supplier_material_cost"),
+        ("Capitalised purchase costs in COGS", "total_landed_charge_cost"),
+        ("Other material cost in COGS", "total_unattributed_material_cost"),
+        ("COGS + Direct Service Cost", "total_cogs"),
+        ("Separate GRN expenses (not COGS)", "total_grn_expenses"),
         ("Operating Expenses", "total_expenses"),
         ("Other Recognized Losses", "total_other_losses"),
         ("Other Recognized Gains", "total_other_gains"),
@@ -143,12 +148,38 @@ def build_profit_loss_excel(report):
     summary_ws.column_dimensions["C"].width = 24
     summary_ws.column_dimensions["D"].width = 20
 
+    bridge = (report.get("breakdown") or {}).get("cogs_bridge") or {}
+    bridge_ws = wb.create_sheet("COGS Bridge")
+    bridge_rows = [
+        ["Delivered goods sales", bridge.get("goods_sales", 0)],
+        ["Supplier material cost in goods sold", bridge.get("supplier_material_cost", 0)],
+        ["Capitalised purchase costs in goods sold", bridge.get("landed_charge_cost", 0)],
+        ["Other recognised material cost", bridge.get("unattributed_material_cost", 0)],
+        ["COGS — cost of goods sold", bridge.get("goods_cogs", 0)],
+        ["Gross profit on goods", bridge.get("gross_profit", 0)],
+        ["Direct service costs (not goods COGS)", bridge.get("direct_service_costs", 0)],
+        ["Separate GRN operating expenses (not COGS)", bridge.get("grn_operating_expenses", 0)],
+        ["Net profit / loss", bridge.get("net_profit", 0)],
+    ]
+    bridge_rows += [["COGS charge: " + c["label"], c["amount"]] for c in bridge.get("charge_components", [])]
+    _write_table(bridge_ws, ["Component", "Amount"], [[label, _value(amount)] for label, amount in bridge_rows], {"Component": 52})
+    for row in bridge_ws.iter_rows(min_row=2, min_col=2, max_col=2):
+        row[0].number_format = '#,##0.00;[Red]-#,##0.00'
+    for offset, note in enumerate([
+        "Supplier ledger follows the GRN billing checkbox: material only, or material + applicable GRN costs.",
+        "INVENTORY charges enter COGS when stock is delivered, paid or unpaid.",
+        "EXPENSE charges are recognised once at receipt outside goods COGS.",
+        "Payments settle liabilities; they never create a second expense.",
+        "Unsold landed cost remains inventory, not a current expense.",
+    ], len(bridge_rows) + 3):
+        bridge_ws.cell(offset, 1, note)
+
     tx_ws = wb.create_sheet("Transactions")
     tx_headers = [
         "Date", "Type", "Category", "Reference", "Customer", "Material",
         "Booked Material", "Qty", "Sale Rate", "Gross", "Discount",
-        "Material Revenue", "Delivery Revenue", "Other Income", "Material Cost",
-        "Delivery Cost", "Expense", "Other Gain", "Other Loss", "Net Profit",
+        "Material Revenue", "Delivery Revenue", "Other Income", "Goods COGS", "Supplier Material COGS", "Capitalised Purchase Cost in COGS", "Other Material COGS",
+        "Direct Service Cost", "Expense", "Other Gain", "Other Loss", "Net Profit",
         "Cost Status", "Cost Basis", "Included In Net", "Document Type",
         "Document ID", "Source Type", "Source ID", "Payment Status", "Notes",
         "Source GRNs", "GRN Cost Layers",
@@ -162,6 +193,7 @@ def build_profit_loss_excel(report):
             _value(row.get("gross_revenue")), _value(row.get("discount")),
             _value(row.get("material_revenue")), _value(row.get("delivery_revenue")),
             _value(row.get("other_income")), _value(row.get("material_cost")),
+            _value(row.get("supplier_material_cost")), _value(row.get("landed_charge_cost")), _value(row.get("unattributed_material_cost")),
             _value(row.get("delivery_cost")), _value(row.get("expense")),
             _value(row.get("other_gain")), _value(row.get("other_loss")),
             _value(row.get("profit")), row.get("cost_status"), row.get("cost_basis"),
@@ -176,7 +208,7 @@ def build_profit_loss_excel(report):
     })
     for row in tx_ws.iter_rows(min_row=2):
         row[0].number_format = "yyyy-mm-dd hh:mm"
-        for index in range(7, 20):
+        for index in range(7, len(tx_headers) - 11):
             row[index].number_format = '#,##0.00;[Red]-#,##0.00'
 
     daily_ws = wb.create_sheet("Daily Insights")
@@ -264,11 +296,12 @@ def build_profit_loss_excel(report):
         item_ws = wb.create_sheet("By Item")
         _write_table(
             item_ws,
-            ["Item", "Delivered qty", "Goods sales", "FIFO cost of goods sold", "Gross profit", "Margin",
+            ["Item", "Delivered qty", "Goods sales", "Supplier material COGS", "Capitalised purchase cost in COGS", "Other material COGS", "Goods COGS (FIFO)", "Gross profit", "Margin",
              "Remaining stock qty", "Remaining stock value"],
             [
                 [
                     row["material"], _value(row["qty"]), _value(row["material_revenue"]),
+                    _value(row.get("supplier_material_cost")), _value(row.get("landed_charge_cost")), _value(row.get("unattributed_material_cost")),
                     _value(row["material_cost"]), _value(row["gross_profit"]), _value(row["margin_pct"]),
                     _value(row.get("remaining_inventory_qty")), _value(row.get("remaining_inventory_value")),
                 ]
@@ -355,26 +388,29 @@ def build_profit_loss_excel(report):
                 row["date"].strftime("%Y-%m-%d") if row.get("date") else "",
                 _value(row["qty"]), _value(lot.get("consumed_qty")), _value(lot.get("remaining_qty")),
                 _value(lot.get("consumed_pct")), _value(row["rate"]), _value(row["amount"]),
+                _value(row.get("landed_rate")), _value(row.get("landed_amount")), _value(row.get("allocated_charges")),
                 _value(lot.get("remaining_value")), lot.get("status", ""),
             ])
         for row in (grn_section or {}).get("inventory_by_material", []):
             stock_rows.append([
                 "Inventory", "", row["material"], "", _value(row["received_qty"]),
-                _value(row["consumed_qty"]), _value(row["remaining_qty"]), "", "",
+                _value(row["consumed_qty"]), _value(row["remaining_qty"]), "", "", "", "", "", "",
                 _value(row.get("average_remaining_rate")), _value(row["remaining_value"]), "",
             ])
         _write_table(
             stock_ws,
             ["Section", "Reference", "Material", "GRN date", "Received qty", "Consumed qty", "Remaining qty",
-             "Consumed percent", "Rate", "Purchase value", "Remaining value", "Lot status"],
+             "Consumed percent", "Supplier rate", "Supplier purchase value", "Landed rate", "Landed purchase value", "Capitalised charges", "Remaining value", "Lot status"],
             stock_rows,
             {"Reference": 24, "Section": 14},
         )
         if grn_section:
             note_row = len(stock_rows) + 3
-            stock_ws.cell(note_row, 1, "Purchases in period (inventory, not expense)")
+            stock_ws.cell(note_row, 1, "Supplier material received in period (inventory, not expense)")
             stock_ws.cell(note_row, 2, _value(grn_section.get("purchase_value"))).number_format = '#,##0.00;[Red]-#,##0.00'
-            stock_ws.cell(note_row + 1, 1, grn_section.get("note", ""))
+            stock_ws.cell(note_row + 1, 1, "Landed purchase cost received in period")
+            stock_ws.cell(note_row + 1, 2, _value(grn_section.get("landed_purchase_value"))).number_format = '#,##0.00;[Red]-#,##0.00'
+            stock_ws.cell(note_row + 2, 1, grn_section.get("note", ""))
 
     buffer = BytesIO()
     wb.save(buffer)

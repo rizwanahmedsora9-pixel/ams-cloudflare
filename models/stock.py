@@ -37,10 +37,11 @@ class GRN(db.Model):
     never creates a cash movement (owner rule A1).  All payments are posted
     from Accounts against the obligations recorded here.
 
-    The Supplier Ledger credit for a GRN is exactly
-    ``sum(GRNItem.qty * GRNItem.price_at_time)`` and nothing else (owner rule
-    A2).  Freight, loading, unloading, transport, other charges, tax, discount
-    and adjustment are never supplier payables.
+    Supplier Ledger credit is controlled by ``include_charges_in_supplier``:
+    unchecked = material qty × supplier rate only; checked = material plus the
+    GRN's applicable vehicle/loading/unloading/other charges.  The same rule
+    drives Accounts payables and GRN payment obligations.  Landed inventory
+    cost is independent of this billing choice.
     """
     id = db.Column(db.Integer, primary_key=True)
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), nullable=True)
@@ -89,6 +90,7 @@ class GRN(db.Model):
     expense_charge_total = db.Column(db.Float, default=0)
     expense_charge_total_minor = db.Column(db.BigInteger, nullable=True)
     allocation_basis_default = db.Column(db.String(20), default='VALUE')  # VALUE | QUANTITY | MANUAL
+    include_charges_in_supplier = db.Column(db.Boolean, default=False, nullable=False, server_default='0')
     # --- Audit / cancellation ----------------------------------------------
     revision = db.Column(db.Integer, default=1, nullable=True)
     created_by = db.Column(db.String(80))
@@ -102,11 +104,12 @@ class GRN(db.Model):
 class GRNCharge(db.Model):
     """One material-related charge / payment obligation on a GRN.
 
-    This is the ONLY new table in the redesign.  A charge always belongs to a
-    non-supplier recipient (owner rule A2) and is either capitalised into the
-    GRN lots (INVENTORY) or recognised as a separate operating expense
-    (EXPENSE).  ``declared_status`` is display-only: a GRN never settles a
-    charge (owner rule A1).  Balances are derived from Accounts payments.
+    A charge is either capitalised into the GRN lots (INVENTORY) or recognised
+    as a separate operating expense (EXPENSE).  If the parent GRN has
+    ``include_charges_in_supplier`` enabled, the charge is billed through the
+    supplier ledger instead of creating a second recipient payable.
+    ``declared_status`` is display-only: a GRN never settles a charge (A1).
+    Balances are derived from Accounts payments.
     """
     __tablename__ = 'grn_charge'
     id = db.Column(db.Integer, primary_key=True)

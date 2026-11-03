@@ -73,15 +73,16 @@
     </div>
   </div>
   <div class="ui-kpi-grid">
-    {{ ui_tile(href=profit_url, label='Total Profit', value=("Rs. " ~ ("{:,.2f}".format(total_profit_sum))), icon='bi-arrow-up-circle', colour='green', sub=(profit_entry_count ~ ' profitable entries'), cta='View profit entries') }}
-    {{ ui_tile(href=loss_url, label='Total Loss', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries'), cta='View loss entries') }}
+    {{ ui_tile(href=profit_url, label='Profitable Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_profit_sum))), icon='bi-arrow-up-circle', colour='green', sub=(profit_entry_count ~ ' profitable entries; not the net result'), cta='View profit entries') }}
+    {{ ui_tile(href=loss_url, label='Loss-making Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries; not the net result'), cta='View loss entries') }}
     {{ ui_tile(href=entries_url, label='Profit (Money Kept)', value=("Rs. " ~ ("{:,.2f}".format(total_profit))), icon='bi-cash-coin', colour=('green' if total_profit >= 0 else 'red'), sub='Net result after FIFO cost, service cost and expenses', cta='See transactions') }}
     {{ ui_tile(href=report_url(view='entries', metric='revenue'), label='Sales (Money In)', value=("Rs. " ~ ("{:,.2f}".format(total_revenue))), icon='bi-bag-cash', colour='sky', sub='Earned material + delivery + other income, net of returns', cta='See revenue entries') }}
-    {{ ui_tile(href=report_url(view='entries', metric='cogs'), label='Cost of Goods (Money Out)', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Recognized material + direct delivery cost', cta='See cost entries') }}
+    {{ ui_tile(href=report_url(view='entries', metric='cogs'), label='COGS + Direct Service Cost', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Goods COGS + direct delivery/service cost; the split is shown below', cta='See cost entries') }}
     {{ ui_tile(href=url_for('financial_details', start_date=start_date, end_date=end_date), label='Money Received', value=("Rs. " ~ ("{:,.2f}".format(payment_received_total))), icon='bi-wallet2', colour='teal', sub='Settlement information only — never new profit', cta='Open financial details') }}
   </div>
 
 {% if bd %}
+  {% include 'partials/profit_cogs_bridge.html' %}
   {# ------------------------- REALIZED PROFIT & LOSS ------------------------- #}
   <div class="pl-section-head">
     <div>
@@ -154,7 +155,7 @@
         <table class="ui-table pl-table">
           <thead><tr>
             <th>Item</th><th class="num">Delivered qty</th><th class="num">Goods sales</th>
-            <th class="num">FIFO cost of goods sold</th><th class="num">Gross profit</th><th class="num">Margin</th>
+            <th class="num">Supplier material</th><th class="num">Landed costs</th><th class="num">COGS (FIFO)</th><th class="num">Gross profit</th><th class="num">Margin</th>
             <th class="num">Remaining stock (FIFO value)</th>
           </tr></thead>
           <tbody>
@@ -163,13 +164,15 @@
               <td class="fw-bold"><a href="{{ report_url(view='entries', material=row.material, page=None) }}">{{ row.material }}</a></td>
               <td class="num">{{ '{:,.2f}'.format(row.qty) }}</td>
               <td class="num">Rs. {{ money(row.material_revenue) }}</td>
-              <td class="num">Rs. {{ money(row.material_cost) }}</td>
+              <td class="num">Rs. {{ money(row.supplier_material_cost) }}</td>
+              <td class="num">Rs. {{ money(row.landed_charge_cost) }}{% if row.unattributed_material_cost %}<br><span class="small text-warning">Other cost: {{ money(row.unattributed_material_cost) }}</span>{% endif %}</td>
+              <td class="num fw-bold">Rs. {{ money(row.material_cost) }}</td>
               <td class="num">{{ signed(row.gross_profit) }}</td>
               <td class="num">{{ '{:,.2f}'.format(row.margin_pct) }}%</td>
               <td class="num text-muted">{% if row.remaining_inventory_value %}Rs. {{ money(row.remaining_inventory_value) }}<br><span class="small">{{ '{:,.2f}'.format(row.remaining_inventory_qty) }} left</span>{% else %}—{% endif %}</td>
             </tr>
             {% else %}
-            <tr><td colspan="7" class="ui-empty">No delivered goods match these filters.</td></tr>
+            <tr><td colspan="9" class="ui-empty">No delivered goods match these filters.</td></tr>
             {% endfor %}
           </tbody>
           <tfoot>
@@ -177,6 +180,8 @@
               <td>Total</td>
               <td class="num">{{ '{:,.2f}'.format(bd.by_item|sum(attribute='qty')) }}</td>
               <td class="num">Rs. {{ money(bd.by_item|sum(attribute='material_revenue')) }}</td>
+              <td class="num">Rs. {{ money(bd.cogs_bridge.supplier_material_cost) }}</td>
+              <td class="num">Rs. {{ money(bd.cogs_bridge.landed_charge_cost) }}</td>
               <td class="num">Rs. {{ money(bd.by_item|sum(attribute='material_cost')) }}</td>
               <td class="num">{{ signed(bd.by_item|sum(attribute='gross_profit')) }}</td>
               <td class="num">—</td>
@@ -370,7 +375,7 @@
               <th class="num"><a href="{{ sort_url(sort='qty', order=('asc' if sort == 'qty' and order == 'desc' else 'desc')) }}" data-pl-nav>Qty</a></th>
               <th class="num">Rate</th>
               <th class="num"><a href="{{ sort_url(sort='revenue', order=('asc' if sort == 'revenue' and order == 'desc' else 'desc')) }}" data-pl-nav>Revenue</a></th>
-              <th class="num"><a href="{{ sort_url(sort='cost', order=('asc' if sort == 'cost' and order == 'desc' else 'desc')) }}" data-pl-nav>FIFO cost</a></th>
+              <th class="num"><a href="{{ sort_url(sort='cost', order=('asc' if sort == 'cost' and order == 'desc' else 'desc')) }}" data-pl-nav>COGS / direct cost</a></th>
               <th class="num"><a href="{{ sort_url(sort='profit', order=('asc' if sort == 'profit' and order == 'desc' else 'desc')) }}" data-pl-nav>Profit / loss</a></th>
               <th>Payment</th>
               <th class="num">Collected</th>
@@ -389,7 +394,7 @@
               <td class="num">{% if t.qty %}{{ '{:,.2f}'.format(t.qty) }}{% else %}—{% endif %}</td>
               <td class="num">{% if t.sale_rate %}Rs. {{ money(t.sale_rate) }}{% else %}—{% endif %}</td>
               <td class="num">{% if t.revenue or t.entry_type == 'material_sale' or t.entry_type == 'booking_supply' %}Rs. {{ money(t.revenue) }}{% else %}—{% endif %}</td>
-              <td class="num">{% if t.include_in_net %}{% if t.cogs or t.material_cost or t.delivery_cost %}Rs. {{ money(t.cogs) }}{% else %}—{% endif %}{% if t.cost_sources %}<br><span class="small text-muted">{% for src in t.cost_sources %}{{ src.reference or src.type }}{% if src.grn_item_id %} L#{{ src.grn_item_id }}{% endif %}{% if src.qty is defined %} {{ '{:,.2f}'.format(src.qty) }}&times;{{ '{:,.0f}'.format(src.rate or 0) }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% else %}<span class="text-warning">Unresolved</span>{% endif %}</td>
+              <td class="num">{% if t.include_in_net %}{% if t.cogs or t.material_cost or t.delivery_cost %}Rs. {{ money(t.cogs) }}{% else %}—{% endif %}{% if t.cost_sources %}<br><span class="small text-muted">{% for src in t.cost_sources %}{{ src.reference or src.type }}{% if src.grn_item_id %} L#{{ src.grn_item_id }}{% endif %}{% if src.qty is defined %} {{ '{:,.2f}'.format(src.qty) }}&times;{{ '{:,.2f}'.format(src.rate or 0) }}{% endif %}{% if not loop.last %} · {% endif %}{% endfor %}</span>{% endif %}{% else %}<span class="text-warning">Unresolved</span>{% endif %}</td>
               <td class="num">{% if t.include_in_net %}{{ signed(t.profit) }}{% else %}<span class="text-warning">—</span>{% endif %}</td>
               <td>{% if t.payment_status_key and t.payment_status_key != 'not_applicable' %}<span class="pl-status pl-status--{{ t.payment_status_key }}">{{ t.payment_status_label }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
               <td class="num">{% if t.document_collected %}Rs. {{ money(t.document_collected) }}{% else %}—{% endif %}</td>
@@ -514,7 +519,8 @@
     <div class="ui-card-body">
       <p class="section-note">{{ bd.grn_section.note }}</p>
       <div class="pl-mini-grid">
-        <div class="pl-mini"><span>Purchases received in period</span><strong>Rs. {{ money(bd.grn_section.purchase_value) }}</strong></div>
+        <div class="pl-mini"><span>Supplier material received in period</span><strong>Rs. {{ money(bd.grn_section.purchase_value) }}</strong></div>
+        <div class="pl-mini"><span>Landed purchase cost received in period</span><strong>Rs. {{ money(bd.grn_section.landed_purchase_value) }}</strong></div>
         <div class="pl-mini"><span>Purchase quantity</span><strong>{{ '{:,.2f}'.format(bd.grn_section.purchase_qty) }}</strong></div>
         <div class="pl-mini"><span>Remaining inventory at GRN FIFO cost (current)</span><strong>Rs. {{ money(bd.grn_section.inventory.total_value or 0) }}</strong></div>
         <div class="pl-mini"><span>Lots consumed via recorded FIFO allocation</span><strong>{{ bd.grn_section.recorded_lot_count }}</strong></div>
@@ -522,7 +528,7 @@
       </div>
       <div class="ui-table-wrap pl-scroll mt-3">
         <table class="ui-table pl-table">
-          <thead><tr><th>Date</th><th>GRN</th><th>Supplier</th><th>Item</th><th class="num">Received</th><th class="num">Rate</th><th class="num">Value</th><th class="num">Consumed</th><th class="num">Remaining</th><th class="num">Consumption</th></tr></thead>
+          <thead><tr><th>Date</th><th>GRN</th><th>Supplier</th><th>Item</th><th class="num">Received</th><th class="num">Supplier rate</th><th class="num">Supplier value</th><th class="num">Landed rate</th><th class="num">Landed value</th><th class="num">Consumed</th><th class="num">Remaining</th><th class="num">Consumption</th></tr></thead>
           <tbody>
             {% for row in bd.grn_section.purchase_rows[:60] %}
             <tr>
@@ -533,6 +539,8 @@
               <td class="num">{{ '{:,.2f}'.format(row.qty) }}</td>
               <td class="num">Rs. {{ money(row.rate) }}</td>
               <td class="num">Rs. {{ money(row.amount) }}</td>
+              <td class="num">Rs. {{ money(row.landed_rate) }}</td>
+              <td class="num fw-bold">Rs. {{ money(row.landed_amount) }}</td>
               {% if row.consumption %}
               <td class="num">{{ '{:,.2f}'.format(row.consumption.consumed_qty) }}</td>
               <td class="num">{{ '{:,.2f}'.format(row.consumption.remaining_qty) }}</td>
@@ -542,7 +550,7 @@
               {% endif %}
             </tr>
             {% else %}
-            <tr><td colspan="10" class="ui-empty">No GRN purchases in this period.</td></tr>
+            <tr><td colspan="12" class="ui-empty">No GRN purchases in this period.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -601,12 +609,12 @@
         </div></div>
         <div class="col-md-4"><div class="h-100 p-3 rounded-3" style="background:var(--ui-surface-2)">
           <div class="fw-bold mb-1">2. FIFO assigns the GRN cost</div>
-          <div class="small text-muted">Each dispatch uses the oldest available GRN lot first. A GRN purchase is stock, not an immediate expense; its cost enters profit only when those goods are delivered.</div>
+          <div class="small text-muted">Each dispatch uses the oldest GRN lot first at its landed rate: supplier price plus allocated vehicle rent, loading and unloading. Only the delivered share enters COGS; the rest stays in stock.</div>
           <div class="small mt-2">Purchases in period <strong>Rs. {{ money(bd.grn_section.purchase_value if bd.grn_section else 0) }}</strong> · cost assigned to delivered goods <strong>Rs. {{ money(bd.reconcile.goods_cost) }}</strong>.</div>
         </div></div>
         <div class="col-md-4"><div class="h-100 p-3 rounded-3" style="background:var(--ui-surface-2)">
           <div class="fw-bold mb-1">3. Net result is the remainder</div>
-          <div class="small text-muted">Gross profit plus service margin plus other income, less operating expenses and other losses. "Total Loss" is the sum of loss rows; it is not the final net loss. Credit, advances and inventory value are positions and are never added in.</div>
+          <div class="small text-muted">Gross profit plus service margin plus other income, less operating expenses and other losses. "Loss-making Entries Total" sums loss rows; it is not the final net loss. Credit, advances and inventory value are positions and are never added in.</div>
           <div class="small mt-2">Net result for this period: <strong class="{{ 'pos' if total_profit >= 0 else 'neg' }}">Rs. {{ money(total_profit) }}</strong>.</div>
         </div></div>
       </div>

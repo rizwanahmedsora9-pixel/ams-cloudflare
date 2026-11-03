@@ -239,8 +239,10 @@ def edit_grn(id):
         return True
 
     if request.method == 'POST':
+        from app.services.grn_costing import landed_cost_signature, grn_has_consumed_quantity
+        is_landed = (getattr(grn_obj, 'costing_mode', '') or '').upper() == 'LANDED'
+        cost_before_edit = landed_cost_signature(grn_obj) if is_landed else None
         header_only_edit = False
-        is_landed = (getattr(grn_obj, 'costing_mode', 'LEGACY') or 'LEGACY').upper() == 'LANDED'
         if _grn_has_locked_lots(grn_obj):
             if not _grn_submitted_item_lines_unchanged(grn_obj):
                 flash(
@@ -455,6 +457,22 @@ def edit_grn(id):
             except ValueError:
                 pass
 
+        # Supplier billing checkbox: unchecked = material only; checked =
+        # material + applicable GRN costs in Supplier Ledger / Accounts.
+        if 'charge_grid_present' in request.form or 'include_charges_in_supplier' in request.form:
+            new_include = (request.form.get('include_charges_in_supplier') or '').strip().lower() in ('1','true','on','yes')
+            old_include = bool(getattr(grn_obj, 'include_charges_in_supplier', False))
+            if new_include != old_include:
+                has_payments = SupplierPayment.query.filter(
+                    SupplierPayment.grn_id == grn_obj.id,
+                    SupplierPayment.is_void == False,  # noqa: E712
+                ).first() is not None
+                if has_payments:
+                    db.session.rollback()
+                    flash('This GRN already has Accounts payments. Void those payments before changing whether GRN costs are billed to the supplier.', 'danger')
+                    return redirect(url_for('edit_grn', id=grn_obj.id))
+                grn_obj.include_charges_in_supplier = new_include
+
         if not header_only_edit:
             # 4. Add / update items (preserve GRNItem IDs so linked DirectSaleItem.grn_item_id stays valid)
             item_ids = request.form.getlist('grn_item_id[]')
@@ -549,6 +567,10 @@ def edit_grn(id):
                 return redirect(url_for('edit_grn', id=grn_obj.id))
         if is_landed:
             recompute_landed_costs(grn_obj, actor=current_user.username)
+            if cost_before_edit != landed_cost_signature(grn_obj) and grn_has_consumed_quantity(grn_obj):
+                db.session.rollback()
+                flash('This GRN already has delivered stock. Changing its material cost would make stock value disagree with the frozen sale COGS. No changes were saved. Reverse the related sales before changing received cost, or record a separate operating expense.', 'danger')
+                return redirect(url_for('edit_grn', id=grn_obj.id))
 
         # The auto supplier payment follows the GRN's date/time (and paid
         # amount).  Moving a paid GRN into an already-reconciled period is
