@@ -1,0 +1,163 @@
+{# Detail rows for one delivery person (or one day) on the Delivery Rent screen.
+
+   Rendered inline by delivery_rents.html and served as-is by the
+   /delivery_rents/group/<key> endpoint when a summary row is expanded lazily,
+   so both paths produce the exact same markup.
+#}
+{% from 'ops/_delivery_rent_macros.html' import money %}
+{% set return_to = return_to if return_to is defined and return_to else request.full_path %}
+
+{% if group.kind == 'day' %}
+<p class="rent-detail-note mb-2">
+    <i class="bi bi-calendar3 me-1"></i>{{ group.name }} — {{ group.entry_count }} trip{{ '' if group.entry_count == 1 else 's' }}
+</p>
+{% endif %}
+
+{% if group.entries %}
+<div class="table-responsive">
+    <table class="table table-sm align-middle mb-0 rent-detail-table">
+        <thead>
+            <tr>
+                <th class="ps-3">Date</th>
+                {% if group.kind == 'day' %}<th>Delivery Person</th>{% endif %}
+                <th>Bill</th>
+                <th>Client</th>
+                <th class="text-end">Bags</th>
+                <th class="text-end">Rent</th>
+                <th class="text-end">Paid</th>
+                <th class="text-end">Remaining</th>
+                <th class="text-end pe-3">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in group.entries %}
+            <tr class="rent-entry-row" data-entry-key="{{ entry.key }}">
+                <td class="ps-3 text-nowrap">{{ entry.date_display or '—' }}</td>
+                {% if group.kind == 'day' %}
+                <td class="text-info fw-semibold">{{ entry.person_name }}
+                    {% if entry.kind == 'legacy_rent' %}<span class="badge rent-pill rent-pill-off ms-1">legacy</span>{% endif %}
+                </td>
+                {% endif %}
+                <td>
+                    {% if entry.bill_ref and entry.sale_id %}
+                    <a class="rent-bill-link" href="{{ url_for('direct_sales_page') }}?q={{ entry.bill_ref|urlencode }}"
+                       title="Open this sale">{{ entry.bill_ref }}</a>
+                    {% else %}
+                    <span class="text-white-50">{{ entry.bill_ref or '—' }}</span>
+                    {% endif %}
+                    {% if group.kind != 'day' and entry.kind == 'legacy_rent' %}
+                    <span class="badge rent-pill rent-pill-off ms-1" title="Recorded before per-trip rent rows existed">legacy</span>
+                    {% endif %}
+                    {% if entry.note %}<i class="bi bi-chat-left-text text-white-50 ms-1" title="{{ entry.note }}"></i>{% endif %}
+                </td>
+                <td class="text-white-50">{{ entry.client_name or '—' }}</td>
+                <td class="text-end text-white-50">{{ '%.0f'|format(entry.bags) if entry.bags else '—' }}</td>
+                <td class="text-end text-warning fw-semibold">{{ money(entry.rent, currency_symbol) }}</td>
+                <td class="text-end {{ 'text-success fw-semibold' if entry.paid else 'text-white-50' }}">{{ money(entry.paid, currency_symbol) }}</td>
+                <td class="text-end fw-bold {{ 'text-danger' if entry.due else 'text-white-50' }}">{{ money(entry.due, currency_symbol) }}</td>
+                <td class="text-end pe-3 text-nowrap">
+                    {% if can_pay and entry.kind == 'rent' and entry.due > 0 %}
+                    <button type="button" class="btn btn-outline-success btn-sm rent-pay-entry"
+                            data-entry-id="{{ entry.id }}"
+                            data-person="{{ entry.person_name|e }}"
+                            data-bill="{{ entry.bill_ref|e }}"
+                            data-due="{{ '%.2f'|format(entry.due) }}"
+                            data-label="{{ (entry.bill_ref or entry.date_display)|e }}">
+                        <i class="bi bi-cash-coin me-1"></i>Pay
+                    </button>
+                    {% endif %}
+                    {% if can_pay and entry.kind == 'rent' %}
+                    <form method="POST" action="{{ url_for('void_delivery_rent', id=entry.id) }}" class="d-inline"
+                          onsubmit="return confirm('Delete this rent entry and any payment recorded against it?');">
+                        <input type="hidden" name="next" value="{{ return_to }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm rent-icon-btn" title="Delete this rent entry">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if not can_pay %}<span class="text-white-50">—</span>{% endif %}
+                </td>
+            </tr>
+            {% if entry.payments %}
+            <tr class="rent-payment-row">
+                <td colspan="{{ 9 if group.kind == 'day' else 8 }}">
+                    <div class="rent-payment-list">
+                        {% for payment in entry.payments %}
+                        <div class="rent-payment-item">
+                            <span class="text-success fw-semibold">{{ money(payment.amount_paid, currency_symbol) }}</span>
+                            {% if payment.waive_off_amount %}
+                            <span class="text-info">+ {{ money(payment.waive_off_amount, currency_symbol) }} waived</span>
+                            {% endif %}
+                            <span class="text-white-50">· {{ payment.date_display or '—' }}
+                                {% if payment.method %} · {{ payment.method }}{% endif %}
+                                {% if payment.account_name %} · {{ payment.account_name }}{% endif %}
+                                {% if payment.reference %} · ref {{ payment.reference }}{% endif %}
+                            </span>
+                            {% if payment.note %}<span class="text-white-50 fst-italic">· {{ payment.note }}</span>{% endif %}
+                            {% if can_pay and payment.void_url %}
+                            <form method="POST" action="{{ payment.void_url }}" class="d-inline"
+                                  onsubmit="return confirm('Reverse this payment? The account balance and the driver payable are restored.');">
+                                <input type="hidden" name="next" value="{{ return_to }}">
+                                <button type="submit" class="btn btn-link btn-sm rent-link-btn" title="Reverse this payment">reverse</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="rent-detail-foot">
+                <td class="ps-3" colspan="{{ 5 if group.kind == 'day' else 4 }}">
+                    {{ group.entry_count }} trip{{ '' if group.entry_count == 1 else 's' }}
+                    {% if group.filtered_entries %} <span class="text-white-50">· filtered view, totals are the full period</span>{% endif %}
+                </td>
+                <td class="text-end text-warning fw-bold">{{ money(group.rent, currency_symbol) }}</td>
+                <td class="text-end text-success fw-bold">{{ money(group.paid, currency_symbol) }}</td>
+                <td class="text-end text-danger fw-bold">{{ money(group.due, currency_symbol) }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% else %}
+<div class="rent-detail-empty"><i class="bi bi-inbox me-1"></i>No rent entries in this period.</div>
+{% endif %}
+
+{% if group.payments %}
+<div class="rent-unallocated">
+    <div class="rent-unallocated-title">
+        <i class="bi bi-wallet2 me-1"></i>Payments with no trip in this period
+        <span class="text-white-50 small">— counted in the paid total</span>
+    </div>
+    {% for payment in group.payments %}
+    <div class="rent-payment-item">
+        <span class="text-success fw-semibold">{{ money(payment.amount_paid, currency_symbol) }}</span>
+        {% if payment.waive_off_amount %}<span class="text-info">+ {{ money(payment.waive_off_amount, currency_symbol) }} waived</span>{% endif %}
+        <span class="text-white-50">· {{ payment.date_display or '—' }}
+            {% if payment.method %} · {{ payment.method }}{% endif %}
+            {% if payment.account_name %} · {{ payment.account_name }}{% endif %}
+            {% if payment.reference %} · ref {{ payment.reference }}{% endif %}
+        </span>
+        {% if payment.note %}<span class="text-white-50 fst-italic">· {{ payment.note }}</span>{% endif %}
+        {% if can_pay and payment.void_url %}
+        <form method="POST" action="{{ payment.void_url }}" class="d-inline"
+              onsubmit="return confirm('Reverse this payment? The account balance and the driver payable are restored.');">
+            <input type="hidden" name="next" value="{{ return_to }}">
+            <button type="submit" class="btn btn-link btn-sm rent-link-btn" title="Reverse this payment">reverse</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if group.truncated %}
+<div class="rent-detail-note text-warning mt-2">
+    <i class="bi bi-exclamation-triangle me-1"></i>Only the first {{ group.entries|length }} trips are listed.
+    Narrow the dates or open the ledger for the full history.
+</div>
+{% endif %}
