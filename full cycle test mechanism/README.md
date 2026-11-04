@@ -34,6 +34,7 @@ full cycle test mechanism/
 │   │   ├── checks.py                read-only assertions -> pass / known / fail
 │   │   ├── route_census.py          breadth: which routes does the suite touch?
 │   │   ├── urlmap_smoke.py          breadth: does every GET route still render?
+│   │   ├── app_walk.py              depth: the 58 documented pages, form by form
 │   │   └── run.py                   one command -> report.md + results.json
 │   ├── run-001-20261104T0518/       <- one directory per run, numbered + stamped
 │   │   ├── scripts/                 the probes used to build that run
@@ -203,6 +204,17 @@ Two breadth tools back the report:
 .venv/bin/python "1.all files/shared/urlmap_smoke.py" \
     --db "1.all files/run-006-.../cycle.db" --label run-006 \
     --json reports/evidence/urlmap-smoke.json --md reports/evidence/urlmap-smoke.md
+```
+
+`app_walk` closes the last gap: it replays `run-001/results/pages.md` against the
+living app — 58 pages, 209 forms, 773 field names, 890 columns, every link, ten
+page-vs-page tie-outs and eight workflows submitted through the real forms
+(14 s, all on a copy of the database):
+
+```bash
+.venv/bin/python "1.all files/shared/app_walk.py" \
+    --db "1.all files/run-007-.../cycle.db" --label run-007 \
+    --json reports/evidence/app-walk.json --md reports/evidence/app-walk.md
 ```
 
 `route_census` answers *"which of the 566 routes has nobody ever asked about?"*

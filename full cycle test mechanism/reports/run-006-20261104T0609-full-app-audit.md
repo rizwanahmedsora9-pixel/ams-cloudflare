@@ -55,6 +55,12 @@ each covering the previous layer's blind spot:
         pytest (531 tests)  the repo's own suite, unchanged, as a backstop
 ```
 
+> **Follow-up:** `run-007-20261104T0636-real-app-walkthrough.md` takes this one
+> step further and walks the app page by page — 58/58 documented pages, 209/209
+> forms, 0 dead links, 8 workflows. Read the two together: `run-006` is about
+> whether the numbers are right, `run-007` is about whether a human can reach
+> them.
+
 Nothing was mocked. The app was booted with `create_app()` against a throw-away
 SQLite file, driven through a CSRF-aware test client, and every write in the
 canonical dataset went in through an **HTTP form post** — the same endpoints a

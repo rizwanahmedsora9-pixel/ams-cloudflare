@@ -1,0 +1,82 @@
+{
+ "report": "run-007-20261104T0636-real-app-walkthrough.md",
+ "verdict": "PASS",
+ "generated": "2026-11-04T06:40:00Z",
+ "repo": {
+  "branch": "arena/9a9e9b43-git-recovered",
+  "base_commit": "e8cdde0",
+  "python": "3.11.2"
+ },
+ "mechanism": {
+  "run_dir": "run-007-20261104T0636",
+  "duration_s": 15.5,
+  "checks": 86,
+  "passed": 82,
+  "known": 4,
+  "failed": 0,
+  "pass_rate": 95.35,
+  "exit_code": 0,
+  "known_checks": [
+   "L-07/KF-007",
+   "W-07/KF-005",
+   "W-06/KF-008",
+   "M-01/KF-008"
+  ]
+ },
+ "walk": {
+  "tool": "1.all files/shared/app_walk.py",
+  "duration_s": 14,
+  "pages": 58,
+  "pages_pass": 58,
+  "pages_partial": 0,
+  "pages_fail": 0,
+  "forms_documented": 209,
+  "forms_found": 209,
+  "fields_documented": 773,
+  "fields_missing": 0,
+  "columns_documented": 890,
+  "columns_missing": 0,
+  "routes": 243,
+  "routes_ok": 193,
+  "routes_redirect": 23,
+  "routes_404": 21,
+  "routes_bad": 0,
+  "routes_skipped": [
+   "/generate_dummy_data",
+   "/logout",
+   "/root/backup-settings",
+   "/root/backup-settings/history/download/<int:history_id>",
+   "/settings/sessions",
+   "/static/<path:filename>",
+   "/tenants/<tenant_id>/backup_history",
+   "/tenants/backup_history/download/<int:history_id>"
+  ],
+  "links": 214,
+  "links_dead": 0,
+  "tie_outs": "10/10",
+  "workflows": "8/8",
+  "workflow_ids": [
+   "W-01",
+   "W-02",
+   "W-03",
+   "W-04",
+   "W-05",
+   "W-06",
+   "W-07",
+   "W-08"
+  ],
+  "hard_findings": 0
+ },
+ "defects": {
+  "register_size": 8,
+  "open": 8,
+  "new_this_run": [],
+  "note": "the walk found no new app defect; it shows the eight register defects are number defects, not page defects"
+ },
+ "added_by_this_run": [
+  "1.all files/shared/app_walk.py",
+  "2.skills/SKL-009-20261104T0636-walk-the-real-app-page-by-page.md",
+  "reports/run-007-20261104T0636-real-app-walkthrough.md",
+  "reports/evidence/app-walk.json / .md"
+ ]
+}

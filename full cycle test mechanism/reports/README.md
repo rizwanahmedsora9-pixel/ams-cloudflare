@@ -11,11 +11,19 @@ report; the old one stays as the record of what was true on that date.
 
 ## Index
 
-| Report | Run | Verdict | Mechanism | pytest | Breadth | New findings |
-|---|---|---|---|---|---|---|
-| [`run-006-20261104T0609-full-app-audit.md`](run-006-20261104T0609-full-app-audit.md) | `run-006-20261104T0609` | **PASS WITH KNOWN DEFECTS** | 82/86 · 4 known · 0 fail (95.35 %) | 531 passed · 6 skipped · 0 failed | 566 rules · 267 reached (47.17 %) · 257 crawled · 0 × 5xx | `KF-008` |
+| Report | Run | Verdict | Mechanism | pytest | Breadth | Real-app walk | New findings |
+|---|---|---|---|---|---|---|---|
+| [`run-007-20261104T0636-real-app-walkthrough.md`](run-007-20261104T0636-real-app-walkthrough.md) | `run-007-20261104T0636` | **PASS** | 82/86 · 4 known · 0 fail (95.35 %) | — | — | **58/58 pages · 209/209 forms · 243 routes 0 × 5xx · 214 links 0 dead · 10/10 tie-outs · 8/8 workflows** | none (corroborates the register) |
+| [`run-006-20261104T0609-full-app-audit.md`](run-006-20261104T0609-full-app-audit.md) | `run-006-20261104T0609` | **PASS WITH KNOWN DEFECTS** | 82/86 · 4 known · 0 fail (95.35 %) | 531 passed · 6 skipped · 0 failed | 566 rules · 267 reached (47.17 %) · 257 crawled · 0 × 5xx | — | `KF-008` |
 
-Machine-readable twin of the same report: [`run-006-20261104T0609-summary.json`](run-006-20261104T0609-summary.json).
+Machine-readable twins of both reports:
+[`run-007-20261104T0636-summary.json`](run-007-20261104T0636-summary.json) and
+[`run-006-20261104T0609-summary.json`](run-006-20261104T0609-summary.json).
+
+> **Read them in this order.** `run-007` answers *"does the app actually work —
+> pages, forms, links, workflows?"* (yes, 0 hard findings). `run-006` answers
+> *"are the numbers right, and where is the suite blind?"* (4 known failures, 8
+> open defects, 299 untouched routes). Neither answers the other's question.
 
 ---
 
@@ -29,6 +37,7 @@ Four layers of evidence, because any one of them alone flatters the app:
 | Regression suite | `pytest -q` | do units and endpoints still behave? | ~26 m |
 | Route census | `shared/route_census.py` | which of the 566 routes has no suite ever mentioned? | 4 s |
 | URL-map crawl | `shared/urlmap_smoke.py` | does every read-only route still render on seeded data? | 5 s |
+| Real-app walk | `shared/app_walk.py` | do the 58 documented pages, 209 forms, 773 fields and 214 links still exist and work? | 14 s |
 
 The mechanism is the only layer that builds the business from an empty database;
 the other three assume it (or a copy of its `cycle.db`).
@@ -50,7 +59,8 @@ reports/
     ├── route-coverage.md / .json              census output
     ├── urlmap-smoke.md / .json                crawl output
     ├── pytest-full.log                        the suite, verbatim
-    └── probe-mutate-gap.json                  probe behind KF-008
+    ├── probe-mutate-gap.json                  probe behind KF-008
+    └── app-walk.md / .json                    page matrix + workflows (run-007)
 ```
 
 `evidence/` holds **outputs, never conclusions**. Conclusions live in the report
