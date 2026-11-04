@@ -1,0 +1,579 @@
+{
+  "run": {
+    "label": "test-run",
+    "started": "2026-11-04T06:58:13.269876+00:00",
+    "finished": "2026-11-04T06:58:17.239409+00:00",
+    "duration_s": 4.0,
+    "database": "audit_cycle_20261104T0658.db"
+  },
+  "score": {
+    "total": 60,
+    "passed": 52,
+    "known_defects": 0,
+    "failures": 8,
+    "pass_rate": 86.67
+  },
+  "counts": {
+    "supplier": 2,
+    "material": 4,
+    "material_category": 4,
+    "service": 1,
+    "client": 2,
+    "delivery_person": 1,
+    "account": 2,
+    "account_transaction": 0,
+    "grn": 0,
+    "grn_item": 0,
+    "direct_sale": 0,
+    "direct_sale_item": 0,
+    "booking": 0,
+    "booking_item": 0,
+    "payment": 0,
+    "supplier_payment": 0,
+    "delivery_rent": 0,
+    "client_ledger": null,
+    "audit_log": 26
+  },
+  "checks": [
+    {
+      "id": "V-home",
+      "label": "GET /",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/"
+    },
+    {
+      "id": "V-accounts",
+      "label": "GET /accounts/",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/"
+    },
+    {
+      "id": "V-accounts/accounts",
+      "label": "GET /accounts/accounts",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/accounts"
+    },
+    {
+      "id": "V-accounts/payments/clients",
+      "label": "GET /accounts/payments/clients",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/payments/clients"
+    },
+    {
+      "id": "V-accounts/payments/suppliers",
+      "label": "GET /accounts/payments/suppliers",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/payments/suppliers"
+    },
+    {
+      "id": "V-accounts/grn_payments",
+      "label": "GET /accounts/grn_payments",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/grn_payments"
+    },
+    {
+      "id": "V-accounts/receipts",
+      "label": "GET /accounts/receipts",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/receipts"
+    },
+    {
+      "id": "V-pending_bills",
+      "label": "GET /pending_bills",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/pending_bills"
+    },
+    {
+      "id": "V-decision_ledger",
+      "label": "GET /decision_ledger",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/decision_ledger"
+    },
+    {
+      "id": "V-material_returns",
+      "label": "GET /material_returns",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/material_returns"
+    },
+    {
+      "id": "V-grn",
+      "label": "GET /grn",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/grn"
+    },
+    {
+      "id": "V-bookings",
+      "label": "GET /bookings",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/bookings"
+    },
+    {
+      "id": "V-direct_sales",
+      "label": "GET /direct_sales",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/direct_sales"
+    },
+    {
+      "id": "V-delivery_persons",
+      "label": "GET /delivery_persons",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/delivery_persons"
+    },
+    {
+      "id": "V-delivery_rents",
+      "label": "GET /delivery_rents",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/delivery_rents"
+    },
+    {
+      "id": "V-materials",
+      "label": "GET /materials",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/materials"
+    },
+    {
+      "id": "V-services",
+      "label": "GET /services",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/services"
+    },
+    {
+      "id": "V-client-ledger/categories",
+      "label": "GET /client-ledger/categories",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/client-ledger/categories"
+    },
+    {
+      "id": "V-settings",
+      "label": "GET /settings",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings"
+    },
+    {
+      "id": "V-admin",
+      "label": "GET /admin/",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/admin/"
+    },
+    {
+      "id": "V-void_audit",
+      "label": "GET /void_audit",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/void_audit"
+    },
+    {
+      "id": "V-notifications",
+      "label": "GET /notifications",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/notifications"
+    },
+    {
+      "id": "V-import_export",
+      "label": "GET /import_export/",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/"
+    },
+    {
+      "id": "V-legacy-migration",
+      "label": "GET /legacy-migration/",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/legacy-migration/"
+    },
+    {
+      "id": "V-system_report",
+      "label": "GET /system_report",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/system_report"
+    },
+    {
+      "id": "V-inventory/stock_summary",
+      "label": "GET /inventory/stock_summary",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/inventory/stock_summary"
+    },
+    {
+      "id": "V-tracking",
+      "label": "GET /tracking",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/tracking"
+    },
+    {
+      "id": "V-cash_flow",
+      "label": "GET /cash_flow",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow"
+    },
+    {
+      "id": "V-profit_reports",
+      "label": "GET /profit_reports",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports"
+    },
+    {
+      "id": "V-cash_flow_differences",
+      "label": "GET /cash_flow_differences",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow_differences"
+    },
+    {
+      "id": "V-current_payables",
+      "label": "GET /current_payables",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/current_payables"
+    },
+    {
+      "id": "V-daily_reconciliation",
+      "label": "GET /daily_reconciliation",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/daily_reconciliation"
+    },
+    {
+      "id": "V-stock_summary",
+      "label": "GET /stock_summary",
+      "ok": false,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/stock_summary"
+    },
+    {
+      "id": "S-01",
+      "label": "DG stock",
+      "ok": false,
+      "observed": "0.0",
+      "expected": "195.0",
+      "known_defect": null,
+      "page": "/materials"
+    },
+    {
+      "id": "S-02",
+      "label": "Pioneer stock",
+      "ok": false,
+      "observed": "0.0",
+      "expected": "60.0",
+      "known_defect": null,
+      "page": "/materials"
+    },
+    {
+      "id": "S-03",
+      "label": "Sand stock",
+      "ok": false,
+      "observed": "0.0",
+      "expected": "200.0",
+      "known_defect": null,
+      "page": "/materials"
+    },
+    {
+      "id": "S-04",
+      "label": "Sheet stock",
+      "ok": false,
+      "observed": "0.0",
+      "expected": "40.0",
+      "known_defect": null,
+      "page": "/materials"
+    },
+    {
+      "id": "A-01",
+      "label": "Main Cash balance",
+      "ok": false,
+      "observed": "200000.0",
+      "expected": "175500.0",
+      "known_defect": null,
+      "page": "/accounts/accounts"
+    },
+    {
+      "id": "A-02",
+      "label": "Meezan Bank balance",
+      "ok": false,
+      "observed": "500000.0",
+      "expected": "483000.0",
+      "known_defect": null,
+      "page": "/accounts/accounts"
+    },
+    {
+      "id": "A-03",
+      "label": "company total",
+      "ok": false,
+      "observed": "700000.0",
+      "expected": "658500.0",
+      "known_defect": null,
+      "page": "/accounts/"
+    },
+    {
+      "id": "P-02",
+      "label": "Total Purchase",
+      "ok": true,
+      "observed": "418500.0",
+      "expected": "418500.0",
+      "known_defect": null,
+      "page": "/accounts/payments/suppliers"
+    },
+    {
+      "id": "P-03",
+      "label": "Outstanding",
+      "ok": true,
+      "observed": "338500.0",
+      "expected": "338500.0",
+      "known_defect": null,
+      "page": "/accounts/payments/suppliers"
+    },
+    {
+      "id": "P-04",
+      "label": "Ravi payable",
+      "ok": true,
+      "observed": "215500.0",
+      "expected": "215500.0",
+      "known_defect": null,
+      "page": "/accounts/payments/suppliers"
+    },
+    {
+      "id": "P-05",
+      "label": "Kohat payable",
+      "ok": true,
+      "observed": "123000.0",
+      "expected": "123000.0",
+      "known_defect": null,
+      "page": "/accounts/payments/suppliers"
+    },
+    {
+      "id": "C-02",
+      "label": "Payable (This Page)",
+      "ok": true,
+      "observed": "20500.0",
+      "expected": "20500.0",
+      "known_defect": null,
+      "page": "/accounts/payments/clients"
+    },
+    {
+      "id": "C-03",
+      "label": "ledger Total Due",
+      "ok": true,
+      "observed": "46500.0",
+      "expected": "46500.0",
+      "known_defect": null,
+      "page": "/accounts/payments/clients"
+    },
+    {
+      "id": "C-04",
+      "label": "ledger Total Paid",
+      "ok": true,
+      "observed": "26000.0",
+      "expected": "26000.0",
+      "known_defect": null,
+      "page": "/accounts/payments/clients"
+    },
+    {
+      "id": "C-05",
+      "label": "ledger Net Balance",
+      "ok": true,
+      "observed": "20500.0",
+      "expected": "20500.0",
+      "known_defect": null,
+      "page": "/accounts/payments/clients"
+    },
+    {
+      "id": "R-02",
+      "label": "rent earned",
+      "ok": true,
+      "observed": "1400.0",
+      "expected": "1400.0",
+      "known_defect": null,
+      "page": "/delivery_rents"
+    },
+    {
+      "id": "R-03",
+      "label": "rent paid",
+      "ok": true,
+      "observed": "1000.0",
+      "expected": "1000.0",
+      "known_defect": null,
+      "page": "/delivery_rents"
+    },
+    {
+      "id": "R-04",
+      "label": "rent remaining",
+      "ok": true,
+      "observed": "400.0",
+      "expected": "400.0",
+      "known_defect": null,
+      "page": "/delivery_rents"
+    },
+    {
+      "id": "R-05",
+      "label": "driver ledger closing",
+      "ok": true,
+      "observed": "400.0",
+      "expected": "400.0",
+      "known_defect": null,
+      "page": "/delivery_rents"
+    },
+    {
+      "id": "L-02",
+      "label": "Sales",
+      "ok": true,
+      "observed": "55000.0",
+      "expected": "55000.0",
+      "known_defect": null,
+      "page": "/profit_reports"
+    },
+    {
+      "id": "L-03",
+      "label": "COGS",
+      "ok": true,
+      "observed": "43400.0",
+      "expected": "43400.0",
+      "known_defect": null,
+      "page": "/profit_reports"
+    },
+    {
+      "id": "L-04",
+      "label": "Profit",
+      "ok": true,
+      "observed": "11600.0",
+      "expected": "11600.0",
+      "known_defect": null,
+      "page": "/profit_reports"
+    },
+    {
+      "id": "L-05",
+      "label": "Money Received",
+      "ok": true,
+      "observed": "34500.0",
+      "expected": "34500.0",
+      "known_defect": null,
+      "page": "/profit_reports"
+    },
+    {
+      "id": "W-02",
+      "label": "opening",
+      "ok": true,
+      "observed": "200000.0",
+      "expected": "200000.0",
+      "known_defect": null,
+      "page": "/cash_flow"
+    },
+    {
+      "id": "W-03",
+      "label": "received",
+      "ok": true,
+      "observed": "39500.0",
+      "expected": "39500.0",
+      "known_defect": null,
+      "page": "/cash_flow"
+    },
+    {
+      "id": "W-04",
+      "label": "spent",
+      "ok": true,
+      "observed": "81000.0",
+      "expected": "81000.0",
+      "known_defect": null,
+      "page": "/cash_flow"
+    },
+    {
+      "id": "W-05",
+      "label": "closing",
+      "ok": true,
+      "observed": "175500.0",
+      "expected": "175500.0",
+      "known_defect": null,
+      "page": "/cash_flow"
+    }
+  ]
+}
