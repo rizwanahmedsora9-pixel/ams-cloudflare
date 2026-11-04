@@ -1,0 +1,6610 @@
+{
+  "run": {
+    "label": "cement-cycle-scenario",
+    "started": "2026-11-04T07:22:33.467036+00:00",
+    "finished": "2026-11-04T07:22:38.926875+00:00",
+    "duration_s": 5.5,
+    "database": "scratch (never production)"
+  },
+  "scenario": {
+    "label": "cement-cycle-scenario",
+    "received_dg_cement": 300,
+    "booked_qty": 200,
+    "cash_sale_qty": 50,
+    "credit_sale_qty": 50
+  },
+  "score": {
+    "total": 211,
+    "passed": 211,
+    "known_defects": 0,
+    "failures": 0,
+    "pass_rate": 100.0
+  },
+  "counts": {
+    "supplier": 2,
+    "material": 1,
+    "material_category": 2,
+    "service": 0,
+    "client": 2,
+    "delivery_person": 1,
+    "account": 2,
+    "account_transaction": 3,
+    "grn": 1,
+    "grn_item": 1,
+    "direct_sale": 2,
+    "direct_sale_item": 2,
+    "booking": 1,
+    "booking_item": 1,
+    "payment": 0,
+    "supplier_payment": 0,
+    "delivery_rent": 0,
+    "client_ledger": null,
+    "audit_log": 15,
+    "entry": 3
+  },
+  "routes": {
+    "get_count": 290,
+    "post_count": 307,
+    "get_routes": [
+      "/static/<path:filename>",
+      "/",
+      "/login",
+      "/root/recovery",
+      "/root/recovery_codes",
+      "/logout",
+      "/root/backup-settings",
+      "/root/backup-settings/history/download/<int:history_id>",
+      "/bookings",
+      "/bookings/<int:booking_id>/edit-modal",
+      "/payments",
+      "/direct_sales",
+      "/material_returns",
+      "/view_bill/<path:bill_no>",
+      "/download_invoice/<path:bill_no>",
+      "/view_bill_detail/<string:type>/<int:id>",
+      "/pending_bills",
+      "/pending_bills/<int:bill_id>/modals",
+      "/mixed_transactions",
+      "/direct_sales/<int:sale_id>/edit-modal",
+      "/clients",
+      "/clients/<int:client_id>/modals",
+      "/client-ledger/categories",
+      "/suppliers",
+      "/supplier_ledger_shift/<int:id>",
+      "/api/supplier_ledger_shift_preview/<int:id>",
+      "/materials",
+      "/delivery_persons",
+      "/services",
+      "/ledger",
+      "/ledger/<int:client_id>",
+      "/download_full_client_history/<int:id>",
+      "/download_client_ledger/<int:id>",
+      "/download_client_clearance/<int:id>",
+      "/financial_ledger/<int:client_id>",
+      "/client_ledger/<int:id>",
+      "/decision_ledger",
+      "/material_ledger/<int:mat_id>",
+      "/delivery_ledger/<int:id>",
+      "/delivery_person_ledger/<int:id>",
+      "/download_delivery_person_ledger/<int:id>",
+      "/api/delivery_persons/search",
+      "/api/delivery_person_ledger/<int:id>",
+      "/dispatching",
+      "/tracking",
+      "/delivery_rents",
+      "/delivery_rents/group/<path:group_key>",
+      "/grn",
+      "/current_payables",
+      "/unpaid_transactions",
+      "/api/current_payables",
+      "/api/current_payables/<int:client_id>",
+      "/export_current_payables",
+      "/financial_details",
+      "/profit_reports",
+      "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+      "/profit_reports/export/pdf",
+      "/profit_reports/export/excel",
+      "/stock_summary",
+      "/daily_transactions",
+      "/cash_flow/meta/categories",
+      "/cash_flow/meta/subcategories",
+      "/cash_flow/meta/parties",
+      "/cash_flow/entry/<int:entry_id>.json",
+      "/cash_flow",
+      "/cash_flow_differences",
+      "/daily_reconciliation",
+      "/financial_tracker",
+      "/cash_flow_differences/<int:rec_id>",
+      "/api/ui/theme",
+      "/api/client_booking_status/<client_code>",
+      "/api/client_financial_summary/<client_code>",
+      "/api/last_sold_price",
+      "/api/material_next_code",
+      "/api/client_next_code",
+      "/api/notifications/contact_history/<int:bill_id>",
+      "/api/notifications/due",
+      "/api/ledger_revision",
+      "/api/grn_consumption",
+      "/api/clients/search",
+      "/api/suppliers/search",
+      "/api/check_bill/<path:bill_no>",
+      "/api/supplier_balance/<int:id>",
+      "/api/audit/financial-integrity",
+      "/debug/db",
+      "/settings",
+      "/settings/activity",
+      "/settings/sessions",
+      "/void_audit",
+      "/settings/sidebar",
+      "/notifications",
+      "/notifications/upcoming",
+      "/notifications/bill/<int:bill_id>",
+      "/tenants",
+      "/tenants/<tenant_id>/backup_history",
+      "/tenants/backup_history/download/<int:history_id>",
+      "/export_pending_bills",
+      "/import_pending_bills",
+      "/edit_grn/<int:id>",
+      "/export_grn",
+      "/export_unpaid_transactions",
+      "/fix_system_issues",
+      "/uploads/<path:filename>",
+      "/generate_dummy_data",
+      "/system_report",
+      "/export_clients",
+      "/pay_supplier",
+      "/supplier_ledger/<int:id>",
+      "/download_supplier_ledger/<int:id>",
+      "/download_supplier_payment/<int:payment_id>",
+      "/party_ledger/<int:id>",
+      "/legacy-migration/",
+      "/legacy-migration/template/<kind>",
+      "/legacy-migration/run/<int:run_id>",
+      "/legacy-migration/run/<int:run_id>/errors.xlsx",
+      "/",
+      "/login",
+      "/root/recovery",
+      "/root/recovery_codes",
+      "/logout",
+      "/root/backup-settings",
+      "/root/backup-settings/history/download/<int:history_id>",
+      "/bookings",
+      "/bookings/<int:booking_id>/edit-modal",
+      "/payments",
+      "/direct_sales",
+      "/material_returns",
+      "/view_bill/<path:bill_no>",
+      "/download_invoice/<path:bill_no>",
+      "/view_bill_detail/<string:type>/<int:id>",
+      "/pending_bills",
+      "/pending_bills/<int:bill_id>/modals",
+      "/mixed_transactions",
+      "/direct_sales/<int:sale_id>/edit-modal",
+      "/clients",
+      "/clients/<int:client_id>/modals",
+      "/client-ledger/categories",
+      "/suppliers",
+      "/supplier_ledger_shift/<int:id>",
+      "/api/supplier_ledger_shift_preview/<int:id>",
+      "/materials",
+      "/delivery_persons",
+      "/services",
+      "/ledger",
+      "/ledger/<int:client_id>",
+      "/download_full_client_history/<int:id>",
+      "/download_client_ledger/<int:id>",
+      "/download_client_clearance/<int:id>",
+      "/financial_ledger/<int:client_id>",
+      "/client_ledger/<int:id>",
+      "/decision_ledger",
+      "/material_ledger/<int:mat_id>",
+      "/delivery_ledger/<int:id>",
+      "/download_delivery_person_ledger/<int:id>",
+      "/api/delivery_persons/search",
+      "/api/delivery_person_ledger/<int:id>",
+      "/dispatching",
+      "/tracking",
+      "/delivery_rents",
+      "/delivery_rents/group/<path:group_key>",
+      "/grn",
+      "/current_payables",
+      "/api/current_payables",
+      "/api/current_payables/<int:client_id>",
+      "/export_current_payables",
+      "/financial_details",
+      "/profit_reports",
+      "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+      "/profit_reports/export/pdf",
+      "/profit_reports/export/excel",
+      "/stock_summary",
+      "/daily_transactions",
+      "/cash_flow/meta/categories",
+      "/cash_flow/meta/subcategories",
+      "/cash_flow/meta/parties",
+      "/cash_flow/entry/<int:entry_id>.json",
+      "/cash_flow",
+      "/cash_flow_differences",
+      "/daily_reconciliation",
+      "/financial_tracker",
+      "/cash_flow_differences/<int:rec_id>",
+      "/api/ui/theme",
+      "/api/client_booking_status/<client_code>",
+      "/api/client_financial_summary/<client_code>",
+      "/api/last_sold_price",
+      "/api/material_next_code",
+      "/api/client_next_code",
+      "/api/notifications/contact_history/<int:bill_id>",
+      "/api/notifications/due",
+      "/api/ledger_revision",
+      "/api/grn_consumption",
+      "/api/clients/search",
+      "/api/suppliers/search",
+      "/api/check_bill/<path:bill_no>",
+      "/api/supplier_balance/<int:id>",
+      "/api/audit/financial-integrity",
+      "/debug/db",
+      "/settings",
+      "/settings/activity",
+      "/settings/sessions",
+      "/void_audit",
+      "/settings/sidebar",
+      "/notifications",
+      "/notifications/upcoming",
+      "/notifications/bill/<int:bill_id>",
+      "/tenants",
+      "/tenants/<tenant_id>/backup_history",
+      "/tenants/backup_history/download/<int:history_id>",
+      "/export_pending_bills",
+      "/import_pending_bills",
+      "/edit_grn/<int:id>",
+      "/export_grn",
+      "/export_unpaid_transactions",
+      "/fix_system_issues",
+      "/uploads/<path:filename>",
+      "/generate_dummy_data",
+      "/system_report",
+      "/export_clients",
+      "/pay_supplier",
+      "/supplier_ledger/<int:id>",
+      "/download_supplier_ledger/<int:id>",
+      "/download_supplier_payment/<int:payment_id>",
+      "/party_ledger/<int:id>",
+      "/legacy-migration/",
+      "/legacy-migration/template/<kind>",
+      "/legacy-migration/run/<int:run_id>",
+      "/legacy-migration/run/<int:run_id>/errors.xlsx",
+      "/accounts/audit",
+      "/accounts/",
+      "/accounts/payments/clients",
+      "/accounts/payments/suppliers",
+      "/accounts/expenditures",
+      "/accounts/receipts",
+      "/accounts/payments/clients/<int:id>/data",
+      "/accounts/payments/suppliers/<int:id>/data",
+      "/accounts/grn_payments",
+      "/accounts/api/grn_obligations/<int:grn_id>",
+      "/accounts/purchase_payables",
+      "/accounts/accounts",
+      "/accounts/accounts/add",
+      "/accounts/ledger/<int:account_id>",
+      "/accounts/<int:account_id>/data",
+      "/accounts/<int:account_id>/edit",
+      "/accounts/reconciliations",
+      "/accounts/<int:account_id>/reconcile",
+      "/accounts/categories",
+      "/accounts/transfers",
+      "/accounts/transfers/add",
+      "/accounts/api/kpi/client_payments",
+      "/accounts/api/kpi/supplier_payments",
+      "/accounts/api/kpi/expenditures",
+      "/accounts/api/kpi/receipts",
+      "/accounts/api/kpi/company_money",
+      "/accounts/kpi/client_payments",
+      "/accounts/kpi/supplier_payments",
+      "/accounts/kpi/expenditures",
+      "/accounts/kpi/receipts",
+      "/accounts/kpi/company_money",
+      "/accounts/kpi/cash_money",
+      "/accounts/kpi/cash_accounts",
+      "/accounts/kpi/bank_accounts",
+      "/admin/",
+      "/admin/modules",
+      "/admin/api/modules",
+      "/admin/api/health",
+      "/data_lab/",
+      "/data_lab/basket",
+      "/import_export/",
+      "/import_export/template/<dataset>",
+      "/import_export/full_raw_export",
+      "/import_export/tenant_db_export",
+      "/import_export/full_raw_import_history",
+      "/import_export/app_upgrade",
+      "/import_export/app_upgrade/status/<job_id>",
+      "/import_export/export",
+      "/import_export/full_db_export",
+      "/import_export/full_db_import_report/<report_name>",
+      "/import_export/export_excel_all",
+      "/import_export/master/export",
+      "/import_export/full_raw_import_history_export",
+      "/import_export/master/import/status/<job_id>",
+      "/import_export/full_raw_import_report/<report_name>",
+      "/inventory/stock_summary",
+      "/inventory/daily_transactions",
+      "/inventory/inventory_log",
+      "/import_export/uploads",
+      "/import_export/uploads/<upload_id>",
+      "/import_export/jobs/<int:job_id>/progress",
+      "/import_export/jobs/<int:job_id>/history",
+      "/import_export/history"
+    ],
+    "post_routes": [
+      "/login",
+      "/root/recovery",
+      "/root/recovery_codes",
+      "/root/backup-settings/save",
+      "/root/backup-settings/send-now",
+      "/root/backup-settings/history/clear",
+      "/add_booking",
+      "/edit_bill/Booking/<int:id>",
+      "/add_payment",
+      "/edit_bill/Payment/<int:id>",
+      "/direct_sales/hold",
+      "/direct_sales/hold/<int:draft_id>/resume",
+      "/direct_sales/hold/<int:draft_id>/delete",
+      "/add_direct_sale",
+      "/add_sale",
+      "/edit_bill/DirectSale/<int:id>",
+      "/add_material_return",
+      "/edit_material_return/<int:id>",
+      "/edit_ledger_transaction/<string:trans_type>/<int:trans_id>",
+      "/void_transaction/<string:type>/<int:id>",
+      "/delete_transaction/<string:type>/<int:id>",
+      "/unvoid_transaction/<string:type>/<int:id>",
+      "/delete_bill/<string:type>/<int:id>",
+      "/client-ledger/categories/add",
+      "/client-ledger/categories",
+      "/client-ledger/categories/<int:category_id>/rename",
+      "/client-ledger/categories/<int:category_id>/toggle",
+      "/client-ledger/categories/<int:category_id>/delete",
+      "/add_client",
+      "/edit_client/<int:id>",
+      "/client_opening_balance/<int:id>",
+      "/delete_client/<int:id>",
+      "/clients/activate_all",
+      "/transfer_client/<int:id>",
+      "/reclaim_client/<int:id>",
+      "/add_supplier",
+      "/edit_supplier/<int:id>",
+      "/supplier_opening_balance/<int:id>",
+      "/delete_supplier/<int:id>",
+      "/hard_delete_supplier/<int:id>",
+      "/transfer_supplier/<int:id>",
+      "/shift_grn_supplier/<int:id>",
+      "/shift_supplier_ledger/<int:id>",
+      "/shift_supplier_payment/<int:id>",
+      "/reclaim_supplier_ledger/<int:id>",
+      "/delivery_persons/add",
+      "/delivery_persons/toggle/<int:id>",
+      "/delivery_persons/edit/<int:id>",
+      "/materials/rename_label",
+      "/materials/activate_all",
+      "/services/add",
+      "/services/edit/<int:id>",
+      "/services/toggle/<int:id>",
+      "/services/delete/<int:id>",
+      "/services/migrate",
+      "/services/merge",
+      "/client_toggle_active/<int:client_id>",
+      "/client_booking_cancel/<int:client_id>",
+      "/client_booking_cancel_revert/<int:client_id>/<int:entry_id>",
+      "/delivery_person_opening_balance/<int:id>",
+      "/delivery_person_ledger/<int:id>/pay",
+      "/delivery_person_payments/<int:id>/edit",
+      "/delivery_person_payments/<int:id>/void",
+      "/delivery_person_payments/<int:id>/restore",
+      "/add_record",
+      "/edit_entry/<int:id>",
+      "/import_dispatch_data",
+      "/delete_entry/<int:id>",
+      "/delivery_rents/void/<int:id>",
+      "/delivery_rents/pay/<int:alloc_id>",
+      "/delivery_rents/pay_driver/<int:person_id>",
+      "/grn",
+      "/cash_flow/meta/categories",
+      "/cash_flow/meta/subcategories",
+      "/cash_flow/meta/parties",
+      "/cash_flow",
+      "/daily_reconciliation",
+      "/api/ui/theme",
+      "/void_audit/restore/<string:entity>/<int:record_id>",
+      "/settings/sidebar/save",
+      "/settings/sidebar/reset",
+      "/notifications/add_email",
+      "/notifications/toggle_email/<int:id>",
+      "/notifications/delete_email/<int:id>",
+      "/notifications/set_reminder/<int:bill_id>",
+      "/notifications/log_contact/<int:bill_id>",
+      "/notifications/close_reminder/<int:id>",
+      "/notifications/set_severity/<int:bill_id>",
+      "/notifications/mark_paid/<int:bill_id>",
+      "/notifications/resolve_due/<int:id>",
+      "/notifications/ack_reminder/<int:id>",
+      "/tenants/create",
+      "/tenants/<tenant_id>/reset_admin",
+      "/tenants/<tenant_id>/reset_missing_passwords",
+      "/tenants/<tenant_id>/status",
+      "/tenants/<tenant_id>/update",
+      "/tenants/backup_history/restore/<int:history_id>",
+      "/tenants/<tenant_id>/delete",
+      "/merge_materials",
+      "/add_material",
+      "/edit_material/<int:id>",
+      "/bulk_update_material_unit",
+      "/material_categories/add",
+      "/material_categories/<int:id>/rename",
+      "/material_categories/<int:id>/toggle",
+      "/delete_material/<int:id>",
+      "/add_pending_bill",
+      "/edit_pending_bill/<int:id>",
+      "/delete_pending_bill/<int:id>",
+      "/import_pending_bills",
+      "/edit_grn/<int:id>",
+      "/toggle_bill_paid/<int:id>",
+      "/change_password",
+      "/delete_all_data",
+      "/reconcile_data",
+      "/admin/rebuild_erp_consistency",
+      "/data_wipe_preview",
+      "/delete_selected_data",
+      "/admin/accounts_domain_wipe",
+      "/add_user",
+      "/edit_user_permissions/<int:id>",
+      "/delete_user/<int:id>",
+      "/toggle_user_status/<int:id>",
+      "/update_settings",
+      "/add_supplier_payment",
+      "/edit_supplier_payment/<int:id>",
+      "/delete_supplier_payment/<int:id>",
+      "/restore_supplier_payment/<int:id>",
+      "/legacy-migration/upload",
+      "/legacy-migration/run/<int:run_id>/dry-run",
+      "/legacy-migration/run/<int:run_id>/import",
+      "/login",
+      "/root/recovery",
+      "/root/recovery_codes",
+      "/root/backup-settings/save",
+      "/root/backup-settings/send-now",
+      "/root/backup-settings/history/clear",
+      "/add_booking",
+      "/edit_bill/Booking/<int:id>",
+      "/add_payment",
+      "/edit_bill/Payment/<int:id>",
+      "/direct_sales/hold",
+      "/direct_sales/hold/<int:draft_id>/resume",
+      "/direct_sales/hold/<int:draft_id>/delete",
+      "/add_direct_sale",
+      "/add_sale",
+      "/edit_bill/DirectSale/<int:id>",
+      "/add_material_return",
+      "/edit_material_return/<int:id>",
+      "/edit_ledger_transaction/<string:trans_type>/<int:trans_id>",
+      "/void_transaction/<string:type>/<int:id>",
+      "/delete_transaction/<string:type>/<int:id>",
+      "/unvoid_transaction/<string:type>/<int:id>",
+      "/delete_bill/<string:type>/<int:id>",
+      "/client-ledger/categories/add",
+      "/client-ledger/categories/<int:category_id>/rename",
+      "/client-ledger/categories/<int:category_id>/toggle",
+      "/client-ledger/categories/<int:category_id>/delete",
+      "/add_client",
+      "/edit_client/<int:id>",
+      "/client_opening_balance/<int:id>",
+      "/delete_client/<int:id>",
+      "/clients/activate_all",
+      "/transfer_client/<int:id>",
+      "/reclaim_client/<int:id>",
+      "/add_supplier",
+      "/edit_supplier/<int:id>",
+      "/supplier_opening_balance/<int:id>",
+      "/delete_supplier/<int:id>",
+      "/hard_delete_supplier/<int:id>",
+      "/transfer_supplier/<int:id>",
+      "/shift_grn_supplier/<int:id>",
+      "/shift_supplier_ledger/<int:id>",
+      "/shift_supplier_payment/<int:id>",
+      "/reclaim_supplier_ledger/<int:id>",
+      "/delivery_persons/add",
+      "/delivery_persons/toggle/<int:id>",
+      "/delivery_persons/edit/<int:id>",
+      "/materials/rename_label",
+      "/materials/activate_all",
+      "/services/add",
+      "/services/edit/<int:id>",
+      "/services/toggle/<int:id>",
+      "/services/delete/<int:id>",
+      "/services/migrate",
+      "/services/merge",
+      "/client_toggle_active/<int:client_id>",
+      "/client_booking_cancel/<int:client_id>",
+      "/client_booking_cancel_revert/<int:client_id>/<int:entry_id>",
+      "/delivery_person_opening_balance/<int:id>",
+      "/delivery_person_ledger/<int:id>/pay",
+      "/delivery_person_payments/<int:id>/edit",
+      "/delivery_person_payments/<int:id>/void",
+      "/delivery_person_payments/<int:id>/restore",
+      "/add_record",
+      "/edit_entry/<int:id>",
+      "/import_dispatch_data",
+      "/delete_entry/<int:id>",
+      "/delivery_rents/void/<int:id>",
+      "/delivery_rents/pay/<int:alloc_id>",
+      "/delivery_rents/pay_driver/<int:person_id>",
+      "/grn",
+      "/cash_flow/meta/categories",
+      "/cash_flow/meta/subcategories",
+      "/cash_flow/meta/parties",
+      "/cash_flow",
+      "/daily_reconciliation",
+      "/api/ui/theme",
+      "/void_audit/restore/<string:entity>/<int:record_id>",
+      "/settings/sidebar/save",
+      "/settings/sidebar/reset",
+      "/notifications/add_email",
+      "/notifications/toggle_email/<int:id>",
+      "/notifications/delete_email/<int:id>",
+      "/notifications/set_reminder/<int:bill_id>",
+      "/notifications/log_contact/<int:bill_id>",
+      "/notifications/close_reminder/<int:id>",
+      "/notifications/set_severity/<int:bill_id>",
+      "/notifications/mark_paid/<int:bill_id>",
+      "/notifications/resolve_due/<int:id>",
+      "/notifications/ack_reminder/<int:id>",
+      "/tenants/create",
+      "/tenants/<tenant_id>/reset_admin",
+      "/tenants/<tenant_id>/reset_missing_passwords",
+      "/tenants/<tenant_id>/status",
+      "/tenants/<tenant_id>/update",
+      "/tenants/backup_history/restore/<int:history_id>",
+      "/tenants/<tenant_id>/delete",
+      "/merge_materials",
+      "/add_material",
+      "/edit_material/<int:id>",
+      "/bulk_update_material_unit",
+      "/material_categories/add",
+      "/material_categories/<int:id>/rename",
+      "/material_categories/<int:id>/toggle",
+      "/delete_material/<int:id>",
+      "/add_pending_bill",
+      "/edit_pending_bill/<int:id>",
+      "/delete_pending_bill/<int:id>",
+      "/import_pending_bills",
+      "/edit_grn/<int:id>",
+      "/toggle_bill_paid/<int:id>",
+      "/change_password",
+      "/delete_all_data",
+      "/reconcile_data",
+      "/admin/rebuild_erp_consistency",
+      "/data_wipe_preview",
+      "/delete_selected_data",
+      "/admin/accounts_domain_wipe",
+      "/add_user",
+      "/edit_user_permissions/<int:id>",
+      "/delete_user/<int:id>",
+      "/toggle_user_status/<int:id>",
+      "/update_settings",
+      "/add_supplier_payment",
+      "/edit_supplier_payment/<int:id>",
+      "/delete_supplier_payment/<int:id>",
+      "/restore_supplier_payment/<int:id>",
+      "/legacy-migration/upload",
+      "/legacy-migration/run/<int:run_id>/dry-run",
+      "/legacy-migration/run/<int:run_id>/import",
+      "/accounts/payments/clients/void/<int:id>",
+      "/accounts/payments/clients/restore/<int:id>",
+      "/accounts/payments/clients/save",
+      "/accounts/payments/suppliers/save",
+      "/accounts/payments/suppliers/<int:id>/delete",
+      "/accounts/payments/suppliers/<int:id>/restore",
+      "/accounts/grn_payments/save",
+      "/accounts/grn_payments/<int:payment_id>/void",
+      "/accounts/grn_payments/<int:payment_id>/restore",
+      "/accounts/categories/add",
+      "/accounts/accounts/add",
+      "/accounts/<int:account_id>/edit",
+      "/accounts/<int:account_id>/toggle",
+      "/accounts/<int:account_id>/delete",
+      "/accounts/<int:account_id>/reconcile",
+      "/accounts/categories",
+      "/accounts/categories/<int:category_id>/edit",
+      "/accounts/categories/<int:category_id>/toggle",
+      "/accounts/categories/<int:category_id>/delete",
+      "/accounts/api/categories/add",
+      "/accounts/transactions/<int:tx_id>/void",
+      "/accounts/transactions/<int:tx_id>/delete",
+      "/accounts/transactions/<int:tx_id>/edit",
+      "/accounts/transactions/new",
+      "/accounts/transfers/add",
+      "/data_lab/",
+      "/data_lab/correct_bill",
+      "/data_lab/legacy_import",
+      "/import_export/preview",
+      "/import_export/execute_import",
+      "/import_export/full_raw_import",
+      "/import_export/full_raw_import_history",
+      "/import_export/app_upgrade",
+      "/import_export/app_upgrade/start",
+      "/import_export/email_file",
+      "/import_export/transfer/import",
+      "/import_export/full_db_import",
+      "/import_export/transfer/export",
+      "/import_export/master/import/start",
+      "/import_export/master/import",
+      "/import_export/tenant_db_restore",
+      "/import_export/app_upgrade/rollback",
+      "/import_export/app_upgrade/migrate",
+      "/import_export/upload",
+      "/import_export/uploads/<upload_id>/start",
+      "/import_export/jobs/<int:job_id>/cancel"
+    ]
+  },
+  "failures": [],
+  "known_defects": [],
+  "checks": [
+    {
+      "id": "SUP-Ravi",
+      "label": "Add supplier Ravi Cement Supplier",
+      "ok": true,
+      "observed": "success: Supplier Added \u2014 by Admin",
+      "expected": "Supplier Added",
+      "known_defect": null,
+      "page": "/add_supplier",
+      "why": "",
+      "input_sent": {
+        "name": "Ravi Cement Supplier",
+        "phone": "0300-1234567"
+      },
+      "output_received": "success: Supplier Added \u2014 by Admin"
+    },
+    {
+      "id": "SUP-Kohat",
+      "label": "Add supplier Kohat Traders",
+      "ok": true,
+      "observed": "success: Supplier Added \u2014 by Admin",
+      "expected": "Supplier Added",
+      "known_defect": null,
+      "page": "/add_supplier",
+      "why": "",
+      "input_sent": {
+        "name": "Kohat Traders",
+        "phone": "0301-7654321"
+      },
+      "output_received": "success: Supplier Added \u2014 by Admin"
+    },
+    {
+      "id": "CAT-1",
+      "label": "Add category Cement",
+      "ok": true,
+      "observed": "success: Category added \u2014 by Admin",
+      "expected": "Category added",
+      "known_defect": null,
+      "page": "/material_categories/add",
+      "why": "",
+      "input_sent": {
+        "category_name": "Cement"
+      },
+      "output_received": "success: Category added \u2014 by Admin"
+    },
+    {
+      "id": "MAT-1",
+      "label": "Add material DG Cement",
+      "ok": true,
+      "observed": "success: Brand Added \u2014 by Admin",
+      "expected": "Brand Added",
+      "known_defect": null,
+      "page": "/add_material",
+      "why": "",
+      "input_sent": {
+        "material_name": "DG Cement",
+        "unit": "Bag",
+        "code": "DG"
+      },
+      "output_received": "success: Brand Added \u2014 by Admin"
+    },
+    {
+      "id": "CLI-1",
+      "label": "Add client Bilal Construction",
+      "ok": true,
+      "observed": "success: Client Registered \u2014 by Admin",
+      "expected": "Client Registered",
+      "known_defect": null,
+      "page": "/add_client",
+      "why": "",
+      "input_sent": {
+        "name": "Bilal Construction",
+        "code": "CYC-CL-1"
+      },
+      "output_received": "success: Client Registered \u2014 by Admin"
+    },
+    {
+      "id": "DRV-1",
+      "label": "Add driver Akram Driver",
+      "ok": true,
+      "observed": "success: Delivery person saved \u2014 by Admin",
+      "expected": "Delivery person saved",
+      "known_defect": null,
+      "page": "/delivery_persons/add",
+      "why": "",
+      "input_sent": {
+        "name": "Akram Driver"
+      },
+      "output_received": "success: Delivery person saved \u2014 by Admin"
+    },
+    {
+      "id": "ACC-Main",
+      "label": "Add account Main Cash",
+      "ok": true,
+      "observed": "success: Account added successfully! \u2014 by Admin",
+      "expected": "Account added",
+      "known_defect": null,
+      "page": "/accounts/accounts/add",
+      "why": "",
+      "input_sent": {
+        "name": "Main Cash",
+        "opening_amount": "200000",
+        "subcategory": "Cash",
+        "type": "Main Cash",
+        "channel": "cash"
+      },
+      "output_received": "success: Account added successfully! \u2014 by Admin"
+    },
+    {
+      "id": "ACC-Bank",
+      "label": "Add account Meezan Bank",
+      "ok": true,
+      "observed": "success: Account added successfully! \u2014 by Admin",
+      "expected": "Account added",
+      "known_defect": null,
+      "page": "/accounts/accounts/add",
+      "why": "",
+      "input_sent": {
+        "name": "Meezan Bank",
+        "opening_amount": "500000",
+        "subcategory": "Bank",
+        "type": "Operating Bank",
+        "channel": "bank"
+      },
+      "output_received": "success: Account added successfully! \u2014 by Admin"
+    },
+    {
+      "id": "GRN-1",
+      "label": "Receive 300 DG Cement via GRN",
+      "ok": true,
+      "observed": "success: GRN added successfully! \u2014 by Admin",
+      "expected": "GRN added successfully",
+      "known_defect": null,
+      "page": "/grn",
+      "why": "",
+      "input_sent": {
+        "mat_name[]": "DG Cement",
+        "qty[]": "300",
+        "price[]": "1200"
+      },
+      "output_received": "success: GRN added successfully! \u2014 by Admin"
+    },
+    {
+      "id": "BK-1",
+      "label": "Book 200 bags",
+      "ok": true,
+      "observed": "success: Booking added successfully (Bill: MB NO.BK-SCENARIO-001) \u00e2\u20ac\u201d Pending amount: 290000.0 \u2014 by Admin",
+      "expected": "Booking saved",
+      "known_defect": null,
+      "page": "/add_booking",
+      "why": "",
+      "input_sent": {
+        "client_code": "CYC-CL-1",
+        "material_name[]": "DG Cement",
+        "qty[]": "200",
+        "unit_rate[]": "1500",
+        "amount": "300000",
+        "paid_amount": "10000",
+        "payment_account_id": "1"
+      },
+      "output_received": "success: Booking added successfully (Bill: MB NO.BK-SCENARIO-001) \u00e2\u20ac\u201d Pending amount: 290000.0 \u2014 by Admin"
+    },
+    {
+      "id": "SALE-1",
+      "label": "Cash sale 50 bags",
+      "ok": true,
+      "observed": "success: Direct sale added successfully \u2014 by Admin",
+      "expected": "Sale saved",
+      "known_defect": null,
+      "page": "/add_direct_sale",
+      "why": "",
+      "input_sent": {
+        "category": "Cash",
+        "product_name[]": "DG Cement",
+        "qty[]": "50",
+        "unit_rate[]": "1700",
+        "paid_amount": "85000",
+        "driver_name": "Akram Driver"
+      },
+      "output_received": "success: Direct sale added successfully \u2014 by Admin"
+    },
+    {
+      "id": "SALE-2",
+      "label": "Credit sale 50 bags",
+      "ok": true,
+      "observed": "success: Direct sale added successfully \u2014 by Admin",
+      "expected": "Sale saved",
+      "known_defect": null,
+      "page": "/add_direct_sale",
+      "why": "",
+      "input_sent": {
+        "category": "Credit Customer",
+        "product_name[]": "DG Cement",
+        "qty[]": "50",
+        "unit_rate[]": "1650",
+        "paid_amount": "5000",
+        "client_code": "CYC-CL-1",
+        "driver_name": "Akram Driver"
+      },
+      "output_received": "success: Direct sale added successfully \u2014 by Admin"
+    },
+    {
+      "id": "V-home",
+      "label": "GET /",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/"
+      },
+      "output_received": "HTTP 200 (1649 chars)"
+    },
+    {
+      "id": "V-login",
+      "label": "GET /login",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/login",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/login"
+      },
+      "output_received": "HTTP 302 (115 chars)"
+    },
+    {
+      "id": "V-root/recovery",
+      "label": "GET /root/recovery",
+      "ok": true,
+      "observed": "404",
+      "expected": "404",
+      "known_defect": null,
+      "page": "/root/recovery",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/root/recovery"
+      },
+      "output_received": "HTTP 404 (144 chars)"
+    },
+    {
+      "id": "V-root/recovery_codes",
+      "label": "GET /root/recovery_codes",
+      "ok": true,
+      "observed": "404",
+      "expected": "302",
+      "known_defect": null,
+      "page": "/root/recovery_codes",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/root/recovery_codes"
+      },
+      "output_received": "HTTP 404 (144 chars)"
+    },
+    {
+      "id": "V-logout",
+      "label": "GET /logout",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/logout",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/logout"
+      },
+      "output_received": "HTTP 302 (120 chars)"
+    },
+    {
+      "id": "V-root/backup-settings",
+      "label": "GET /root/backup-settings",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/root/backup-settings",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/root/backup-settings"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-bookings",
+      "label": "GET /bookings",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/bookings",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/bookings"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-payments",
+      "label": "GET /payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/payments"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-direct_sales",
+      "label": "GET /direct_sales",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/direct_sales",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/direct_sales"
+      },
+      "output_received": "HTTP 302 (141 chars)"
+    },
+    {
+      "id": "V-material_returns",
+      "label": "GET /material_returns",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/material_returns",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/material_returns"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-pending_bills",
+      "label": "GET /pending_bills",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/pending_bills",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/pending_bills"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-mixed_transactions",
+      "label": "GET /mixed_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/mixed_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/mixed_transactions"
+      },
+      "output_received": "HTTP 302 (147 chars)"
+    },
+    {
+      "id": "V-clients",
+      "label": "GET /clients",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/clients",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/clients"
+      },
+      "output_received": "HTTP 302 (136 chars)"
+    },
+    {
+      "id": "V-client-ledger/categories",
+      "label": "GET /client-ledger/categories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/client-ledger/categories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/client-ledger/categories"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-suppliers",
+      "label": "GET /suppliers",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/suppliers",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/suppliers"
+      },
+      "output_received": "HTTP 302 (138 chars)"
+    },
+    {
+      "id": "V-materials",
+      "label": "GET /materials",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/materials",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/materials"
+      },
+      "output_received": "HTTP 302 (138 chars)"
+    },
+    {
+      "id": "V-delivery_persons",
+      "label": "GET /delivery_persons",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/delivery_persons",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/delivery_persons"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-services",
+      "label": "GET /services",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/services",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/services"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-ledger",
+      "label": "GET /ledger",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/ledger",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/ledger"
+      },
+      "output_received": "HTTP 302 (135 chars)"
+    },
+    {
+      "id": "V-decision_ledger",
+      "label": "GET /decision_ledger",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/decision_ledger",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/decision_ledger"
+      },
+      "output_received": "HTTP 302 (144 chars)"
+    },
+    {
+      "id": "V-api/delivery_persons/search",
+      "label": "GET /api/delivery_persons/search",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/delivery_persons/search",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/delivery_persons/search"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-dispatching",
+      "label": "GET /dispatching",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/dispatching",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/dispatching"
+      },
+      "output_received": "HTTP 302 (140 chars)"
+    },
+    {
+      "id": "V-tracking",
+      "label": "GET /tracking",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/tracking",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/tracking"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-delivery_rents",
+      "label": "GET /delivery_rents",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/delivery_rents",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/delivery_rents"
+      },
+      "output_received": "HTTP 302 (143 chars)"
+    },
+    {
+      "id": "V-grn",
+      "label": "GET /grn",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/grn",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/grn"
+      },
+      "output_received": "HTTP 302 (132 chars)"
+    },
+    {
+      "id": "V-current_payables",
+      "label": "GET /current_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/current_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/current_payables"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-unpaid_transactions",
+      "label": "GET /unpaid_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/unpaid_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/unpaid_transactions"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-api/current_payables",
+      "label": "GET /api/current_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/current_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/current_payables"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-export_current_payables",
+      "label": "GET /export_current_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_current_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_current_payables"
+      },
+      "output_received": "HTTP 302 (152 chars)"
+    },
+    {
+      "id": "V-financial_details",
+      "label": "GET /financial_details",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/financial_details",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/financial_details"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-profit_reports",
+      "label": "GET /profit_reports",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/profit_reports"
+      },
+      "output_received": "HTTP 302 (143 chars)"
+    },
+    {
+      "id": "V-profit_reports/export/pdf",
+      "label": "GET /profit_reports/export/pdf",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports/export/pdf",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/profit_reports/export/pdf"
+      },
+      "output_received": "HTTP 302 (158 chars)"
+    },
+    {
+      "id": "V-profit_reports/export/excel",
+      "label": "GET /profit_reports/export/excel",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports/export/excel",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/profit_reports/export/excel"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-stock_summary",
+      "label": "GET /stock_summary",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/stock_summary",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/stock_summary"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-daily_transactions",
+      "label": "GET /daily_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/daily_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/daily_transactions"
+      },
+      "output_received": "HTTP 302 (147 chars)"
+    },
+    {
+      "id": "V-cash_flow/meta/categories",
+      "label": "GET /cash_flow/meta/categories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow/meta/categories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow/meta/categories"
+      },
+      "output_received": "HTTP 302 (158 chars)"
+    },
+    {
+      "id": "V-cash_flow/meta/subcategories",
+      "label": "GET /cash_flow/meta/subcategories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow/meta/subcategories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow/meta/subcategories"
+      },
+      "output_received": "HTTP 302 (161 chars)"
+    },
+    {
+      "id": "V-cash_flow/meta/parties",
+      "label": "GET /cash_flow/meta/parties",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow/meta/parties",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow/meta/parties"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-cash_flow",
+      "label": "GET /cash_flow",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow"
+      },
+      "output_received": "HTTP 302 (138 chars)"
+    },
+    {
+      "id": "V-cash_flow_differences",
+      "label": "GET /cash_flow_differences",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow_differences",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow_differences"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-daily_reconciliation",
+      "label": "GET /daily_reconciliation",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/daily_reconciliation",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/daily_reconciliation"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-financial_tracker",
+      "label": "GET /financial_tracker",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/financial_tracker",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/financial_tracker"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-api/ui/theme",
+      "label": "GET /api/ui/theme",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/ui/theme",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/ui/theme"
+      },
+      "output_received": "HTTP 200 (14 chars)"
+    },
+    {
+      "id": "V-api/last_sold_price",
+      "label": "GET /api/last_sold_price",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/last_sold_price",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/last_sold_price"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-api/material_next_code",
+      "label": "GET /api/material_next_code",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/material_next_code",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/material_next_code"
+      },
+      "output_received": "HTTP 302 (153 chars)"
+    },
+    {
+      "id": "V-api/client_next_code",
+      "label": "GET /api/client_next_code",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/client_next_code",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/client_next_code"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-api/notifications/due",
+      "label": "GET /api/notifications/due",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/notifications/due",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/notifications/due"
+      },
+      "output_received": "HTTP 302 (154 chars)"
+    },
+    {
+      "id": "V-api/ledger_revision",
+      "label": "GET /api/ledger_revision",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/ledger_revision",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/ledger_revision"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-api/grn_consumption",
+      "label": "GET /api/grn_consumption",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/grn_consumption",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/grn_consumption"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-api/clients/search",
+      "label": "GET /api/clients/search",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/clients/search",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/clients/search"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-api/suppliers/search",
+      "label": "GET /api/suppliers/search",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/suppliers/search",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/suppliers/search"
+      },
+      "output_received": "HTTP 302 (153 chars)"
+    },
+    {
+      "id": "V-api/audit/financial-integrity",
+      "label": "GET /api/audit/financial-integrity",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/audit/financial-integrity",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/audit/financial-integrity"
+      },
+      "output_received": "HTTP 302 (162 chars)"
+    },
+    {
+      "id": "V-debug/db",
+      "label": "GET /debug/db",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/debug/db",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/debug/db"
+      },
+      "output_received": "HTTP 302 (139 chars)"
+    },
+    {
+      "id": "V-settings",
+      "label": "GET /settings",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-settings/activity",
+      "label": "GET /settings/activity",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings/activity",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings/activity"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-settings/sessions",
+      "label": "GET /settings/sessions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings/sessions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings/sessions"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-void_audit",
+      "label": "GET /void_audit",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/void_audit",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/void_audit"
+      },
+      "output_received": "HTTP 302 (139 chars)"
+    },
+    {
+      "id": "V-settings/sidebar",
+      "label": "GET /settings/sidebar",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings/sidebar",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings/sidebar"
+      },
+      "output_received": "HTTP 302 (147 chars)"
+    },
+    {
+      "id": "V-notifications",
+      "label": "GET /notifications",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/notifications",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/notifications"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-notifications/upcoming",
+      "label": "GET /notifications/upcoming",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/notifications/upcoming",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/notifications/upcoming"
+      },
+      "output_received": "HTTP 302 (153 chars)"
+    },
+    {
+      "id": "V-tenants",
+      "label": "GET /tenants",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/tenants",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/tenants"
+      },
+      "output_received": "HTTP 302 (136 chars)"
+    },
+    {
+      "id": "V-export_pending_bills",
+      "label": "GET /export_pending_bills",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_pending_bills",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_pending_bills"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-import_pending_bills",
+      "label": "GET /import_pending_bills",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_pending_bills",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_pending_bills"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-export_grn",
+      "label": "GET /export_grn",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_grn",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_grn"
+      },
+      "output_received": "HTTP 302 (139 chars)"
+    },
+    {
+      "id": "V-export_unpaid_transactions",
+      "label": "GET /export_unpaid_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_unpaid_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_unpaid_transactions"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-fix_system_issues",
+      "label": "GET /fix_system_issues",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/fix_system_issues",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/fix_system_issues"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-generate_dummy_data",
+      "label": "GET /generate_dummy_data",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/generate_dummy_data",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/generate_dummy_data"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-system_report",
+      "label": "GET /system_report",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/system_report",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/system_report"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-export_clients",
+      "label": "GET /export_clients",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_clients",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_clients"
+      },
+      "output_received": "HTTP 302 (143 chars)"
+    },
+    {
+      "id": "V-pay_supplier",
+      "label": "GET /pay_supplier",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/pay_supplier",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/pay_supplier"
+      },
+      "output_received": "HTTP 302 (141 chars)"
+    },
+    {
+      "id": "V-legacy-migration",
+      "label": "GET /legacy-migration/",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/legacy-migration/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/legacy-migration/"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-home",
+      "label": "GET /",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/"
+      },
+      "output_received": "HTTP 302 (129 chars)"
+    },
+    {
+      "id": "V-login",
+      "label": "GET /login",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/login",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/login"
+      },
+      "output_received": "HTTP 200 (2484 chars)"
+    },
+    {
+      "id": "V-root/recovery",
+      "label": "GET /root/recovery",
+      "ok": true,
+      "observed": "404",
+      "expected": "404",
+      "known_defect": null,
+      "page": "/root/recovery",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/root/recovery"
+      },
+      "output_received": "HTTP 404 (144 chars)"
+    },
+    {
+      "id": "V-root/recovery_codes",
+      "label": "GET /root/recovery_codes",
+      "ok": true,
+      "observed": "302",
+      "expected": "302",
+      "known_defect": null,
+      "page": "/root/recovery_codes",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/root/recovery_codes"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-logout",
+      "label": "GET /logout",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/logout",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/logout"
+      },
+      "output_received": "HTTP 302 (135 chars)"
+    },
+    {
+      "id": "V-root/backup-settings",
+      "label": "GET /root/backup-settings",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/root/backup-settings",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/root/backup-settings"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-bookings",
+      "label": "GET /bookings",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/bookings",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/bookings"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-payments",
+      "label": "GET /payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/payments"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-direct_sales",
+      "label": "GET /direct_sales",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/direct_sales",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/direct_sales"
+      },
+      "output_received": "HTTP 302 (141 chars)"
+    },
+    {
+      "id": "V-material_returns",
+      "label": "GET /material_returns",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/material_returns",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/material_returns"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-pending_bills",
+      "label": "GET /pending_bills",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/pending_bills",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/pending_bills"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-mixed_transactions",
+      "label": "GET /mixed_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/mixed_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/mixed_transactions"
+      },
+      "output_received": "HTTP 302 (147 chars)"
+    },
+    {
+      "id": "V-clients",
+      "label": "GET /clients",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/clients",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/clients"
+      },
+      "output_received": "HTTP 302 (136 chars)"
+    },
+    {
+      "id": "V-client-ledger/categories",
+      "label": "GET /client-ledger/categories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/client-ledger/categories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/client-ledger/categories"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-suppliers",
+      "label": "GET /suppliers",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/suppliers",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/suppliers"
+      },
+      "output_received": "HTTP 302 (138 chars)"
+    },
+    {
+      "id": "V-materials",
+      "label": "GET /materials",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/materials",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/materials"
+      },
+      "output_received": "HTTP 302 (138 chars)"
+    },
+    {
+      "id": "V-delivery_persons",
+      "label": "GET /delivery_persons",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/delivery_persons",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/delivery_persons"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-services",
+      "label": "GET /services",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/services",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/services"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-ledger",
+      "label": "GET /ledger",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/ledger",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/ledger"
+      },
+      "output_received": "HTTP 302 (135 chars)"
+    },
+    {
+      "id": "V-decision_ledger",
+      "label": "GET /decision_ledger",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/decision_ledger",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/decision_ledger"
+      },
+      "output_received": "HTTP 302 (144 chars)"
+    },
+    {
+      "id": "V-api/delivery_persons/search",
+      "label": "GET /api/delivery_persons/search",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/delivery_persons/search",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/delivery_persons/search"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-dispatching",
+      "label": "GET /dispatching",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/dispatching",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/dispatching"
+      },
+      "output_received": "HTTP 302 (140 chars)"
+    },
+    {
+      "id": "V-tracking",
+      "label": "GET /tracking",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/tracking",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/tracking"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-delivery_rents",
+      "label": "GET /delivery_rents",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/delivery_rents",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/delivery_rents"
+      },
+      "output_received": "HTTP 302 (143 chars)"
+    },
+    {
+      "id": "V-grn",
+      "label": "GET /grn",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/grn",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/grn"
+      },
+      "output_received": "HTTP 302 (132 chars)"
+    },
+    {
+      "id": "V-current_payables",
+      "label": "GET /current_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/current_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/current_payables"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-api/current_payables",
+      "label": "GET /api/current_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/current_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/current_payables"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-export_current_payables",
+      "label": "GET /export_current_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_current_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_current_payables"
+      },
+      "output_received": "HTTP 302 (152 chars)"
+    },
+    {
+      "id": "V-financial_details",
+      "label": "GET /financial_details",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/financial_details",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/financial_details"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-profit_reports",
+      "label": "GET /profit_reports",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/profit_reports"
+      },
+      "output_received": "HTTP 302 (143 chars)"
+    },
+    {
+      "id": "V-profit_reports/export/pdf",
+      "label": "GET /profit_reports/export/pdf",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports/export/pdf",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/profit_reports/export/pdf"
+      },
+      "output_received": "HTTP 302 (158 chars)"
+    },
+    {
+      "id": "V-profit_reports/export/excel",
+      "label": "GET /profit_reports/export/excel",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/profit_reports/export/excel",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/profit_reports/export/excel"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-stock_summary",
+      "label": "GET /stock_summary",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/stock_summary",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/stock_summary"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-daily_transactions",
+      "label": "GET /daily_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/daily_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/daily_transactions"
+      },
+      "output_received": "HTTP 302 (147 chars)"
+    },
+    {
+      "id": "V-cash_flow/meta/categories",
+      "label": "GET /cash_flow/meta/categories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow/meta/categories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow/meta/categories"
+      },
+      "output_received": "HTTP 302 (158 chars)"
+    },
+    {
+      "id": "V-cash_flow/meta/subcategories",
+      "label": "GET /cash_flow/meta/subcategories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow/meta/subcategories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow/meta/subcategories"
+      },
+      "output_received": "HTTP 302 (161 chars)"
+    },
+    {
+      "id": "V-cash_flow/meta/parties",
+      "label": "GET /cash_flow/meta/parties",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow/meta/parties",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow/meta/parties"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-cash_flow",
+      "label": "GET /cash_flow",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow"
+      },
+      "output_received": "HTTP 302 (138 chars)"
+    },
+    {
+      "id": "V-cash_flow_differences",
+      "label": "GET /cash_flow_differences",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/cash_flow_differences",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/cash_flow_differences"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-daily_reconciliation",
+      "label": "GET /daily_reconciliation",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/daily_reconciliation",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/daily_reconciliation"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-financial_tracker",
+      "label": "GET /financial_tracker",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/financial_tracker",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/financial_tracker"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-api/ui/theme",
+      "label": "GET /api/ui/theme",
+      "ok": true,
+      "observed": "200",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/ui/theme",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/ui/theme"
+      },
+      "output_received": "HTTP 200 (14 chars)"
+    },
+    {
+      "id": "V-api/last_sold_price",
+      "label": "GET /api/last_sold_price",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/last_sold_price",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/last_sold_price"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-api/material_next_code",
+      "label": "GET /api/material_next_code",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/material_next_code",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/material_next_code"
+      },
+      "output_received": "HTTP 302 (153 chars)"
+    },
+    {
+      "id": "V-api/client_next_code",
+      "label": "GET /api/client_next_code",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/client_next_code",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/client_next_code"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-api/notifications/due",
+      "label": "GET /api/notifications/due",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/notifications/due",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/notifications/due"
+      },
+      "output_received": "HTTP 302 (154 chars)"
+    },
+    {
+      "id": "V-api/ledger_revision",
+      "label": "GET /api/ledger_revision",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/ledger_revision",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/ledger_revision"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-api/grn_consumption",
+      "label": "GET /api/grn_consumption",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/grn_consumption",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/grn_consumption"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-api/clients/search",
+      "label": "GET /api/clients/search",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/clients/search",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/clients/search"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-api/suppliers/search",
+      "label": "GET /api/suppliers/search",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/suppliers/search",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/suppliers/search"
+      },
+      "output_received": "HTTP 302 (153 chars)"
+    },
+    {
+      "id": "V-api/audit/financial-integrity",
+      "label": "GET /api/audit/financial-integrity",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/api/audit/financial-integrity",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/api/audit/financial-integrity"
+      },
+      "output_received": "HTTP 302 (162 chars)"
+    },
+    {
+      "id": "V-debug/db",
+      "label": "GET /debug/db",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/debug/db",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/debug/db"
+      },
+      "output_received": "HTTP 302 (139 chars)"
+    },
+    {
+      "id": "V-settings",
+      "label": "GET /settings",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings"
+      },
+      "output_received": "HTTP 302 (137 chars)"
+    },
+    {
+      "id": "V-settings/activity",
+      "label": "GET /settings/activity",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings/activity",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings/activity"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-settings/sessions",
+      "label": "GET /settings/sessions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings/sessions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings/sessions"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-void_audit",
+      "label": "GET /void_audit",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/void_audit",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/void_audit"
+      },
+      "output_received": "HTTP 302 (139 chars)"
+    },
+    {
+      "id": "V-settings/sidebar",
+      "label": "GET /settings/sidebar",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/settings/sidebar",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/settings/sidebar"
+      },
+      "output_received": "HTTP 302 (147 chars)"
+    },
+    {
+      "id": "V-notifications",
+      "label": "GET /notifications",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/notifications",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/notifications"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-notifications/upcoming",
+      "label": "GET /notifications/upcoming",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/notifications/upcoming",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/notifications/upcoming"
+      },
+      "output_received": "HTTP 302 (153 chars)"
+    },
+    {
+      "id": "V-tenants",
+      "label": "GET /tenants",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/tenants",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/tenants"
+      },
+      "output_received": "HTTP 302 (136 chars)"
+    },
+    {
+      "id": "V-export_pending_bills",
+      "label": "GET /export_pending_bills",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_pending_bills",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_pending_bills"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-import_pending_bills",
+      "label": "GET /import_pending_bills",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_pending_bills",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_pending_bills"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-export_grn",
+      "label": "GET /export_grn",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_grn",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_grn"
+      },
+      "output_received": "HTTP 302 (139 chars)"
+    },
+    {
+      "id": "V-export_unpaid_transactions",
+      "label": "GET /export_unpaid_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_unpaid_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_unpaid_transactions"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-fix_system_issues",
+      "label": "GET /fix_system_issues",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/fix_system_issues",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/fix_system_issues"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-generate_dummy_data",
+      "label": "GET /generate_dummy_data",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/generate_dummy_data",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/generate_dummy_data"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-system_report",
+      "label": "GET /system_report",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/system_report",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/system_report"
+      },
+      "output_received": "HTTP 302 (142 chars)"
+    },
+    {
+      "id": "V-export_clients",
+      "label": "GET /export_clients",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/export_clients",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/export_clients"
+      },
+      "output_received": "HTTP 302 (143 chars)"
+    },
+    {
+      "id": "V-pay_supplier",
+      "label": "GET /pay_supplier",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/pay_supplier",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/pay_supplier"
+      },
+      "output_received": "HTTP 302 (141 chars)"
+    },
+    {
+      "id": "V-legacy-migration",
+      "label": "GET /legacy-migration/",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/legacy-migration/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/legacy-migration/"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-accounts/audit",
+      "label": "GET /accounts/audit",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/audit",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/audit"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-accounts",
+      "label": "GET /accounts/",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/"
+      },
+      "output_received": "HTTP 302 (140 chars)"
+    },
+    {
+      "id": "V-accounts/payments/clients",
+      "label": "GET /accounts/payments/clients",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/payments/clients",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/payments/clients"
+      },
+      "output_received": "HTTP 302 (158 chars)"
+    },
+    {
+      "id": "V-accounts/payments/suppliers",
+      "label": "GET /accounts/payments/suppliers",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/payments/suppliers",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/payments/suppliers"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-accounts/expenditures",
+      "label": "GET /accounts/expenditures",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/expenditures",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/expenditures"
+      },
+      "output_received": "HTTP 302 (152 chars)"
+    },
+    {
+      "id": "V-accounts/receipts",
+      "label": "GET /accounts/receipts",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/receipts",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/receipts"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-accounts/grn_payments",
+      "label": "GET /accounts/grn_payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/grn_payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/grn_payments"
+      },
+      "output_received": "HTTP 302 (152 chars)"
+    },
+    {
+      "id": "V-accounts/purchase_payables",
+      "label": "GET /accounts/purchase_payables",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/purchase_payables",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/purchase_payables"
+      },
+      "output_received": "HTTP 302 (157 chars)"
+    },
+    {
+      "id": "V-accounts/accounts",
+      "label": "GET /accounts/accounts",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/accounts",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/accounts"
+      },
+      "output_received": "HTTP 302 (148 chars)"
+    },
+    {
+      "id": "V-accounts/accounts/add",
+      "label": "GET /accounts/accounts/add",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/accounts/add",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/accounts/add"
+      },
+      "output_received": "HTTP 302 (154 chars)"
+    },
+    {
+      "id": "V-accounts/reconciliations",
+      "label": "GET /accounts/reconciliations",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/reconciliations",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/reconciliations"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-accounts/categories",
+      "label": "GET /accounts/categories",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/categories",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/categories"
+      },
+      "output_received": "HTTP 302 (150 chars)"
+    },
+    {
+      "id": "V-accounts/transfers",
+      "label": "GET /accounts/transfers",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/transfers",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/transfers"
+      },
+      "output_received": "HTTP 302 (149 chars)"
+    },
+    {
+      "id": "V-accounts/transfers/add",
+      "label": "GET /accounts/transfers/add",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/transfers/add",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/transfers/add"
+      },
+      "output_received": "HTTP 302 (155 chars)"
+    },
+    {
+      "id": "V-accounts/api/kpi/client_payments",
+      "label": "GET /accounts/api/kpi/client_payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/api/kpi/client_payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/client_payments"
+      },
+      "output_received": "HTTP 302 (167 chars)"
+    },
+    {
+      "id": "V-accounts/api/kpi/supplier_payments",
+      "label": "GET /accounts/api/kpi/supplier_payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/api/kpi/supplier_payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/supplier_payments"
+      },
+      "output_received": "HTTP 302 (169 chars)"
+    },
+    {
+      "id": "V-accounts/api/kpi/expenditures",
+      "label": "GET /accounts/api/kpi/expenditures",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/api/kpi/expenditures",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/expenditures"
+      },
+      "output_received": "HTTP 302 (164 chars)"
+    },
+    {
+      "id": "V-accounts/api/kpi/receipts",
+      "label": "GET /accounts/api/kpi/receipts",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/api/kpi/receipts",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/receipts"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-accounts/api/kpi/company_money",
+      "label": "GET /accounts/api/kpi/company_money",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/api/kpi/company_money",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/company_money"
+      },
+      "output_received": "HTTP 302 (165 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/client_payments",
+      "label": "GET /accounts/kpi/client_payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/client_payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/client_payments"
+      },
+      "output_received": "HTTP 302 (161 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/supplier_payments",
+      "label": "GET /accounts/kpi/supplier_payments",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/supplier_payments",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/supplier_payments"
+      },
+      "output_received": "HTTP 302 (163 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/expenditures",
+      "label": "GET /accounts/kpi/expenditures",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/expenditures",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/expenditures"
+      },
+      "output_received": "HTTP 302 (158 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/receipts",
+      "label": "GET /accounts/kpi/receipts",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/receipts",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/receipts"
+      },
+      "output_received": "HTTP 302 (154 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/company_money",
+      "label": "GET /accounts/kpi/company_money",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/company_money",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/company_money"
+      },
+      "output_received": "HTTP 302 (159 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/cash_money",
+      "label": "GET /accounts/kpi/cash_money",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/cash_money",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/cash_money"
+      },
+      "output_received": "HTTP 302 (156 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/cash_accounts",
+      "label": "GET /accounts/kpi/cash_accounts",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/cash_accounts",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/cash_accounts"
+      },
+      "output_received": "HTTP 302 (159 chars)"
+    },
+    {
+      "id": "V-accounts/kpi/bank_accounts",
+      "label": "GET /accounts/kpi/bank_accounts",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/accounts/kpi/bank_accounts",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/accounts/kpi/bank_accounts"
+      },
+      "output_received": "HTTP 302 (159 chars)"
+    },
+    {
+      "id": "V-admin",
+      "label": "GET /admin/",
+      "ok": true,
+      "observed": "403",
+      "expected": "403",
+      "known_defect": null,
+      "page": "/admin/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/admin/"
+      },
+      "output_received": "HTTP 403 (150 chars)"
+    },
+    {
+      "id": "V-admin/modules",
+      "label": "GET /admin/modules",
+      "ok": true,
+      "observed": "403",
+      "expected": "403",
+      "known_defect": null,
+      "page": "/admin/modules",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/admin/modules"
+      },
+      "output_received": "HTTP 403 (150 chars)"
+    },
+    {
+      "id": "V-admin/api/modules",
+      "label": "GET /admin/api/modules",
+      "ok": true,
+      "observed": "403",
+      "expected": "403",
+      "known_defect": null,
+      "page": "/admin/api/modules",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/admin/api/modules"
+      },
+      "output_received": "HTTP 403 (150 chars)"
+    },
+    {
+      "id": "V-admin/api/health",
+      "label": "GET /admin/api/health",
+      "ok": true,
+      "observed": "403",
+      "expected": "403",
+      "known_defect": null,
+      "page": "/admin/api/health",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/admin/api/health"
+      },
+      "output_received": "HTTP 403 (150 chars)"
+    },
+    {
+      "id": "V-data_lab",
+      "label": "GET /data_lab/",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/data_lab/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/data_lab/"
+      },
+      "output_received": "HTTP 302 (140 chars)"
+    },
+    {
+      "id": "V-data_lab/basket",
+      "label": "GET /data_lab/basket",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/data_lab/basket",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/data_lab/basket"
+      },
+      "output_received": "HTTP 302 (146 chars)"
+    },
+    {
+      "id": "V-import_export",
+      "label": "GET /import_export/",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/"
+      },
+      "output_received": "HTTP 302 (145 chars)"
+    },
+    {
+      "id": "V-import_export/full_raw_export",
+      "label": "GET /import_export/full_raw_export",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/full_raw_export",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/full_raw_export"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-import_export/tenant_db_export",
+      "label": "GET /import_export/tenant_db_export",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/tenant_db_export",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/tenant_db_export"
+      },
+      "output_received": "HTTP 302 (161 chars)"
+    },
+    {
+      "id": "V-import_export/full_raw_import_history",
+      "label": "GET /import_export/full_raw_import_history",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/full_raw_import_history",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/full_raw_import_history"
+      },
+      "output_received": "HTTP 302 (168 chars)"
+    },
+    {
+      "id": "V-import_export/app_upgrade",
+      "label": "GET /import_export/app_upgrade",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/app_upgrade",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/app_upgrade"
+      },
+      "output_received": "HTTP 302 (156 chars)"
+    },
+    {
+      "id": "V-import_export/export",
+      "label": "GET /import_export/export",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/export",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/export"
+      },
+      "output_received": "HTTP 302 (151 chars)"
+    },
+    {
+      "id": "V-import_export/full_db_export",
+      "label": "GET /import_export/full_db_export",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/full_db_export",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/full_db_export"
+      },
+      "output_received": "HTTP 302 (159 chars)"
+    },
+    {
+      "id": "V-import_export/export_excel_all",
+      "label": "GET /import_export/export_excel_all",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/export_excel_all",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/export_excel_all"
+      },
+      "output_received": "HTTP 302 (161 chars)"
+    },
+    {
+      "id": "V-import_export/master/export",
+      "label": "GET /import_export/master/export",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/master/export",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/master/export"
+      },
+      "output_received": "HTTP 302 (160 chars)"
+    },
+    {
+      "id": "V-import_export/full_raw_import_history_export",
+      "label": "GET /import_export/full_raw_import_history_export",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/full_raw_import_history_export",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/full_raw_import_history_export"
+      },
+      "output_received": "HTTP 302 (175 chars)"
+    },
+    {
+      "id": "V-inventory/stock_summary",
+      "label": "GET /inventory/stock_summary",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/inventory/stock_summary",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/inventory/stock_summary"
+      },
+      "output_received": "HTTP 302 (154 chars)"
+    },
+    {
+      "id": "V-inventory/daily_transactions",
+      "label": "GET /inventory/daily_transactions",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/inventory/daily_transactions",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/inventory/daily_transactions"
+      },
+      "output_received": "HTTP 302 (159 chars)"
+    },
+    {
+      "id": "V-inventory/inventory_log",
+      "label": "GET /inventory/inventory_log",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/inventory/inventory_log",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/inventory/inventory_log"
+      },
+      "output_received": "HTTP 302 (154 chars)"
+    },
+    {
+      "id": "V-import_export/uploads",
+      "label": "GET /import_export/uploads",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/uploads",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/uploads"
+      },
+      "output_received": "HTTP 302 (152 chars)"
+    },
+    {
+      "id": "V-import_export/history",
+      "label": "GET /import_export/history",
+      "ok": true,
+      "observed": "302",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/import_export/history",
+      "why": "",
+      "input_sent": {
+        "method": "GET",
+        "path": "/import_export/history"
+      },
+      "output_received": "HTTP 302 (152 chars)"
+    },
+    {
+      "id": "STK-1",
+      "label": "DG Cement stock",
+      "ok": true,
+      "observed": "200.0",
+      "expected": "200",
+      "known_defect": null,
+      "page": "/materials",
+      "why": "GRN adds stock; sales subtract (no delivery/cancel endpoints exist in app)",
+      "input_sent": {
+        "received": 300,
+        "cash_sale": 50,
+        "credit_sale": 50
+      },
+      "output_received": "stock_dg=200.0"
+    },
+    {
+      "id": "GRN-CNT",
+      "label": "GRN record exists",
+      "ok": true,
+      "observed": "1",
+      "expected": "1",
+      "known_defect": null,
+      "page": "/grn",
+      "why": "GRN POST should create one GRN row",
+      "input_sent": {
+        "action": "add",
+        "mat_name[]": "DG Cement",
+        "qty[]": "300"
+      },
+      "output_received": "grn_count=1"
+    },
+    {
+      "id": "GRN-ITEM-CNT",
+      "label": "GRN item records exist",
+      "ok": true,
+      "observed": "1",
+      "expected": "1",
+      "known_defect": null,
+      "page": "/grn",
+      "why": "GRN item POST should create GRN item rows",
+      "input_sent": {
+        "mat_name[]": "DG Cement",
+        "qty[]": "300"
+      },
+      "output_received": "grn_item_count=1"
+    },
+    {
+      "id": "BK-CNT",
+      "label": "Booking record exists",
+      "ok": true,
+      "observed": "1",
+      "expected": "1",
+      "known_defect": null,
+      "page": "/bookings",
+      "why": "Booking POST should create one booking row",
+      "input_sent": {
+        "client_code": "CYC-CL-1",
+        "material_name[]": "DG Cement",
+        "qty[]": "200"
+      },
+      "output_received": "booking_count=1"
+    },
+    {
+      "id": "BK-ITEM-CNT",
+      "label": "Booking item records exist",
+      "ok": true,
+      "observed": "1",
+      "expected": "1",
+      "known_defect": null,
+      "page": "/bookings",
+      "why": "Booking item POST should create booking_item rows",
+      "input_sent": {
+        "qty[]": "200"
+      },
+      "output_received": "booking_item_count=1"
+    },
+    {
+      "id": "SALE-CNT",
+      "label": "Direct sale records exist",
+      "ok": true,
+      "observed": "2",
+      "expected": "2",
+      "known_defect": null,
+      "page": "/direct_sales",
+      "why": "Two sale POSTs should create two direct_sale rows",
+      "input_sent": {
+        "cash_sale_qty": 50,
+        "credit_sale_qty": 50
+      },
+      "output_received": "direct_sale_count=2"
+    },
+    {
+      "id": "ACC-1",
+      "label": "Main Cash balance",
+      "ok": true,
+      "observed": "300000.0",
+      "expected": "300000",
+      "known_defect": null,
+      "page": "/accounts/accounts",
+      "why": "Cash = opening + booking paid + cash sale paid + credit part paid",
+      "input_sent": {
+        "opening": 200000,
+        "booking_paid": 10000,
+        "cash_sale_paid": 85000,
+        "credit_part_paid": 5000
+      },
+      "output_received": "balance=300000.0"
+    },
+    {
+      "id": "ACC-2",
+      "label": "Meezan Bank balance",
+      "ok": true,
+      "observed": "500000.0",
+      "expected": "500000",
+      "known_defect": null,
+      "page": "/accounts/accounts",
+      "why": "Bank unchanged (no bank payments in this scenario)",
+      "input_sent": {
+        "opening": 500000
+      },
+      "output_received": "balance=500000.0"
+    },
+    {
+      "id": "ACC-3",
+      "label": "Company total (cash + bank)",
+      "ok": true,
+      "observed": "800000.0",
+      "expected": "800000",
+      "known_defect": null,
+      "page": "/accounts/",
+      "why": "Company total = Main Cash + Meezan Bank",
+      "input_sent": {
+        "cash": 300000,
+        "bank": 500000
+      },
+      "output_received": "total=800000.0"
+    },
+    {
+      "id": "ENTRY-CNT",
+      "label": "Stock entry ledger rows",
+      "ok": true,
+      "observed": "3",
+      "expected": "1",
+      "known_defect": null,
+      "page": "/inventory/stock_summary",
+      "why": "Every stock movement should create an Entry row",
+      "input_sent": {
+        "grn_received": 300
+      },
+      "output_received": "entry_count=3"
+    }
+  ],
+  "inputs_tested": [
+    {
+      "cid": "SUP-Ravi",
+      "page": "/add_supplier",
+      "input": {
+        "name": "Ravi Cement Supplier",
+        "phone": "0300-1234567"
+      }
+    },
+    {
+      "cid": "SUP-Kohat",
+      "page": "/add_supplier",
+      "input": {
+        "name": "Kohat Traders",
+        "phone": "0301-7654321"
+      }
+    },
+    {
+      "cid": "CAT-1",
+      "page": "/material_categories/add",
+      "input": {
+        "category_name": "Cement"
+      }
+    },
+    {
+      "cid": "MAT-1",
+      "page": "/add_material",
+      "input": {
+        "material_name": "DG Cement",
+        "unit": "Bag",
+        "code": "DG"
+      }
+    },
+    {
+      "cid": "CLI-1",
+      "page": "/add_client",
+      "input": {
+        "name": "Bilal Construction",
+        "code": "CYC-CL-1"
+      }
+    },
+    {
+      "cid": "DRV-1",
+      "page": "/delivery_persons/add",
+      "input": {
+        "name": "Akram Driver"
+      }
+    },
+    {
+      "cid": "ACC-Main",
+      "page": "/accounts/accounts/add",
+      "input": {
+        "name": "Main Cash",
+        "opening_amount": "200000",
+        "subcategory": "Cash",
+        "type": "Main Cash",
+        "channel": "cash"
+      }
+    },
+    {
+      "cid": "ACC-Bank",
+      "page": "/accounts/accounts/add",
+      "input": {
+        "name": "Meezan Bank",
+        "opening_amount": "500000",
+        "subcategory": "Bank",
+        "type": "Operating Bank",
+        "channel": "bank"
+      }
+    },
+    {
+      "cid": "GRN-1",
+      "page": "/grn",
+      "input": {
+        "mat_name[]": "DG Cement",
+        "qty[]": "300",
+        "price[]": "1200"
+      }
+    },
+    {
+      "cid": "BK-1",
+      "page": "/add_booking",
+      "input": {
+        "client_code": "CYC-CL-1",
+        "material_name[]": "DG Cement",
+        "qty[]": "200",
+        "unit_rate[]": "1500",
+        "amount": "300000",
+        "paid_amount": "10000",
+        "payment_account_id": "1"
+      }
+    },
+    {
+      "cid": "SALE-1",
+      "page": "/add_direct_sale",
+      "input": {
+        "category": "Cash",
+        "product_name[]": "DG Cement",
+        "qty[]": "50",
+        "unit_rate[]": "1700",
+        "paid_amount": "85000",
+        "driver_name": "Akram Driver"
+      }
+    },
+    {
+      "cid": "SALE-2",
+      "page": "/add_direct_sale",
+      "input": {
+        "category": "Credit Customer",
+        "product_name[]": "DG Cement",
+        "qty[]": "50",
+        "unit_rate[]": "1650",
+        "paid_amount": "5000",
+        "client_code": "CYC-CL-1",
+        "driver_name": "Akram Driver"
+      }
+    },
+    {
+      "cid": "V-home",
+      "page": "/",
+      "input": {
+        "method": "GET",
+        "path": "/"
+      }
+    },
+    {
+      "cid": "V-login",
+      "page": "/login",
+      "input": {
+        "method": "GET",
+        "path": "/login"
+      }
+    },
+    {
+      "cid": "V-root/recovery",
+      "page": "/root/recovery",
+      "input": {
+        "method": "GET",
+        "path": "/root/recovery"
+      }
+    },
+    {
+      "cid": "V-root/recovery_codes",
+      "page": "/root/recovery_codes",
+      "input": {
+        "method": "GET",
+        "path": "/root/recovery_codes"
+      }
+    },
+    {
+      "cid": "V-logout",
+      "page": "/logout",
+      "input": {
+        "method": "GET",
+        "path": "/logout"
+      }
+    },
+    {
+      "cid": "V-root/backup-settings",
+      "page": "/root/backup-settings",
+      "input": {
+        "method": "GET",
+        "path": "/root/backup-settings"
+      }
+    },
+    {
+      "cid": "V-bookings",
+      "page": "/bookings",
+      "input": {
+        "method": "GET",
+        "path": "/bookings"
+      }
+    },
+    {
+      "cid": "V-payments",
+      "page": "/payments",
+      "input": {
+        "method": "GET",
+        "path": "/payments"
+      }
+    },
+    {
+      "cid": "V-direct_sales",
+      "page": "/direct_sales",
+      "input": {
+        "method": "GET",
+        "path": "/direct_sales"
+      }
+    },
+    {
+      "cid": "V-material_returns",
+      "page": "/material_returns",
+      "input": {
+        "method": "GET",
+        "path": "/material_returns"
+      }
+    },
+    {
+      "cid": "V-pending_bills",
+      "page": "/pending_bills",
+      "input": {
+        "method": "GET",
+        "path": "/pending_bills"
+      }
+    },
+    {
+      "cid": "V-mixed_transactions",
+      "page": "/mixed_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/mixed_transactions"
+      }
+    },
+    {
+      "cid": "V-clients",
+      "page": "/clients",
+      "input": {
+        "method": "GET",
+        "path": "/clients"
+      }
+    },
+    {
+      "cid": "V-client-ledger/categories",
+      "page": "/client-ledger/categories",
+      "input": {
+        "method": "GET",
+        "path": "/client-ledger/categories"
+      }
+    },
+    {
+      "cid": "V-suppliers",
+      "page": "/suppliers",
+      "input": {
+        "method": "GET",
+        "path": "/suppliers"
+      }
+    },
+    {
+      "cid": "V-materials",
+      "page": "/materials",
+      "input": {
+        "method": "GET",
+        "path": "/materials"
+      }
+    },
+    {
+      "cid": "V-delivery_persons",
+      "page": "/delivery_persons",
+      "input": {
+        "method": "GET",
+        "path": "/delivery_persons"
+      }
+    },
+    {
+      "cid": "V-services",
+      "page": "/services",
+      "input": {
+        "method": "GET",
+        "path": "/services"
+      }
+    },
+    {
+      "cid": "V-ledger",
+      "page": "/ledger",
+      "input": {
+        "method": "GET",
+        "path": "/ledger"
+      }
+    },
+    {
+      "cid": "V-decision_ledger",
+      "page": "/decision_ledger",
+      "input": {
+        "method": "GET",
+        "path": "/decision_ledger"
+      }
+    },
+    {
+      "cid": "V-api/delivery_persons/search",
+      "page": "/api/delivery_persons/search",
+      "input": {
+        "method": "GET",
+        "path": "/api/delivery_persons/search"
+      }
+    },
+    {
+      "cid": "V-dispatching",
+      "page": "/dispatching",
+      "input": {
+        "method": "GET",
+        "path": "/dispatching"
+      }
+    },
+    {
+      "cid": "V-tracking",
+      "page": "/tracking",
+      "input": {
+        "method": "GET",
+        "path": "/tracking"
+      }
+    },
+    {
+      "cid": "V-delivery_rents",
+      "page": "/delivery_rents",
+      "input": {
+        "method": "GET",
+        "path": "/delivery_rents"
+      }
+    },
+    {
+      "cid": "V-grn",
+      "page": "/grn",
+      "input": {
+        "method": "GET",
+        "path": "/grn"
+      }
+    },
+    {
+      "cid": "V-current_payables",
+      "page": "/current_payables",
+      "input": {
+        "method": "GET",
+        "path": "/current_payables"
+      }
+    },
+    {
+      "cid": "V-unpaid_transactions",
+      "page": "/unpaid_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/unpaid_transactions"
+      }
+    },
+    {
+      "cid": "V-api/current_payables",
+      "page": "/api/current_payables",
+      "input": {
+        "method": "GET",
+        "path": "/api/current_payables"
+      }
+    },
+    {
+      "cid": "V-export_current_payables",
+      "page": "/export_current_payables",
+      "input": {
+        "method": "GET",
+        "path": "/export_current_payables"
+      }
+    },
+    {
+      "cid": "V-financial_details",
+      "page": "/financial_details",
+      "input": {
+        "method": "GET",
+        "path": "/financial_details"
+      }
+    },
+    {
+      "cid": "V-profit_reports",
+      "page": "/profit_reports",
+      "input": {
+        "method": "GET",
+        "path": "/profit_reports"
+      }
+    },
+    {
+      "cid": "V-profit_reports/export/pdf",
+      "page": "/profit_reports/export/pdf",
+      "input": {
+        "method": "GET",
+        "path": "/profit_reports/export/pdf"
+      }
+    },
+    {
+      "cid": "V-profit_reports/export/excel",
+      "page": "/profit_reports/export/excel",
+      "input": {
+        "method": "GET",
+        "path": "/profit_reports/export/excel"
+      }
+    },
+    {
+      "cid": "V-stock_summary",
+      "page": "/stock_summary",
+      "input": {
+        "method": "GET",
+        "path": "/stock_summary"
+      }
+    },
+    {
+      "cid": "V-daily_transactions",
+      "page": "/daily_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/daily_transactions"
+      }
+    },
+    {
+      "cid": "V-cash_flow/meta/categories",
+      "page": "/cash_flow/meta/categories",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow/meta/categories"
+      }
+    },
+    {
+      "cid": "V-cash_flow/meta/subcategories",
+      "page": "/cash_flow/meta/subcategories",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow/meta/subcategories"
+      }
+    },
+    {
+      "cid": "V-cash_flow/meta/parties",
+      "page": "/cash_flow/meta/parties",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow/meta/parties"
+      }
+    },
+    {
+      "cid": "V-cash_flow",
+      "page": "/cash_flow",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow"
+      }
+    },
+    {
+      "cid": "V-cash_flow_differences",
+      "page": "/cash_flow_differences",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow_differences"
+      }
+    },
+    {
+      "cid": "V-daily_reconciliation",
+      "page": "/daily_reconciliation",
+      "input": {
+        "method": "GET",
+        "path": "/daily_reconciliation"
+      }
+    },
+    {
+      "cid": "V-financial_tracker",
+      "page": "/financial_tracker",
+      "input": {
+        "method": "GET",
+        "path": "/financial_tracker"
+      }
+    },
+    {
+      "cid": "V-api/ui/theme",
+      "page": "/api/ui/theme",
+      "input": {
+        "method": "GET",
+        "path": "/api/ui/theme"
+      }
+    },
+    {
+      "cid": "V-api/last_sold_price",
+      "page": "/api/last_sold_price",
+      "input": {
+        "method": "GET",
+        "path": "/api/last_sold_price"
+      }
+    },
+    {
+      "cid": "V-api/material_next_code",
+      "page": "/api/material_next_code",
+      "input": {
+        "method": "GET",
+        "path": "/api/material_next_code"
+      }
+    },
+    {
+      "cid": "V-api/client_next_code",
+      "page": "/api/client_next_code",
+      "input": {
+        "method": "GET",
+        "path": "/api/client_next_code"
+      }
+    },
+    {
+      "cid": "V-api/notifications/due",
+      "page": "/api/notifications/due",
+      "input": {
+        "method": "GET",
+        "path": "/api/notifications/due"
+      }
+    },
+    {
+      "cid": "V-api/ledger_revision",
+      "page": "/api/ledger_revision",
+      "input": {
+        "method": "GET",
+        "path": "/api/ledger_revision"
+      }
+    },
+    {
+      "cid": "V-api/grn_consumption",
+      "page": "/api/grn_consumption",
+      "input": {
+        "method": "GET",
+        "path": "/api/grn_consumption"
+      }
+    },
+    {
+      "cid": "V-api/clients/search",
+      "page": "/api/clients/search",
+      "input": {
+        "method": "GET",
+        "path": "/api/clients/search"
+      }
+    },
+    {
+      "cid": "V-api/suppliers/search",
+      "page": "/api/suppliers/search",
+      "input": {
+        "method": "GET",
+        "path": "/api/suppliers/search"
+      }
+    },
+    {
+      "cid": "V-api/audit/financial-integrity",
+      "page": "/api/audit/financial-integrity",
+      "input": {
+        "method": "GET",
+        "path": "/api/audit/financial-integrity"
+      }
+    },
+    {
+      "cid": "V-debug/db",
+      "page": "/debug/db",
+      "input": {
+        "method": "GET",
+        "path": "/debug/db"
+      }
+    },
+    {
+      "cid": "V-settings",
+      "page": "/settings",
+      "input": {
+        "method": "GET",
+        "path": "/settings"
+      }
+    },
+    {
+      "cid": "V-settings/activity",
+      "page": "/settings/activity",
+      "input": {
+        "method": "GET",
+        "path": "/settings/activity"
+      }
+    },
+    {
+      "cid": "V-settings/sessions",
+      "page": "/settings/sessions",
+      "input": {
+        "method": "GET",
+        "path": "/settings/sessions"
+      }
+    },
+    {
+      "cid": "V-void_audit",
+      "page": "/void_audit",
+      "input": {
+        "method": "GET",
+        "path": "/void_audit"
+      }
+    },
+    {
+      "cid": "V-settings/sidebar",
+      "page": "/settings/sidebar",
+      "input": {
+        "method": "GET",
+        "path": "/settings/sidebar"
+      }
+    },
+    {
+      "cid": "V-notifications",
+      "page": "/notifications",
+      "input": {
+        "method": "GET",
+        "path": "/notifications"
+      }
+    },
+    {
+      "cid": "V-notifications/upcoming",
+      "page": "/notifications/upcoming",
+      "input": {
+        "method": "GET",
+        "path": "/notifications/upcoming"
+      }
+    },
+    {
+      "cid": "V-tenants",
+      "page": "/tenants",
+      "input": {
+        "method": "GET",
+        "path": "/tenants"
+      }
+    },
+    {
+      "cid": "V-export_pending_bills",
+      "page": "/export_pending_bills",
+      "input": {
+        "method": "GET",
+        "path": "/export_pending_bills"
+      }
+    },
+    {
+      "cid": "V-import_pending_bills",
+      "page": "/import_pending_bills",
+      "input": {
+        "method": "GET",
+        "path": "/import_pending_bills"
+      }
+    },
+    {
+      "cid": "V-export_grn",
+      "page": "/export_grn",
+      "input": {
+        "method": "GET",
+        "path": "/export_grn"
+      }
+    },
+    {
+      "cid": "V-export_unpaid_transactions",
+      "page": "/export_unpaid_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/export_unpaid_transactions"
+      }
+    },
+    {
+      "cid": "V-fix_system_issues",
+      "page": "/fix_system_issues",
+      "input": {
+        "method": "GET",
+        "path": "/fix_system_issues"
+      }
+    },
+    {
+      "cid": "V-generate_dummy_data",
+      "page": "/generate_dummy_data",
+      "input": {
+        "method": "GET",
+        "path": "/generate_dummy_data"
+      }
+    },
+    {
+      "cid": "V-system_report",
+      "page": "/system_report",
+      "input": {
+        "method": "GET",
+        "path": "/system_report"
+      }
+    },
+    {
+      "cid": "V-export_clients",
+      "page": "/export_clients",
+      "input": {
+        "method": "GET",
+        "path": "/export_clients"
+      }
+    },
+    {
+      "cid": "V-pay_supplier",
+      "page": "/pay_supplier",
+      "input": {
+        "method": "GET",
+        "path": "/pay_supplier"
+      }
+    },
+    {
+      "cid": "V-legacy-migration",
+      "page": "/legacy-migration/",
+      "input": {
+        "method": "GET",
+        "path": "/legacy-migration/"
+      }
+    },
+    {
+      "cid": "V-home",
+      "page": "/",
+      "input": {
+        "method": "GET",
+        "path": "/"
+      }
+    },
+    {
+      "cid": "V-login",
+      "page": "/login",
+      "input": {
+        "method": "GET",
+        "path": "/login"
+      }
+    },
+    {
+      "cid": "V-root/recovery",
+      "page": "/root/recovery",
+      "input": {
+        "method": "GET",
+        "path": "/root/recovery"
+      }
+    },
+    {
+      "cid": "V-root/recovery_codes",
+      "page": "/root/recovery_codes",
+      "input": {
+        "method": "GET",
+        "path": "/root/recovery_codes"
+      }
+    },
+    {
+      "cid": "V-logout",
+      "page": "/logout",
+      "input": {
+        "method": "GET",
+        "path": "/logout"
+      }
+    },
+    {
+      "cid": "V-root/backup-settings",
+      "page": "/root/backup-settings",
+      "input": {
+        "method": "GET",
+        "path": "/root/backup-settings"
+      }
+    },
+    {
+      "cid": "V-bookings",
+      "page": "/bookings",
+      "input": {
+        "method": "GET",
+        "path": "/bookings"
+      }
+    },
+    {
+      "cid": "V-payments",
+      "page": "/payments",
+      "input": {
+        "method": "GET",
+        "path": "/payments"
+      }
+    },
+    {
+      "cid": "V-direct_sales",
+      "page": "/direct_sales",
+      "input": {
+        "method": "GET",
+        "path": "/direct_sales"
+      }
+    },
+    {
+      "cid": "V-material_returns",
+      "page": "/material_returns",
+      "input": {
+        "method": "GET",
+        "path": "/material_returns"
+      }
+    },
+    {
+      "cid": "V-pending_bills",
+      "page": "/pending_bills",
+      "input": {
+        "method": "GET",
+        "path": "/pending_bills"
+      }
+    },
+    {
+      "cid": "V-mixed_transactions",
+      "page": "/mixed_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/mixed_transactions"
+      }
+    },
+    {
+      "cid": "V-clients",
+      "page": "/clients",
+      "input": {
+        "method": "GET",
+        "path": "/clients"
+      }
+    },
+    {
+      "cid": "V-client-ledger/categories",
+      "page": "/client-ledger/categories",
+      "input": {
+        "method": "GET",
+        "path": "/client-ledger/categories"
+      }
+    },
+    {
+      "cid": "V-suppliers",
+      "page": "/suppliers",
+      "input": {
+        "method": "GET",
+        "path": "/suppliers"
+      }
+    },
+    {
+      "cid": "V-materials",
+      "page": "/materials",
+      "input": {
+        "method": "GET",
+        "path": "/materials"
+      }
+    },
+    {
+      "cid": "V-delivery_persons",
+      "page": "/delivery_persons",
+      "input": {
+        "method": "GET",
+        "path": "/delivery_persons"
+      }
+    },
+    {
+      "cid": "V-services",
+      "page": "/services",
+      "input": {
+        "method": "GET",
+        "path": "/services"
+      }
+    },
+    {
+      "cid": "V-ledger",
+      "page": "/ledger",
+      "input": {
+        "method": "GET",
+        "path": "/ledger"
+      }
+    },
+    {
+      "cid": "V-decision_ledger",
+      "page": "/decision_ledger",
+      "input": {
+        "method": "GET",
+        "path": "/decision_ledger"
+      }
+    },
+    {
+      "cid": "V-api/delivery_persons/search",
+      "page": "/api/delivery_persons/search",
+      "input": {
+        "method": "GET",
+        "path": "/api/delivery_persons/search"
+      }
+    },
+    {
+      "cid": "V-dispatching",
+      "page": "/dispatching",
+      "input": {
+        "method": "GET",
+        "path": "/dispatching"
+      }
+    },
+    {
+      "cid": "V-tracking",
+      "page": "/tracking",
+      "input": {
+        "method": "GET",
+        "path": "/tracking"
+      }
+    },
+    {
+      "cid": "V-delivery_rents",
+      "page": "/delivery_rents",
+      "input": {
+        "method": "GET",
+        "path": "/delivery_rents"
+      }
+    },
+    {
+      "cid": "V-grn",
+      "page": "/grn",
+      "input": {
+        "method": "GET",
+        "path": "/grn"
+      }
+    },
+    {
+      "cid": "V-current_payables",
+      "page": "/current_payables",
+      "input": {
+        "method": "GET",
+        "path": "/current_payables"
+      }
+    },
+    {
+      "cid": "V-api/current_payables",
+      "page": "/api/current_payables",
+      "input": {
+        "method": "GET",
+        "path": "/api/current_payables"
+      }
+    },
+    {
+      "cid": "V-export_current_payables",
+      "page": "/export_current_payables",
+      "input": {
+        "method": "GET",
+        "path": "/export_current_payables"
+      }
+    },
+    {
+      "cid": "V-financial_details",
+      "page": "/financial_details",
+      "input": {
+        "method": "GET",
+        "path": "/financial_details"
+      }
+    },
+    {
+      "cid": "V-profit_reports",
+      "page": "/profit_reports",
+      "input": {
+        "method": "GET",
+        "path": "/profit_reports"
+      }
+    },
+    {
+      "cid": "V-profit_reports/export/pdf",
+      "page": "/profit_reports/export/pdf",
+      "input": {
+        "method": "GET",
+        "path": "/profit_reports/export/pdf"
+      }
+    },
+    {
+      "cid": "V-profit_reports/export/excel",
+      "page": "/profit_reports/export/excel",
+      "input": {
+        "method": "GET",
+        "path": "/profit_reports/export/excel"
+      }
+    },
+    {
+      "cid": "V-stock_summary",
+      "page": "/stock_summary",
+      "input": {
+        "method": "GET",
+        "path": "/stock_summary"
+      }
+    },
+    {
+      "cid": "V-daily_transactions",
+      "page": "/daily_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/daily_transactions"
+      }
+    },
+    {
+      "cid": "V-cash_flow/meta/categories",
+      "page": "/cash_flow/meta/categories",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow/meta/categories"
+      }
+    },
+    {
+      "cid": "V-cash_flow/meta/subcategories",
+      "page": "/cash_flow/meta/subcategories",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow/meta/subcategories"
+      }
+    },
+    {
+      "cid": "V-cash_flow/meta/parties",
+      "page": "/cash_flow/meta/parties",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow/meta/parties"
+      }
+    },
+    {
+      "cid": "V-cash_flow",
+      "page": "/cash_flow",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow"
+      }
+    },
+    {
+      "cid": "V-cash_flow_differences",
+      "page": "/cash_flow_differences",
+      "input": {
+        "method": "GET",
+        "path": "/cash_flow_differences"
+      }
+    },
+    {
+      "cid": "V-daily_reconciliation",
+      "page": "/daily_reconciliation",
+      "input": {
+        "method": "GET",
+        "path": "/daily_reconciliation"
+      }
+    },
+    {
+      "cid": "V-financial_tracker",
+      "page": "/financial_tracker",
+      "input": {
+        "method": "GET",
+        "path": "/financial_tracker"
+      }
+    },
+    {
+      "cid": "V-api/ui/theme",
+      "page": "/api/ui/theme",
+      "input": {
+        "method": "GET",
+        "path": "/api/ui/theme"
+      }
+    },
+    {
+      "cid": "V-api/last_sold_price",
+      "page": "/api/last_sold_price",
+      "input": {
+        "method": "GET",
+        "path": "/api/last_sold_price"
+      }
+    },
+    {
+      "cid": "V-api/material_next_code",
+      "page": "/api/material_next_code",
+      "input": {
+        "method": "GET",
+        "path": "/api/material_next_code"
+      }
+    },
+    {
+      "cid": "V-api/client_next_code",
+      "page": "/api/client_next_code",
+      "input": {
+        "method": "GET",
+        "path": "/api/client_next_code"
+      }
+    },
+    {
+      "cid": "V-api/notifications/due",
+      "page": "/api/notifications/due",
+      "input": {
+        "method": "GET",
+        "path": "/api/notifications/due"
+      }
+    },
+    {
+      "cid": "V-api/ledger_revision",
+      "page": "/api/ledger_revision",
+      "input": {
+        "method": "GET",
+        "path": "/api/ledger_revision"
+      }
+    },
+    {
+      "cid": "V-api/grn_consumption",
+      "page": "/api/grn_consumption",
+      "input": {
+        "method": "GET",
+        "path": "/api/grn_consumption"
+      }
+    },
+    {
+      "cid": "V-api/clients/search",
+      "page": "/api/clients/search",
+      "input": {
+        "method": "GET",
+        "path": "/api/clients/search"
+      }
+    },
+    {
+      "cid": "V-api/suppliers/search",
+      "page": "/api/suppliers/search",
+      "input": {
+        "method": "GET",
+        "path": "/api/suppliers/search"
+      }
+    },
+    {
+      "cid": "V-api/audit/financial-integrity",
+      "page": "/api/audit/financial-integrity",
+      "input": {
+        "method": "GET",
+        "path": "/api/audit/financial-integrity"
+      }
+    },
+    {
+      "cid": "V-debug/db",
+      "page": "/debug/db",
+      "input": {
+        "method": "GET",
+        "path": "/debug/db"
+      }
+    },
+    {
+      "cid": "V-settings",
+      "page": "/settings",
+      "input": {
+        "method": "GET",
+        "path": "/settings"
+      }
+    },
+    {
+      "cid": "V-settings/activity",
+      "page": "/settings/activity",
+      "input": {
+        "method": "GET",
+        "path": "/settings/activity"
+      }
+    },
+    {
+      "cid": "V-settings/sessions",
+      "page": "/settings/sessions",
+      "input": {
+        "method": "GET",
+        "path": "/settings/sessions"
+      }
+    },
+    {
+      "cid": "V-void_audit",
+      "page": "/void_audit",
+      "input": {
+        "method": "GET",
+        "path": "/void_audit"
+      }
+    },
+    {
+      "cid": "V-settings/sidebar",
+      "page": "/settings/sidebar",
+      "input": {
+        "method": "GET",
+        "path": "/settings/sidebar"
+      }
+    },
+    {
+      "cid": "V-notifications",
+      "page": "/notifications",
+      "input": {
+        "method": "GET",
+        "path": "/notifications"
+      }
+    },
+    {
+      "cid": "V-notifications/upcoming",
+      "page": "/notifications/upcoming",
+      "input": {
+        "method": "GET",
+        "path": "/notifications/upcoming"
+      }
+    },
+    {
+      "cid": "V-tenants",
+      "page": "/tenants",
+      "input": {
+        "method": "GET",
+        "path": "/tenants"
+      }
+    },
+    {
+      "cid": "V-export_pending_bills",
+      "page": "/export_pending_bills",
+      "input": {
+        "method": "GET",
+        "path": "/export_pending_bills"
+      }
+    },
+    {
+      "cid": "V-import_pending_bills",
+      "page": "/import_pending_bills",
+      "input": {
+        "method": "GET",
+        "path": "/import_pending_bills"
+      }
+    },
+    {
+      "cid": "V-export_grn",
+      "page": "/export_grn",
+      "input": {
+        "method": "GET",
+        "path": "/export_grn"
+      }
+    },
+    {
+      "cid": "V-export_unpaid_transactions",
+      "page": "/export_unpaid_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/export_unpaid_transactions"
+      }
+    },
+    {
+      "cid": "V-fix_system_issues",
+      "page": "/fix_system_issues",
+      "input": {
+        "method": "GET",
+        "path": "/fix_system_issues"
+      }
+    },
+    {
+      "cid": "V-generate_dummy_data",
+      "page": "/generate_dummy_data",
+      "input": {
+        "method": "GET",
+        "path": "/generate_dummy_data"
+      }
+    },
+    {
+      "cid": "V-system_report",
+      "page": "/system_report",
+      "input": {
+        "method": "GET",
+        "path": "/system_report"
+      }
+    },
+    {
+      "cid": "V-export_clients",
+      "page": "/export_clients",
+      "input": {
+        "method": "GET",
+        "path": "/export_clients"
+      }
+    },
+    {
+      "cid": "V-pay_supplier",
+      "page": "/pay_supplier",
+      "input": {
+        "method": "GET",
+        "path": "/pay_supplier"
+      }
+    },
+    {
+      "cid": "V-legacy-migration",
+      "page": "/legacy-migration/",
+      "input": {
+        "method": "GET",
+        "path": "/legacy-migration/"
+      }
+    },
+    {
+      "cid": "V-accounts/audit",
+      "page": "/accounts/audit",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/audit"
+      }
+    },
+    {
+      "cid": "V-accounts",
+      "page": "/accounts/",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/"
+      }
+    },
+    {
+      "cid": "V-accounts/payments/clients",
+      "page": "/accounts/payments/clients",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/payments/clients"
+      }
+    },
+    {
+      "cid": "V-accounts/payments/suppliers",
+      "page": "/accounts/payments/suppliers",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/payments/suppliers"
+      }
+    },
+    {
+      "cid": "V-accounts/expenditures",
+      "page": "/accounts/expenditures",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/expenditures"
+      }
+    },
+    {
+      "cid": "V-accounts/receipts",
+      "page": "/accounts/receipts",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/receipts"
+      }
+    },
+    {
+      "cid": "V-accounts/grn_payments",
+      "page": "/accounts/grn_payments",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/grn_payments"
+      }
+    },
+    {
+      "cid": "V-accounts/purchase_payables",
+      "page": "/accounts/purchase_payables",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/purchase_payables"
+      }
+    },
+    {
+      "cid": "V-accounts/accounts",
+      "page": "/accounts/accounts",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/accounts"
+      }
+    },
+    {
+      "cid": "V-accounts/accounts/add",
+      "page": "/accounts/accounts/add",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/accounts/add"
+      }
+    },
+    {
+      "cid": "V-accounts/reconciliations",
+      "page": "/accounts/reconciliations",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/reconciliations"
+      }
+    },
+    {
+      "cid": "V-accounts/categories",
+      "page": "/accounts/categories",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/categories"
+      }
+    },
+    {
+      "cid": "V-accounts/transfers",
+      "page": "/accounts/transfers",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/transfers"
+      }
+    },
+    {
+      "cid": "V-accounts/transfers/add",
+      "page": "/accounts/transfers/add",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/transfers/add"
+      }
+    },
+    {
+      "cid": "V-accounts/api/kpi/client_payments",
+      "page": "/accounts/api/kpi/client_payments",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/client_payments"
+      }
+    },
+    {
+      "cid": "V-accounts/api/kpi/supplier_payments",
+      "page": "/accounts/api/kpi/supplier_payments",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/supplier_payments"
+      }
+    },
+    {
+      "cid": "V-accounts/api/kpi/expenditures",
+      "page": "/accounts/api/kpi/expenditures",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/expenditures"
+      }
+    },
+    {
+      "cid": "V-accounts/api/kpi/receipts",
+      "page": "/accounts/api/kpi/receipts",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/receipts"
+      }
+    },
+    {
+      "cid": "V-accounts/api/kpi/company_money",
+      "page": "/accounts/api/kpi/company_money",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/api/kpi/company_money"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/client_payments",
+      "page": "/accounts/kpi/client_payments",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/client_payments"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/supplier_payments",
+      "page": "/accounts/kpi/supplier_payments",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/supplier_payments"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/expenditures",
+      "page": "/accounts/kpi/expenditures",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/expenditures"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/receipts",
+      "page": "/accounts/kpi/receipts",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/receipts"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/company_money",
+      "page": "/accounts/kpi/company_money",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/company_money"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/cash_money",
+      "page": "/accounts/kpi/cash_money",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/cash_money"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/cash_accounts",
+      "page": "/accounts/kpi/cash_accounts",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/cash_accounts"
+      }
+    },
+    {
+      "cid": "V-accounts/kpi/bank_accounts",
+      "page": "/accounts/kpi/bank_accounts",
+      "input": {
+        "method": "GET",
+        "path": "/accounts/kpi/bank_accounts"
+      }
+    },
+    {
+      "cid": "V-admin",
+      "page": "/admin/",
+      "input": {
+        "method": "GET",
+        "path": "/admin/"
+      }
+    },
+    {
+      "cid": "V-admin/modules",
+      "page": "/admin/modules",
+      "input": {
+        "method": "GET",
+        "path": "/admin/modules"
+      }
+    },
+    {
+      "cid": "V-admin/api/modules",
+      "page": "/admin/api/modules",
+      "input": {
+        "method": "GET",
+        "path": "/admin/api/modules"
+      }
+    },
+    {
+      "cid": "V-admin/api/health",
+      "page": "/admin/api/health",
+      "input": {
+        "method": "GET",
+        "path": "/admin/api/health"
+      }
+    },
+    {
+      "cid": "V-data_lab",
+      "page": "/data_lab/",
+      "input": {
+        "method": "GET",
+        "path": "/data_lab/"
+      }
+    },
+    {
+      "cid": "V-data_lab/basket",
+      "page": "/data_lab/basket",
+      "input": {
+        "method": "GET",
+        "path": "/data_lab/basket"
+      }
+    },
+    {
+      "cid": "V-import_export",
+      "page": "/import_export/",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/"
+      }
+    },
+    {
+      "cid": "V-import_export/full_raw_export",
+      "page": "/import_export/full_raw_export",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/full_raw_export"
+      }
+    },
+    {
+      "cid": "V-import_export/tenant_db_export",
+      "page": "/import_export/tenant_db_export",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/tenant_db_export"
+      }
+    },
+    {
+      "cid": "V-import_export/full_raw_import_history",
+      "page": "/import_export/full_raw_import_history",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/full_raw_import_history"
+      }
+    },
+    {
+      "cid": "V-import_export/app_upgrade",
+      "page": "/import_export/app_upgrade",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/app_upgrade"
+      }
+    },
+    {
+      "cid": "V-import_export/export",
+      "page": "/import_export/export",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/export"
+      }
+    },
+    {
+      "cid": "V-import_export/full_db_export",
+      "page": "/import_export/full_db_export",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/full_db_export"
+      }
+    },
+    {
+      "cid": "V-import_export/export_excel_all",
+      "page": "/import_export/export_excel_all",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/export_excel_all"
+      }
+    },
+    {
+      "cid": "V-import_export/master/export",
+      "page": "/import_export/master/export",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/master/export"
+      }
+    },
+    {
+      "cid": "V-import_export/full_raw_import_history_export",
+      "page": "/import_export/full_raw_import_history_export",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/full_raw_import_history_export"
+      }
+    },
+    {
+      "cid": "V-inventory/stock_summary",
+      "page": "/inventory/stock_summary",
+      "input": {
+        "method": "GET",
+        "path": "/inventory/stock_summary"
+      }
+    },
+    {
+      "cid": "V-inventory/daily_transactions",
+      "page": "/inventory/daily_transactions",
+      "input": {
+        "method": "GET",
+        "path": "/inventory/daily_transactions"
+      }
+    },
+    {
+      "cid": "V-inventory/inventory_log",
+      "page": "/inventory/inventory_log",
+      "input": {
+        "method": "GET",
+        "path": "/inventory/inventory_log"
+      }
+    },
+    {
+      "cid": "V-import_export/uploads",
+      "page": "/import_export/uploads",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/uploads"
+      }
+    },
+    {
+      "cid": "V-import_export/history",
+      "page": "/import_export/history",
+      "input": {
+        "method": "GET",
+        "path": "/import_export/history"
+      }
+    },
+    {
+      "cid": "STK-1",
+      "page": "/materials",
+      "input": {
+        "received": 300,
+        "cash_sale": 50,
+        "credit_sale": 50
+      }
+    },
+    {
+      "cid": "GRN-CNT",
+      "page": "/grn",
+      "input": {
+        "action": "add",
+        "mat_name[]": "DG Cement",
+        "qty[]": "300"
+      }
+    },
+    {
+      "cid": "GRN-ITEM-CNT",
+      "page": "/grn",
+      "input": {
+        "mat_name[]": "DG Cement",
+        "qty[]": "300"
+      }
+    },
+    {
+      "cid": "BK-CNT",
+      "page": "/bookings",
+      "input": {
+        "client_code": "CYC-CL-1",
+        "material_name[]": "DG Cement",
+        "qty[]": "200"
+      }
+    },
+    {
+      "cid": "BK-ITEM-CNT",
+      "page": "/bookings",
+      "input": {
+        "qty[]": "200"
+      }
+    },
+    {
+      "cid": "SALE-CNT",
+      "page": "/direct_sales",
+      "input": {
+        "cash_sale_qty": 50,
+        "credit_sale_qty": 50
+      }
+    },
+    {
+      "cid": "ACC-1",
+      "page": "/accounts/accounts",
+      "input": {
+        "opening": 200000,
+        "booking_paid": 10000,
+        "cash_sale_paid": 85000,
+        "credit_part_paid": 5000
+      }
+    },
+    {
+      "cid": "ACC-2",
+      "page": "/accounts/accounts",
+      "input": {
+        "opening": 500000
+      }
+    },
+    {
+      "cid": "ACC-3",
+      "page": "/accounts/",
+      "input": {
+        "cash": 300000,
+        "bank": 500000
+      }
+    },
+    {
+      "cid": "ENTRY-CNT",
+      "page": "/inventory/stock_summary",
+      "input": {
+        "grn_received": 300
+      }
+    }
+  ],
+  "outputs_observed": [
+    {
+      "cid": "SUP-Ravi",
+      "page": "/add_supplier",
+      "output": "success: Supplier Added \u2014 by Admin"
+    },
+    {
+      "cid": "SUP-Kohat",
+      "page": "/add_supplier",
+      "output": "success: Supplier Added \u2014 by Admin"
+    },
+    {
+      "cid": "CAT-1",
+      "page": "/material_categories/add",
+      "output": "success: Category added \u2014 by Admin"
+    },
+    {
+      "cid": "MAT-1",
+      "page": "/add_material",
+      "output": "success: Brand Added \u2014 by Admin"
+    },
+    {
+      "cid": "CLI-1",
+      "page": "/add_client",
+      "output": "success: Client Registered \u2014 by Admin"
+    },
+    {
+      "cid": "DRV-1",
+      "page": "/delivery_persons/add",
+      "output": "success: Delivery person saved \u2014 by Admin"
+    },
+    {
+      "cid": "ACC-Main",
+      "page": "/accounts/accounts/add",
+      "output": "success: Account added successfully! \u2014 by Admin"
+    },
+    {
+      "cid": "ACC-Bank",
+      "page": "/accounts/accounts/add",
+      "output": "success: Account added successfully! \u2014 by Admin"
+    },
+    {
+      "cid": "GRN-1",
+      "page": "/grn",
+      "output": "success: GRN added successfully! \u2014 by Admin"
+    },
+    {
+      "cid": "BK-1",
+      "page": "/add_booking",
+      "output": "success: Booking added successfully (Bill: MB NO.BK-SCENARIO-001) \u00e2\u20ac\u201d Pending amount: 290000.0 \u2014 by Admin"
+    },
+    {
+      "cid": "SALE-1",
+      "page": "/add_direct_sale",
+      "output": "success: Direct sale added successfully \u2014 by Admin"
+    },
+    {
+      "cid": "SALE-2",
+      "page": "/add_direct_sale",
+      "output": "success: Direct sale added successfully \u2014 by Admin"
+    },
+    {
+      "cid": "V-home",
+      "page": "/",
+      "output": "HTTP 200 (1649 chars)"
+    },
+    {
+      "cid": "V-login",
+      "page": "/login",
+      "output": "HTTP 302 (115 chars)"
+    },
+    {
+      "cid": "V-root/recovery",
+      "page": "/root/recovery",
+      "output": "HTTP 404 (144 chars)"
+    },
+    {
+      "cid": "V-root/recovery_codes",
+      "page": "/root/recovery_codes",
+      "output": "HTTP 404 (144 chars)"
+    },
+    {
+      "cid": "V-logout",
+      "page": "/logout",
+      "output": "HTTP 302 (120 chars)"
+    },
+    {
+      "cid": "V-root/backup-settings",
+      "page": "/root/backup-settings",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-bookings",
+      "page": "/bookings",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-payments",
+      "page": "/payments",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-direct_sales",
+      "page": "/direct_sales",
+      "output": "HTTP 302 (141 chars)"
+    },
+    {
+      "cid": "V-material_returns",
+      "page": "/material_returns",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-pending_bills",
+      "page": "/pending_bills",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-mixed_transactions",
+      "page": "/mixed_transactions",
+      "output": "HTTP 302 (147 chars)"
+    },
+    {
+      "cid": "V-clients",
+      "page": "/clients",
+      "output": "HTTP 302 (136 chars)"
+    },
+    {
+      "cid": "V-client-ledger/categories",
+      "page": "/client-ledger/categories",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-suppliers",
+      "page": "/suppliers",
+      "output": "HTTP 302 (138 chars)"
+    },
+    {
+      "cid": "V-materials",
+      "page": "/materials",
+      "output": "HTTP 302 (138 chars)"
+    },
+    {
+      "cid": "V-delivery_persons",
+      "page": "/delivery_persons",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-services",
+      "page": "/services",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-ledger",
+      "page": "/ledger",
+      "output": "HTTP 302 (135 chars)"
+    },
+    {
+      "cid": "V-decision_ledger",
+      "page": "/decision_ledger",
+      "output": "HTTP 302 (144 chars)"
+    },
+    {
+      "cid": "V-api/delivery_persons/search",
+      "page": "/api/delivery_persons/search",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-dispatching",
+      "page": "/dispatching",
+      "output": "HTTP 302 (140 chars)"
+    },
+    {
+      "cid": "V-tracking",
+      "page": "/tracking",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-delivery_rents",
+      "page": "/delivery_rents",
+      "output": "HTTP 302 (143 chars)"
+    },
+    {
+      "cid": "V-grn",
+      "page": "/grn",
+      "output": "HTTP 302 (132 chars)"
+    },
+    {
+      "cid": "V-current_payables",
+      "page": "/current_payables",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-unpaid_transactions",
+      "page": "/unpaid_transactions",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-api/current_payables",
+      "page": "/api/current_payables",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-export_current_payables",
+      "page": "/export_current_payables",
+      "output": "HTTP 302 (152 chars)"
+    },
+    {
+      "cid": "V-financial_details",
+      "page": "/financial_details",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-profit_reports",
+      "page": "/profit_reports",
+      "output": "HTTP 302 (143 chars)"
+    },
+    {
+      "cid": "V-profit_reports/export/pdf",
+      "page": "/profit_reports/export/pdf",
+      "output": "HTTP 302 (158 chars)"
+    },
+    {
+      "cid": "V-profit_reports/export/excel",
+      "page": "/profit_reports/export/excel",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-stock_summary",
+      "page": "/stock_summary",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-daily_transactions",
+      "page": "/daily_transactions",
+      "output": "HTTP 302 (147 chars)"
+    },
+    {
+      "cid": "V-cash_flow/meta/categories",
+      "page": "/cash_flow/meta/categories",
+      "output": "HTTP 302 (158 chars)"
+    },
+    {
+      "cid": "V-cash_flow/meta/subcategories",
+      "page": "/cash_flow/meta/subcategories",
+      "output": "HTTP 302 (161 chars)"
+    },
+    {
+      "cid": "V-cash_flow/meta/parties",
+      "page": "/cash_flow/meta/parties",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-cash_flow",
+      "page": "/cash_flow",
+      "output": "HTTP 302 (138 chars)"
+    },
+    {
+      "cid": "V-cash_flow_differences",
+      "page": "/cash_flow_differences",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-daily_reconciliation",
+      "page": "/daily_reconciliation",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-financial_tracker",
+      "page": "/financial_tracker",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-api/ui/theme",
+      "page": "/api/ui/theme",
+      "output": "HTTP 200 (14 chars)"
+    },
+    {
+      "cid": "V-api/last_sold_price",
+      "page": "/api/last_sold_price",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-api/material_next_code",
+      "page": "/api/material_next_code",
+      "output": "HTTP 302 (153 chars)"
+    },
+    {
+      "cid": "V-api/client_next_code",
+      "page": "/api/client_next_code",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-api/notifications/due",
+      "page": "/api/notifications/due",
+      "output": "HTTP 302 (154 chars)"
+    },
+    {
+      "cid": "V-api/ledger_revision",
+      "page": "/api/ledger_revision",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-api/grn_consumption",
+      "page": "/api/grn_consumption",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-api/clients/search",
+      "page": "/api/clients/search",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-api/suppliers/search",
+      "page": "/api/suppliers/search",
+      "output": "HTTP 302 (153 chars)"
+    },
+    {
+      "cid": "V-api/audit/financial-integrity",
+      "page": "/api/audit/financial-integrity",
+      "output": "HTTP 302 (162 chars)"
+    },
+    {
+      "cid": "V-debug/db",
+      "page": "/debug/db",
+      "output": "HTTP 302 (139 chars)"
+    },
+    {
+      "cid": "V-settings",
+      "page": "/settings",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-settings/activity",
+      "page": "/settings/activity",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-settings/sessions",
+      "page": "/settings/sessions",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-void_audit",
+      "page": "/void_audit",
+      "output": "HTTP 302 (139 chars)"
+    },
+    {
+      "cid": "V-settings/sidebar",
+      "page": "/settings/sidebar",
+      "output": "HTTP 302 (147 chars)"
+    },
+    {
+      "cid": "V-notifications",
+      "page": "/notifications",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-notifications/upcoming",
+      "page": "/notifications/upcoming",
+      "output": "HTTP 302 (153 chars)"
+    },
+    {
+      "cid": "V-tenants",
+      "page": "/tenants",
+      "output": "HTTP 302 (136 chars)"
+    },
+    {
+      "cid": "V-export_pending_bills",
+      "page": "/export_pending_bills",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-import_pending_bills",
+      "page": "/import_pending_bills",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-export_grn",
+      "page": "/export_grn",
+      "output": "HTTP 302 (139 chars)"
+    },
+    {
+      "cid": "V-export_unpaid_transactions",
+      "page": "/export_unpaid_transactions",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-fix_system_issues",
+      "page": "/fix_system_issues",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-generate_dummy_data",
+      "page": "/generate_dummy_data",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-system_report",
+      "page": "/system_report",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-export_clients",
+      "page": "/export_clients",
+      "output": "HTTP 302 (143 chars)"
+    },
+    {
+      "cid": "V-pay_supplier",
+      "page": "/pay_supplier",
+      "output": "HTTP 302 (141 chars)"
+    },
+    {
+      "cid": "V-legacy-migration",
+      "page": "/legacy-migration/",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-home",
+      "page": "/",
+      "output": "HTTP 302 (129 chars)"
+    },
+    {
+      "cid": "V-login",
+      "page": "/login",
+      "output": "HTTP 200 (2484 chars)"
+    },
+    {
+      "cid": "V-root/recovery",
+      "page": "/root/recovery",
+      "output": "HTTP 404 (144 chars)"
+    },
+    {
+      "cid": "V-root/recovery_codes",
+      "page": "/root/recovery_codes",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-logout",
+      "page": "/logout",
+      "output": "HTTP 302 (135 chars)"
+    },
+    {
+      "cid": "V-root/backup-settings",
+      "page": "/root/backup-settings",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-bookings",
+      "page": "/bookings",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-payments",
+      "page": "/payments",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-direct_sales",
+      "page": "/direct_sales",
+      "output": "HTTP 302 (141 chars)"
+    },
+    {
+      "cid": "V-material_returns",
+      "page": "/material_returns",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-pending_bills",
+      "page": "/pending_bills",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-mixed_transactions",
+      "page": "/mixed_transactions",
+      "output": "HTTP 302 (147 chars)"
+    },
+    {
+      "cid": "V-clients",
+      "page": "/clients",
+      "output": "HTTP 302 (136 chars)"
+    },
+    {
+      "cid": "V-client-ledger/categories",
+      "page": "/client-ledger/categories",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-suppliers",
+      "page": "/suppliers",
+      "output": "HTTP 302 (138 chars)"
+    },
+    {
+      "cid": "V-materials",
+      "page": "/materials",
+      "output": "HTTP 302 (138 chars)"
+    },
+    {
+      "cid": "V-delivery_persons",
+      "page": "/delivery_persons",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-services",
+      "page": "/services",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-ledger",
+      "page": "/ledger",
+      "output": "HTTP 302 (135 chars)"
+    },
+    {
+      "cid": "V-decision_ledger",
+      "page": "/decision_ledger",
+      "output": "HTTP 302 (144 chars)"
+    },
+    {
+      "cid": "V-api/delivery_persons/search",
+      "page": "/api/delivery_persons/search",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-dispatching",
+      "page": "/dispatching",
+      "output": "HTTP 302 (140 chars)"
+    },
+    {
+      "cid": "V-tracking",
+      "page": "/tracking",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-delivery_rents",
+      "page": "/delivery_rents",
+      "output": "HTTP 302 (143 chars)"
+    },
+    {
+      "cid": "V-grn",
+      "page": "/grn",
+      "output": "HTTP 302 (132 chars)"
+    },
+    {
+      "cid": "V-current_payables",
+      "page": "/current_payables",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-api/current_payables",
+      "page": "/api/current_payables",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-export_current_payables",
+      "page": "/export_current_payables",
+      "output": "HTTP 302 (152 chars)"
+    },
+    {
+      "cid": "V-financial_details",
+      "page": "/financial_details",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-profit_reports",
+      "page": "/profit_reports",
+      "output": "HTTP 302 (143 chars)"
+    },
+    {
+      "cid": "V-profit_reports/export/pdf",
+      "page": "/profit_reports/export/pdf",
+      "output": "HTTP 302 (158 chars)"
+    },
+    {
+      "cid": "V-profit_reports/export/excel",
+      "page": "/profit_reports/export/excel",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-stock_summary",
+      "page": "/stock_summary",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-daily_transactions",
+      "page": "/daily_transactions",
+      "output": "HTTP 302 (147 chars)"
+    },
+    {
+      "cid": "V-cash_flow/meta/categories",
+      "page": "/cash_flow/meta/categories",
+      "output": "HTTP 302 (158 chars)"
+    },
+    {
+      "cid": "V-cash_flow/meta/subcategories",
+      "page": "/cash_flow/meta/subcategories",
+      "output": "HTTP 302 (161 chars)"
+    },
+    {
+      "cid": "V-cash_flow/meta/parties",
+      "page": "/cash_flow/meta/parties",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-cash_flow",
+      "page": "/cash_flow",
+      "output": "HTTP 302 (138 chars)"
+    },
+    {
+      "cid": "V-cash_flow_differences",
+      "page": "/cash_flow_differences",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-daily_reconciliation",
+      "page": "/daily_reconciliation",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-financial_tracker",
+      "page": "/financial_tracker",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-api/ui/theme",
+      "page": "/api/ui/theme",
+      "output": "HTTP 200 (14 chars)"
+    },
+    {
+      "cid": "V-api/last_sold_price",
+      "page": "/api/last_sold_price",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-api/material_next_code",
+      "page": "/api/material_next_code",
+      "output": "HTTP 302 (153 chars)"
+    },
+    {
+      "cid": "V-api/client_next_code",
+      "page": "/api/client_next_code",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-api/notifications/due",
+      "page": "/api/notifications/due",
+      "output": "HTTP 302 (154 chars)"
+    },
+    {
+      "cid": "V-api/ledger_revision",
+      "page": "/api/ledger_revision",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-api/grn_consumption",
+      "page": "/api/grn_consumption",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-api/clients/search",
+      "page": "/api/clients/search",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-api/suppliers/search",
+      "page": "/api/suppliers/search",
+      "output": "HTTP 302 (153 chars)"
+    },
+    {
+      "cid": "V-api/audit/financial-integrity",
+      "page": "/api/audit/financial-integrity",
+      "output": "HTTP 302 (162 chars)"
+    },
+    {
+      "cid": "V-debug/db",
+      "page": "/debug/db",
+      "output": "HTTP 302 (139 chars)"
+    },
+    {
+      "cid": "V-settings",
+      "page": "/settings",
+      "output": "HTTP 302 (137 chars)"
+    },
+    {
+      "cid": "V-settings/activity",
+      "page": "/settings/activity",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-settings/sessions",
+      "page": "/settings/sessions",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-void_audit",
+      "page": "/void_audit",
+      "output": "HTTP 302 (139 chars)"
+    },
+    {
+      "cid": "V-settings/sidebar",
+      "page": "/settings/sidebar",
+      "output": "HTTP 302 (147 chars)"
+    },
+    {
+      "cid": "V-notifications",
+      "page": "/notifications",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-notifications/upcoming",
+      "page": "/notifications/upcoming",
+      "output": "HTTP 302 (153 chars)"
+    },
+    {
+      "cid": "V-tenants",
+      "page": "/tenants",
+      "output": "HTTP 302 (136 chars)"
+    },
+    {
+      "cid": "V-export_pending_bills",
+      "page": "/export_pending_bills",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-import_pending_bills",
+      "page": "/import_pending_bills",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-export_grn",
+      "page": "/export_grn",
+      "output": "HTTP 302 (139 chars)"
+    },
+    {
+      "cid": "V-export_unpaid_transactions",
+      "page": "/export_unpaid_transactions",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-fix_system_issues",
+      "page": "/fix_system_issues",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-generate_dummy_data",
+      "page": "/generate_dummy_data",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-system_report",
+      "page": "/system_report",
+      "output": "HTTP 302 (142 chars)"
+    },
+    {
+      "cid": "V-export_clients",
+      "page": "/export_clients",
+      "output": "HTTP 302 (143 chars)"
+    },
+    {
+      "cid": "V-pay_supplier",
+      "page": "/pay_supplier",
+      "output": "HTTP 302 (141 chars)"
+    },
+    {
+      "cid": "V-legacy-migration",
+      "page": "/legacy-migration/",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-accounts/audit",
+      "page": "/accounts/audit",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-accounts",
+      "page": "/accounts/",
+      "output": "HTTP 302 (140 chars)"
+    },
+    {
+      "cid": "V-accounts/payments/clients",
+      "page": "/accounts/payments/clients",
+      "output": "HTTP 302 (158 chars)"
+    },
+    {
+      "cid": "V-accounts/payments/suppliers",
+      "page": "/accounts/payments/suppliers",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-accounts/expenditures",
+      "page": "/accounts/expenditures",
+      "output": "HTTP 302 (152 chars)"
+    },
+    {
+      "cid": "V-accounts/receipts",
+      "page": "/accounts/receipts",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-accounts/grn_payments",
+      "page": "/accounts/grn_payments",
+      "output": "HTTP 302 (152 chars)"
+    },
+    {
+      "cid": "V-accounts/purchase_payables",
+      "page": "/accounts/purchase_payables",
+      "output": "HTTP 302 (157 chars)"
+    },
+    {
+      "cid": "V-accounts/accounts",
+      "page": "/accounts/accounts",
+      "output": "HTTP 302 (148 chars)"
+    },
+    {
+      "cid": "V-accounts/accounts/add",
+      "page": "/accounts/accounts/add",
+      "output": "HTTP 302 (154 chars)"
+    },
+    {
+      "cid": "V-accounts/reconciliations",
+      "page": "/accounts/reconciliations",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-accounts/categories",
+      "page": "/accounts/categories",
+      "output": "HTTP 302 (150 chars)"
+    },
+    {
+      "cid": "V-accounts/transfers",
+      "page": "/accounts/transfers",
+      "output": "HTTP 302 (149 chars)"
+    },
+    {
+      "cid": "V-accounts/transfers/add",
+      "page": "/accounts/transfers/add",
+      "output": "HTTP 302 (155 chars)"
+    },
+    {
+      "cid": "V-accounts/api/kpi/client_payments",
+      "page": "/accounts/api/kpi/client_payments",
+      "output": "HTTP 302 (167 chars)"
+    },
+    {
+      "cid": "V-accounts/api/kpi/supplier_payments",
+      "page": "/accounts/api/kpi/supplier_payments",
+      "output": "HTTP 302 (169 chars)"
+    },
+    {
+      "cid": "V-accounts/api/kpi/expenditures",
+      "page": "/accounts/api/kpi/expenditures",
+      "output": "HTTP 302 (164 chars)"
+    },
+    {
+      "cid": "V-accounts/api/kpi/receipts",
+      "page": "/accounts/api/kpi/receipts",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-accounts/api/kpi/company_money",
+      "page": "/accounts/api/kpi/company_money",
+      "output": "HTTP 302 (165 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/client_payments",
+      "page": "/accounts/kpi/client_payments",
+      "output": "HTTP 302 (161 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/supplier_payments",
+      "page": "/accounts/kpi/supplier_payments",
+      "output": "HTTP 302 (163 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/expenditures",
+      "page": "/accounts/kpi/expenditures",
+      "output": "HTTP 302 (158 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/receipts",
+      "page": "/accounts/kpi/receipts",
+      "output": "HTTP 302 (154 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/company_money",
+      "page": "/accounts/kpi/company_money",
+      "output": "HTTP 302 (159 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/cash_money",
+      "page": "/accounts/kpi/cash_money",
+      "output": "HTTP 302 (156 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/cash_accounts",
+      "page": "/accounts/kpi/cash_accounts",
+      "output": "HTTP 302 (159 chars)"
+    },
+    {
+      "cid": "V-accounts/kpi/bank_accounts",
+      "page": "/accounts/kpi/bank_accounts",
+      "output": "HTTP 302 (159 chars)"
+    },
+    {
+      "cid": "V-admin",
+      "page": "/admin/",
+      "output": "HTTP 403 (150 chars)"
+    },
+    {
+      "cid": "V-admin/modules",
+      "page": "/admin/modules",
+      "output": "HTTP 403 (150 chars)"
+    },
+    {
+      "cid": "V-admin/api/modules",
+      "page": "/admin/api/modules",
+      "output": "HTTP 403 (150 chars)"
+    },
+    {
+      "cid": "V-admin/api/health",
+      "page": "/admin/api/health",
+      "output": "HTTP 403 (150 chars)"
+    },
+    {
+      "cid": "V-data_lab",
+      "page": "/data_lab/",
+      "output": "HTTP 302 (140 chars)"
+    },
+    {
+      "cid": "V-data_lab/basket",
+      "page": "/data_lab/basket",
+      "output": "HTTP 302 (146 chars)"
+    },
+    {
+      "cid": "V-import_export",
+      "page": "/import_export/",
+      "output": "HTTP 302 (145 chars)"
+    },
+    {
+      "cid": "V-import_export/full_raw_export",
+      "page": "/import_export/full_raw_export",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-import_export/tenant_db_export",
+      "page": "/import_export/tenant_db_export",
+      "output": "HTTP 302 (161 chars)"
+    },
+    {
+      "cid": "V-import_export/full_raw_import_history",
+      "page": "/import_export/full_raw_import_history",
+      "output": "HTTP 302 (168 chars)"
+    },
+    {
+      "cid": "V-import_export/app_upgrade",
+      "page": "/import_export/app_upgrade",
+      "output": "HTTP 302 (156 chars)"
+    },
+    {
+      "cid": "V-import_export/export",
+      "page": "/import_export/export",
+      "output": "HTTP 302 (151 chars)"
+    },
+    {
+      "cid": "V-import_export/full_db_export",
+      "page": "/import_export/full_db_export",
+      "output": "HTTP 302 (159 chars)"
+    },
+    {
+      "cid": "V-import_export/export_excel_all",
+      "page": "/import_export/export_excel_all",
+      "output": "HTTP 302 (161 chars)"
+    },
+    {
+      "cid": "V-import_export/master/export",
+      "page": "/import_export/master/export",
+      "output": "HTTP 302 (160 chars)"
+    },
+    {
+      "cid": "V-import_export/full_raw_import_history_export",
+      "page": "/import_export/full_raw_import_history_export",
+      "output": "HTTP 302 (175 chars)"
+    },
+    {
+      "cid": "V-inventory/stock_summary",
+      "page": "/inventory/stock_summary",
+      "output": "HTTP 302 (154 chars)"
+    },
+    {
+      "cid": "V-inventory/daily_transactions",
+      "page": "/inventory/daily_transactions",
+      "output": "HTTP 302 (159 chars)"
+    },
+    {
+      "cid": "V-inventory/inventory_log",
+      "page": "/inventory/inventory_log",
+      "output": "HTTP 302 (154 chars)"
+    },
+    {
+      "cid": "V-import_export/uploads",
+      "page": "/import_export/uploads",
+      "output": "HTTP 302 (152 chars)"
+    },
+    {
+      "cid": "V-import_export/history",
+      "page": "/import_export/history",
+      "output": "HTTP 302 (152 chars)"
+    },
+    {
+      "cid": "STK-1",
+      "page": "/materials",
+      "output": "stock_dg=200.0"
+    },
+    {
+      "cid": "GRN-CNT",
+      "page": "/grn",
+      "output": "grn_count=1"
+    },
+    {
+      "cid": "GRN-ITEM-CNT",
+      "page": "/grn",
+      "output": "grn_item_count=1"
+    },
+    {
+      "cid": "BK-CNT",
+      "page": "/bookings",
+      "output": "booking_count=1"
+    },
+    {
+      "cid": "BK-ITEM-CNT",
+      "page": "/bookings",
+      "output": "booking_item_count=1"
+    },
+    {
+      "cid": "SALE-CNT",
+      "page": "/direct_sales",
+      "output": "direct_sale_count=2"
+    },
+    {
+      "cid": "ACC-1",
+      "page": "/accounts/accounts",
+      "output": "balance=300000.0"
+    },
+    {
+      "cid": "ACC-2",
+      "page": "/accounts/accounts",
+      "output": "balance=500000.0"
+    },
+    {
+      "cid": "ACC-3",
+      "page": "/accounts/",
+      "output": "total=800000.0"
+    },
+    {
+      "cid": "ENTRY-CNT",
+      "page": "/inventory/stock_summary",
+      "output": "entry_count=3"
+    }
+  ]
+}
