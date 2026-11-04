@@ -32,6 +32,8 @@ full cycle test mechanism/
 │   │   ├── data.py                  every input value + every expected total
 │   │   ├── seed.py                  writes the dataset through HTTP forms
 │   │   ├── checks.py                read-only assertions -> pass / known / fail
+│   │   ├── route_census.py          breadth: which routes does the suite touch?
+│   │   ├── urlmap_smoke.py          breadth: does every GET route still render?
 │   │   └── run.py                   one command -> report.md + results.json
 │   ├── run-001-20261104T0518/       <- one directory per run, numbered + stamped
 │   │   ├── scripts/                 the probes used to build that run
@@ -42,6 +44,12 @@ full cycle test mechanism/
 │   │   ├── counts.json              row count per table
 │   │   └── report.md                the human report
 │   └── run-NNN-.../                 <- the next run, next number
+├── reports/                         <- human-facing audits (one per review)
+│   ├── README.md                    <- index: which report covers which run
+│   ├── REPORT-TEMPLATE.md           <- copy this for the next audit
+│   ├── run-NNN-<stamp>-<slug>.md    <- the report itself
+│   ├── run-NNN-<stamp>-summary.json <- the same thing, machine-readable
+│   └── evidence/                    <- census, crawl, pytest log, run copies
 └── 2.skills/                        <- everything that makes run N+1 better
     ├── skills-index.md              auto-generated: inventory + history + trend
     ├── ledger.jsonl                 append-only run history (never edited)
@@ -51,9 +59,11 @@ full cycle test mechanism/
     └── _tools/ledger.py             numbering, history, index generation
 ```
 
-Two folders, exactly as asked: **`1.all files`** holds the artifacts of every
-run, **`2.skills`** holds the distilled knowledge. Everything in `1` is evidence;
-everything in `2` is reusable.
+Three folders, each with one job: **`1.all files`** holds the artifacts of every
+run, **`2.skills`** holds the distilled knowledge, **`reports/`** holds the
+human-facing audit written on top of both. Everything in `1` is evidence;
+everything in `2` is reusable; everything in `reports/` is a reading of the other
+two and never the only copy of anything.
 
 ---
 
@@ -152,6 +162,54 @@ be remembered; the suite tells you when the defect dies.
 
 Adding a `known=` is a visible edit to `checks.py`, so it cannot be used to
 quietly bury a new failure — the known count in every report would move.
+
+---
+
+## Reports (`reports/`)
+
+`1.all files/run-NNN/report.md` answers *"what did this run produce?"*.
+`reports/` answers the wider question a reviewer asks — *"is the app tested, and
+where is it blind?"* — by stacking the mechanism on top of the other evidence:
+
+```
+reports/
+├── README.md                                 <- index: report -> run -> verdict
+├── REPORT-TEMPLATE.md                        <- copy for the next audit
+├── run-006-20261104T0615-full-app-audit.md   <- the deliverable
+├── run-006-20261104T0615-summary.json        <- numbers only, for CI/diffing
+└── evidence/
+    ├── route-coverage.md / .json             route_census.py output
+    ├── urlmap-smoke.md / .json               urlmap_smoke.py output
+    ├── pytest-full.log                       the repo's own suite, verbatim
+    └── cycle-results.json                    the run's results.json, copied
+```
+
+Rules that keep it honest:
+
+| Rule | Why |
+|---|---|
+| one report per review, named `run-NNN-<stamp>-<slug>.md` | sorts with the runs, greppable by number |
+| every claim in a report cites a check id, a file, or an evidence file | a number with no source is a rumour |
+| `evidence/` holds *outputs*, never conclusions | conclusions rot, outputs can be re-read |
+| a report may say "known" but never hides a `FAIL` | the three-state rule applies to prose too |
+| log the verdict (`PASS` / `PASS WITH KNOWN DEFECTS` / `BLOCKED`) at the top | the first line is what people read |
+
+Two breadth tools back the report:
+
+```bash
+.venv/bin/python "1.all files/shared/route_census.py" --label run-006 \
+    --json reports/evidence/route-coverage.json --md reports/evidence/route-coverage.md
+
+.venv/bin/python "1.all files/shared/urlmap_smoke.py" \
+    --db "1.all files/run-006-.../cycle.db" --label run-006 \
+    --json reports/evidence/urlmap-smoke.json --md reports/evidence/urlmap-smoke.md
+```
+
+`route_census` answers *"which of the 566 routes has nobody ever asked about?"*
+(static, 4 s). `urlmap_smoke` answers *"does every GET route still render on a
+seeded database?"* (5 s, 0 × 5xx expected). Neither can say a page is *right* —
+that is what the 85 checks are for — but together they stop a green suite from
+being mistaken for a tested app. See `SKL-008`.
 
 ---
 

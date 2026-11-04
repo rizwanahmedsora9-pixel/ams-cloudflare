@@ -1,0 +1,1755 @@
+{
+ "routes": 257,
+ "counts": {
+  "not-found": 8,
+  "ok": 117,
+  "redirect": 76,
+  "skipped": 56
+ },
+ "errors": [],
+ "rows": [
+  {
+   "rule": "/",
+   "endpoint": "core.index",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/"
+  },
+  {
+   "rule": "/",
+   "endpoint": "index",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/"
+  },
+  {
+   "rule": "/accounts/",
+   "endpoint": "accounts.dashboard",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/"
+  },
+  {
+   "rule": "/accounts/<int:account_id>/data",
+   "endpoint": "accounts.account_data",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/1/data"
+  },
+  {
+   "rule": "/accounts/accounts",
+   "endpoint": "accounts.manage_accounts",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/accounts"
+  },
+  {
+   "rule": "/accounts/api/grn_obligations/<int:grn_id>",
+   "endpoint": "accounts.grn_obligations_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/api/grn_obligations/1"
+  },
+  {
+   "rule": "/accounts/api/kpi/client_payments",
+   "endpoint": "accounts.api_client_payments_today",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/api/kpi/client_payments"
+  },
+  {
+   "rule": "/accounts/api/kpi/company_money",
+   "endpoint": "accounts.api_company_money",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/api/kpi/company_money"
+  },
+  {
+   "rule": "/accounts/api/kpi/expenditures",
+   "endpoint": "accounts.api_expenditures_today",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/api/kpi/expenditures"
+  },
+  {
+   "rule": "/accounts/api/kpi/receipts",
+   "endpoint": "accounts.api_receipts_today",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/api/kpi/receipts"
+  },
+  {
+   "rule": "/accounts/api/kpi/supplier_payments",
+   "endpoint": "accounts.api_supplier_payments_today",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/api/kpi/supplier_payments"
+  },
+  {
+   "rule": "/accounts/audit",
+   "endpoint": "accounts.audit_trail",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/audit"
+  },
+  {
+   "rule": "/accounts/expenditures",
+   "endpoint": "accounts.expenditures",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/expenditures"
+  },
+  {
+   "rule": "/accounts/grn_payments",
+   "endpoint": "accounts.grn_payments",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/grn_payments"
+  },
+  {
+   "rule": "/accounts/kpi/bank_accounts",
+   "endpoint": "accounts.kpi_bank_accounts",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/bank_accounts"
+  },
+  {
+   "rule": "/accounts/kpi/cash_accounts",
+   "endpoint": "accounts.kpi_cash_accounts",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/cash_accounts"
+  },
+  {
+   "rule": "/accounts/kpi/cash_money",
+   "endpoint": "accounts.kpi_cash_money",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/cash_money"
+  },
+  {
+   "rule": "/accounts/kpi/client_payments",
+   "endpoint": "accounts.kpi_client_payments",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/client_payments"
+  },
+  {
+   "rule": "/accounts/kpi/company_money",
+   "endpoint": "accounts.kpi_company_money",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/company_money"
+  },
+  {
+   "rule": "/accounts/kpi/expenditures",
+   "endpoint": "accounts.kpi_expenditures",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/expenditures"
+  },
+  {
+   "rule": "/accounts/kpi/receipts",
+   "endpoint": "accounts.kpi_receipts",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/receipts"
+  },
+  {
+   "rule": "/accounts/kpi/supplier_payments",
+   "endpoint": "accounts.kpi_supplier_payments",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/kpi/supplier_payments"
+  },
+  {
+   "rule": "/accounts/ledger/<int:account_id>",
+   "endpoint": "accounts.account_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/ledger/1"
+  },
+  {
+   "rule": "/accounts/payments/clients",
+   "endpoint": "accounts.client_payments",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/payments/clients"
+  },
+  {
+   "rule": "/accounts/payments/clients/<int:id>/data",
+   "endpoint": "accounts.client_payment_data",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/payments/clients/1/data"
+  },
+  {
+   "rule": "/accounts/payments/suppliers",
+   "endpoint": "accounts.supplier_payments",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/payments/suppliers"
+  },
+  {
+   "rule": "/accounts/payments/suppliers/<int:id>/data",
+   "endpoint": "accounts.supplier_payment_data",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/payments/suppliers/1/data"
+  },
+  {
+   "rule": "/accounts/purchase_payables",
+   "endpoint": "accounts.purchase_payables",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/purchase_payables"
+  },
+  {
+   "rule": "/accounts/receipts",
+   "endpoint": "accounts.receipts",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/receipts"
+  },
+  {
+   "rule": "/accounts/reconciliations",
+   "endpoint": "accounts.reconciliations",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/reconciliations"
+  },
+  {
+   "rule": "/accounts/transfers",
+   "endpoint": "accounts.transfers",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/accounts/transfers"
+  },
+  {
+   "rule": "/admin/",
+   "endpoint": "admin.dashboard",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/admin/api/health",
+   "endpoint": "admin.api_health_check",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/admin/api/modules",
+   "endpoint": "admin.api_get_modules",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/admin/modules",
+   "endpoint": "admin.modules_list",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/api/audit/financial-integrity",
+   "endpoint": "api.api_financial_integrity_audit",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/audit/financial-integrity"
+  },
+  {
+   "rule": "/api/audit/financial-integrity",
+   "endpoint": "api_financial_integrity_audit",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/audit/financial-integrity"
+  },
+  {
+   "rule": "/api/check_bill/<path:bill_no>",
+   "endpoint": "api.check_bill_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/check_bill/test"
+  },
+  {
+   "rule": "/api/check_bill/<path:bill_no>",
+   "endpoint": "check_bill_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/check_bill/test"
+  },
+  {
+   "rule": "/api/client_booking_status/<client_code>",
+   "endpoint": "api.api_client_booking_status",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/client_booking_status/test"
+  },
+  {
+   "rule": "/api/client_booking_status/<client_code>",
+   "endpoint": "api_client_booking_status",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/client_booking_status/test"
+  },
+  {
+   "rule": "/api/client_financial_summary/<client_code>",
+   "endpoint": "api.api_client_financial_summary",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/client_financial_summary/test"
+  },
+  {
+   "rule": "/api/client_financial_summary/<client_code>",
+   "endpoint": "api_client_financial_summary",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/client_financial_summary/test"
+  },
+  {
+   "rule": "/api/client_next_code",
+   "endpoint": "api.api_client_next_code",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/client_next_code"
+  },
+  {
+   "rule": "/api/client_next_code",
+   "endpoint": "api_client_next_code",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/client_next_code"
+  },
+  {
+   "rule": "/api/clients/search",
+   "endpoint": "api.api_clients_search",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/clients/search"
+  },
+  {
+   "rule": "/api/clients/search",
+   "endpoint": "api_clients_search",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/clients/search"
+  },
+  {
+   "rule": "/api/current_payables",
+   "endpoint": "reports.current_payables_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/current_payables"
+  },
+  {
+   "rule": "/api/current_payables",
+   "endpoint": "current_payables_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/current_payables"
+  },
+  {
+   "rule": "/api/current_payables/<int:client_id>",
+   "endpoint": "reports.current_payable_detail_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/current_payables/1"
+  },
+  {
+   "rule": "/api/current_payables/<int:client_id>",
+   "endpoint": "current_payable_detail_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/current_payables/1"
+  },
+  {
+   "rule": "/api/delivery_person_ledger/<int:id>",
+   "endpoint": "ledgers.delivery_person_ledger_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/delivery_person_ledger/1"
+  },
+  {
+   "rule": "/api/delivery_person_ledger/<int:id>",
+   "endpoint": "delivery_person_ledger_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/delivery_person_ledger/1"
+  },
+  {
+   "rule": "/api/delivery_persons/search",
+   "endpoint": "ledgers.delivery_person_search_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/delivery_persons/search"
+  },
+  {
+   "rule": "/api/delivery_persons/search",
+   "endpoint": "delivery_person_search_api",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/delivery_persons/search"
+  },
+  {
+   "rule": "/api/grn_consumption",
+   "endpoint": "api.api_grn_consumption",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/grn_consumption"
+  },
+  {
+   "rule": "/api/grn_consumption",
+   "endpoint": "api_grn_consumption",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/grn_consumption"
+  },
+  {
+   "rule": "/api/last_sold_price",
+   "endpoint": "api.api_last_sold_price",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/last_sold_price"
+  },
+  {
+   "rule": "/api/last_sold_price",
+   "endpoint": "api_last_sold_price",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/last_sold_price"
+  },
+  {
+   "rule": "/api/ledger_revision",
+   "endpoint": "api.api_ledger_revision",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/ledger_revision"
+  },
+  {
+   "rule": "/api/ledger_revision",
+   "endpoint": "api_ledger_revision",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/ledger_revision"
+  },
+  {
+   "rule": "/api/material_next_code",
+   "endpoint": "api.api_material_next_code",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/material_next_code"
+  },
+  {
+   "rule": "/api/material_next_code",
+   "endpoint": "api_material_next_code",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/material_next_code"
+  },
+  {
+   "rule": "/api/notifications/contact_history/<int:bill_id>",
+   "endpoint": "api.api_notifications_contact_history",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/notifications/contact_history/1"
+  },
+  {
+   "rule": "/api/notifications/contact_history/<int:bill_id>",
+   "endpoint": "api_notifications_contact_history",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/notifications/contact_history/1"
+  },
+  {
+   "rule": "/api/notifications/due",
+   "endpoint": "api.api_notifications_due",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/notifications/due"
+  },
+  {
+   "rule": "/api/notifications/due",
+   "endpoint": "api_notifications_due",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/notifications/due"
+  },
+  {
+   "rule": "/api/supplier_balance/<int:id>",
+   "endpoint": "api.api_supplier_balance",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/supplier_balance/1"
+  },
+  {
+   "rule": "/api/supplier_balance/<int:id>",
+   "endpoint": "api_supplier_balance",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/supplier_balance/1"
+  },
+  {
+   "rule": "/api/supplier_ledger_shift_preview/<int:id>",
+   "endpoint": "masters.api_supplier_ledger_shift_preview",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/supplier_ledger_shift_preview/1"
+  },
+  {
+   "rule": "/api/supplier_ledger_shift_preview/<int:id>",
+   "endpoint": "api_supplier_ledger_shift_preview",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/supplier_ledger_shift_preview/1"
+  },
+  {
+   "rule": "/api/suppliers/search",
+   "endpoint": "api.api_suppliers_search",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/suppliers/search"
+  },
+  {
+   "rule": "/api/suppliers/search",
+   "endpoint": "api_suppliers_search",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/api/suppliers/search"
+  },
+  {
+   "rule": "/bookings",
+   "endpoint": "sales.bookings_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/bookings"
+  },
+  {
+   "rule": "/bookings",
+   "endpoint": "bookings_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/bookings"
+  },
+  {
+   "rule": "/bookings/<int:booking_id>/edit-modal",
+   "endpoint": "sales.booking_edit_modal",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/bookings/1/edit-modal"
+  },
+  {
+   "rule": "/bookings/<int:booking_id>/edit-modal",
+   "endpoint": "booking_edit_modal",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/bookings/1/edit-modal"
+  },
+  {
+   "rule": "/cash_flow/entry/<int:entry_id>.json",
+   "endpoint": "reports.cash_flow_entry_json",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/cash_flow/entry/1.json"
+  },
+  {
+   "rule": "/cash_flow/entry/<int:entry_id>.json",
+   "endpoint": "cash_flow_entry_json",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/cash_flow/entry/1.json"
+  },
+  {
+   "rule": "/cash_flow_differences",
+   "endpoint": "reports.cash_flow_differences",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/cash_flow_differences"
+  },
+  {
+   "rule": "/cash_flow_differences",
+   "endpoint": "cash_flow_differences",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/cash_flow_differences"
+  },
+  {
+   "rule": "/cash_flow_differences/<int:rec_id>",
+   "endpoint": "reports.cash_flow_reconciliation_detail",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/cash_flow_differences/1"
+  },
+  {
+   "rule": "/cash_flow_differences/<int:rec_id>",
+   "endpoint": "cash_flow_reconciliation_detail",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/cash_flow_differences/1"
+  },
+  {
+   "rule": "/client-ledger/categories",
+   "endpoint": "masters.manage_client_categories",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/client-ledger/categories"
+  },
+  {
+   "rule": "/client-ledger/categories",
+   "endpoint": "manage_client_categories",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/client-ledger/categories"
+  },
+  {
+   "rule": "/client_ledger/<int:id>",
+   "endpoint": "ledgers.client_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/client_ledger/1"
+  },
+  {
+   "rule": "/client_ledger/<int:id>",
+   "endpoint": "client_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/client_ledger/1"
+  },
+  {
+   "rule": "/clients",
+   "endpoint": "masters.clients",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/clients"
+  },
+  {
+   "rule": "/clients",
+   "endpoint": "clients",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/clients"
+  },
+  {
+   "rule": "/clients/<int:client_id>/modals",
+   "endpoint": "masters.client_modals",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/clients/1/modals"
+  },
+  {
+   "rule": "/clients/<int:client_id>/modals",
+   "endpoint": "client_modals",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/clients/1/modals"
+  },
+  {
+   "rule": "/current_payables",
+   "endpoint": "reports.unpaid_transactions_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/current_payables"
+  },
+  {
+   "rule": "/current_payables",
+   "endpoint": "unpaid_transactions_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/current_payables"
+  },
+  {
+   "rule": "/daily_transactions",
+   "endpoint": "reports.daily_transactions_redirect",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/daily_transactions"
+  },
+  {
+   "rule": "/daily_transactions",
+   "endpoint": "daily_transactions_redirect",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/daily_transactions"
+  },
+  {
+   "rule": "/data_lab/basket",
+   "endpoint": "data_lab.view_basket",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/data_lab/basket"
+  },
+  {
+   "rule": "/debug/db",
+   "endpoint": "system.debug_db",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/debug/db"
+  },
+  {
+   "rule": "/debug/db",
+   "endpoint": "debug_db",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/debug/db"
+  },
+  {
+   "rule": "/decision_ledger",
+   "endpoint": "ledgers.decision_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/decision_ledger"
+  },
+  {
+   "rule": "/decision_ledger",
+   "endpoint": "decision_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/decision_ledger"
+  },
+  {
+   "rule": "/delivery_ledger/<int:id>",
+   "endpoint": "ledgers.delivery_person_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_ledger/1"
+  },
+  {
+   "rule": "/delivery_ledger/<int:id>",
+   "endpoint": "delivery_person_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_ledger/1"
+  },
+  {
+   "rule": "/delivery_person_ledger/<int:id>",
+   "endpoint": "ledgers.delivery_person_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_person_ledger/1"
+  },
+  {
+   "rule": "/delivery_persons",
+   "endpoint": "masters.delivery_persons_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_persons"
+  },
+  {
+   "rule": "/delivery_persons",
+   "endpoint": "delivery_persons_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_persons"
+  },
+  {
+   "rule": "/delivery_rents",
+   "endpoint": "ops.delivery_rents_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_rents"
+  },
+  {
+   "rule": "/delivery_rents",
+   "endpoint": "delivery_rents_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/delivery_rents"
+  },
+  {
+   "rule": "/delivery_rents/group/<path:group_key>",
+   "endpoint": "ops.delivery_rent_group",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/delivery_rents/group/test"
+  },
+  {
+   "rule": "/delivery_rents/group/<path:group_key>",
+   "endpoint": "delivery_rent_group",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/delivery_rents/group/test"
+  },
+  {
+   "rule": "/direct_sales",
+   "endpoint": "sales.direct_sales_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/direct_sales"
+  },
+  {
+   "rule": "/direct_sales",
+   "endpoint": "direct_sales_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/direct_sales"
+  },
+  {
+   "rule": "/direct_sales/<int:sale_id>/edit-modal",
+   "endpoint": "sales.direct_sale_edit_modal",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/direct_sales/1/edit-modal"
+  },
+  {
+   "rule": "/direct_sales/<int:sale_id>/edit-modal",
+   "endpoint": "direct_sale_edit_modal",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/direct_sales/1/edit-modal"
+  },
+  {
+   "rule": "/dispatching",
+   "endpoint": "ops.dispatching",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/dispatching"
+  },
+  {
+   "rule": "/dispatching",
+   "endpoint": "dispatching",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/dispatching"
+  },
+  {
+   "rule": "/download_client_clearance/<int:id>",
+   "endpoint": "ledgers.download_client_clearance",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_client_clearance/<int:id>",
+   "endpoint": "download_client_clearance",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_client_ledger/<int:id>",
+   "endpoint": "ledgers.download_client_ledger",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_client_ledger/<int:id>",
+   "endpoint": "download_client_ledger",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_delivery_person_ledger/<int:id>",
+   "endpoint": "ledgers.download_delivery_person_ledger",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_delivery_person_ledger/<int:id>",
+   "endpoint": "download_delivery_person_ledger",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_full_client_history/<int:id>",
+   "endpoint": "ledgers.download_full_client_history",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_full_client_history/<int:id>",
+   "endpoint": "download_full_client_history",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_invoice/<path:bill_no>",
+   "endpoint": "sales.download_invoice",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_invoice/<path:bill_no>",
+   "endpoint": "download_invoice",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_supplier_ledger/<int:id>",
+   "endpoint": "misc.download_supplier_ledger",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_supplier_ledger/<int:id>",
+   "endpoint": "download_supplier_ledger",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_supplier_payment/<int:payment_id>",
+   "endpoint": "misc.download_supplier_payment",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/download_supplier_payment/<int:payment_id>",
+   "endpoint": "download_supplier_payment",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_clients",
+   "endpoint": "misc.export_clients",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_clients",
+   "endpoint": "export_clients",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_current_payables",
+   "endpoint": "reports.export_current_payables",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_current_payables",
+   "endpoint": "export_current_payables",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_grn",
+   "endpoint": "misc.export_grn",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_grn",
+   "endpoint": "export_grn",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_pending_bills",
+   "endpoint": "misc.export_pending_bills",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_pending_bills",
+   "endpoint": "export_pending_bills",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_unpaid_transactions",
+   "endpoint": "misc.export_unpaid_transactions",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/export_unpaid_transactions",
+   "endpoint": "export_unpaid_transactions",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/financial_details",
+   "endpoint": "reports.financial_details",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/financial_details"
+  },
+  {
+   "rule": "/financial_details",
+   "endpoint": "financial_details",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/financial_details"
+  },
+  {
+   "rule": "/financial_ledger/<int:client_id>",
+   "endpoint": "ledgers.financial_ledger_details",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/financial_ledger/1"
+  },
+  {
+   "rule": "/financial_ledger/<int:client_id>",
+   "endpoint": "financial_ledger_details",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/financial_ledger/1"
+  },
+  {
+   "rule": "/financial_tracker",
+   "endpoint": "reports.financial_tracker",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/financial_tracker"
+  },
+  {
+   "rule": "/financial_tracker",
+   "endpoint": "financial_tracker",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/financial_tracker"
+  },
+  {
+   "rule": "/fix_system_issues",
+   "endpoint": "misc.fix_system_issues",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/fix_system_issues"
+  },
+  {
+   "rule": "/fix_system_issues",
+   "endpoint": "fix_system_issues",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/fix_system_issues"
+  },
+  {
+   "rule": "/generate_dummy_data",
+   "endpoint": "misc.generate_dummy_data",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/generate_dummy_data"
+  },
+  {
+   "rule": "/generate_dummy_data",
+   "endpoint": "generate_dummy_data",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/generate_dummy_data"
+  },
+  {
+   "rule": "/import_export/",
+   "endpoint": "import_export.import_export_page",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/app_upgrade/status/<job_id>",
+   "endpoint": "import_export.app_upgrade_status",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/export",
+   "endpoint": "import_export.export_data",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/export_excel_all",
+   "endpoint": "import_export.export_excel_all",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/full_db_export",
+   "endpoint": "import_export.full_db_export",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/full_db_import_report/<report_name>",
+   "endpoint": "import_export.full_db_import_report",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/full_raw_export",
+   "endpoint": "import_export.full_raw_export",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/full_raw_import_history_export",
+   "endpoint": "import_export.full_raw_import_history_export",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/full_raw_import_report/<report_name>",
+   "endpoint": "import_export.full_raw_import_report",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/history",
+   "endpoint": "import_browse_history",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/jobs/<int:job_id>/history",
+   "endpoint": "import_job_history",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/jobs/<int:job_id>/progress",
+   "endpoint": "import_job_progress",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/master/export",
+   "endpoint": "import_export.export_master",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/master/import/status/<job_id>",
+   "endpoint": "import_export.master_import_status",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/template/<dataset>",
+   "endpoint": "import_export.get_template",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/tenant_db_export",
+   "endpoint": "import_export.tenant_db_export",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/uploads",
+   "endpoint": "import_list_uploads",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/import_export/uploads/<upload_id>",
+   "endpoint": "import_get_upload",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/inventory/daily_transactions",
+   "endpoint": "inventory.daily_transactions",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/inventory/daily_transactions"
+  },
+  {
+   "rule": "/inventory/inventory_log",
+   "endpoint": "inventory.inventory_log",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/inventory/inventory_log"
+  },
+  {
+   "rule": "/inventory/stock_summary",
+   "endpoint": "inventory.stock_summary",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/inventory/stock_summary"
+  },
+  {
+   "rule": "/ledger",
+   "endpoint": "ledgers.ledger_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/ledger"
+  },
+  {
+   "rule": "/ledger",
+   "endpoint": "ledger_page",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/ledger"
+  },
+  {
+   "rule": "/ledger/<int:client_id>",
+   "endpoint": "ledgers.financial_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/ledger/1"
+  },
+  {
+   "rule": "/ledger/<int:client_id>",
+   "endpoint": "financial_ledger",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/ledger/1"
+  },
+  {
+   "rule": "/legacy-migration/",
+   "endpoint": "legacy_migration.dashboard",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/legacy-migration/"
+  },
+  {
+   "rule": "/legacy-migration/",
+   "endpoint": "dashboard",
+   "status": 200,
+   "verdict": "ok",
+   "url": "/legacy-migration/"
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>",
+   "endpoint": "legacy_migration.preview",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/legacy-migration/run/1"
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>",
+   "endpoint": "preview",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/legacy-migration/run/1"
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/errors.xlsx",
+   "endpoint": "legacy_migration.errors",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/legacy-migration/run/1/errors.xlsx"
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/errors.xlsx",
+   "endpoint": "errors",
+   "status": 404,
+   "verdict": "not-found",
+   "url": "/legacy-migration/run/1/errors.xlsx"
+  },
+  {
+   "rule": "/legacy-migration/template/<kind>",
+   "endpoint": "legacy_migration.download",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/legacy-migration/template/<kind>",
+   "endpoint": "download",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/logout",
+   "endpoint": "auth.logout",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/logout"
+  },
+  {
+   "rule": "/logout",
+   "endpoint": "logout",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/logout"
+  },
+  {
+   "rule": "/material_ledger/<int:mat_id>",
+   "endpoint": "ledgers.material_ledger_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/material_ledger/1"
+  },
+  {
+   "rule": "/material_ledger/<int:mat_id>",
+   "endpoint": "material_ledger_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/material_ledger/1"
+  },
+  {
+   "rule": "/material_returns",
+   "endpoint": "sales.material_returns_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/material_returns"
+  },
+  {
+   "rule": "/material_returns",
+   "endpoint": "material_returns_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/material_returns"
+  },
+  {
+   "rule": "/materials",
+   "endpoint": "masters.materials",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/materials"
+  },
+  {
+   "rule": "/materials",
+   "endpoint": "materials",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/materials"
+  },
+  {
+   "rule": "/mixed_transactions",
+   "endpoint": "sales.mixed_transactions",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/mixed_transactions"
+  },
+  {
+   "rule": "/mixed_transactions",
+   "endpoint": "mixed_transactions",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/mixed_transactions"
+  },
+  {
+   "rule": "/notifications",
+   "endpoint": "system.notifications_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/notifications"
+  },
+  {
+   "rule": "/notifications",
+   "endpoint": "notifications_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/notifications"
+  },
+  {
+   "rule": "/notifications/bill/<int:bill_id>",
+   "endpoint": "system.notifications_bill_detail",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/notifications/bill/1"
+  },
+  {
+   "rule": "/notifications/bill/<int:bill_id>",
+   "endpoint": "notifications_bill_detail",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/notifications/bill/1"
+  },
+  {
+   "rule": "/notifications/upcoming",
+   "endpoint": "system.notifications_upcoming",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/notifications/upcoming"
+  },
+  {
+   "rule": "/notifications/upcoming",
+   "endpoint": "notifications_upcoming",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/notifications/upcoming"
+  },
+  {
+   "rule": "/party_ledger/<int:id>",
+   "endpoint": "misc.party_ledger",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/party_ledger/1"
+  },
+  {
+   "rule": "/party_ledger/<int:id>",
+   "endpoint": "party_ledger",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/party_ledger/1"
+  },
+  {
+   "rule": "/pay_supplier",
+   "endpoint": "misc.pay_supplier_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/pay_supplier"
+  },
+  {
+   "rule": "/pay_supplier",
+   "endpoint": "pay_supplier_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/pay_supplier"
+  },
+  {
+   "rule": "/payments",
+   "endpoint": "sales.payments_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/payments"
+  },
+  {
+   "rule": "/payments",
+   "endpoint": "payments_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/payments"
+  },
+  {
+   "rule": "/pending_bills",
+   "endpoint": "sales.pending_bills",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/pending_bills"
+  },
+  {
+   "rule": "/pending_bills",
+   "endpoint": "pending_bills",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/pending_bills"
+  },
+  {
+   "rule": "/pending_bills/<int:bill_id>/modals",
+   "endpoint": "sales.pending_bill_modals",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/pending_bills/1/modals"
+  },
+  {
+   "rule": "/pending_bills/<int:bill_id>/modals",
+   "endpoint": "pending_bill_modals",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/pending_bills/1/modals"
+  },
+  {
+   "rule": "/profit_reports",
+   "endpoint": "reports.profit_reports",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports"
+  },
+  {
+   "rule": "/profit_reports",
+   "endpoint": "profit_reports",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports"
+  },
+  {
+   "rule": "/profit_reports/export/excel",
+   "endpoint": "reports.profit_report_excel",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports/export/excel"
+  },
+  {
+   "rule": "/profit_reports/export/excel",
+   "endpoint": "profit_report_excel",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports/export/excel"
+  },
+  {
+   "rule": "/profit_reports/export/pdf",
+   "endpoint": "reports.profit_report_pdf",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports/export/pdf"
+  },
+  {
+   "rule": "/profit_reports/export/pdf",
+   "endpoint": "profit_report_pdf",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports/export/pdf"
+  },
+  {
+   "rule": "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+   "endpoint": "reports.profit_transaction_detail",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports/transaction/test/1"
+  },
+  {
+   "rule": "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+   "endpoint": "profit_transaction_detail",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/profit_reports/transaction/test/1"
+  },
+  {
+   "rule": "/root/backup-settings",
+   "endpoint": "auth.root_backup_settings",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/root/backup-settings",
+   "endpoint": "root_backup_settings",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/root/backup-settings/history/download/<int:history_id>",
+   "endpoint": "auth.root_backup_settings_history_download",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/root/backup-settings/history/download/<int:history_id>",
+   "endpoint": "root_backup_settings_history_download",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/services",
+   "endpoint": "masters.services",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/services"
+  },
+  {
+   "rule": "/services",
+   "endpoint": "services",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/services"
+  },
+  {
+   "rule": "/settings",
+   "endpoint": "system.settings",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings"
+  },
+  {
+   "rule": "/settings",
+   "endpoint": "settings",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings"
+  },
+  {
+   "rule": "/settings/activity",
+   "endpoint": "system.activity_log_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings/activity"
+  },
+  {
+   "rule": "/settings/activity",
+   "endpoint": "activity_log_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings/activity"
+  },
+  {
+   "rule": "/settings/sessions",
+   "endpoint": "system.login_sessions_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings/sessions"
+  },
+  {
+   "rule": "/settings/sessions",
+   "endpoint": "login_sessions_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings/sessions"
+  },
+  {
+   "rule": "/settings/sidebar",
+   "endpoint": "system.sidebar_settings_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings/sidebar"
+  },
+  {
+   "rule": "/settings/sidebar",
+   "endpoint": "sidebar_settings_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/settings/sidebar"
+  },
+  {
+   "rule": "/stock_summary",
+   "endpoint": "reports.stock_summary_redirect",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/stock_summary"
+  },
+  {
+   "rule": "/stock_summary",
+   "endpoint": "stock_summary_redirect",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/stock_summary"
+  },
+  {
+   "rule": "/supplier_ledger/<int:id>",
+   "endpoint": "misc.supplier_ledger",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/supplier_ledger/1"
+  },
+  {
+   "rule": "/supplier_ledger/<int:id>",
+   "endpoint": "supplier_ledger",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/supplier_ledger/1"
+  },
+  {
+   "rule": "/supplier_ledger_shift/<int:id>",
+   "endpoint": "masters.supplier_ledger_shift_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/supplier_ledger_shift/1"
+  },
+  {
+   "rule": "/supplier_ledger_shift/<int:id>",
+   "endpoint": "supplier_ledger_shift_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/supplier_ledger_shift/1"
+  },
+  {
+   "rule": "/suppliers",
+   "endpoint": "masters.suppliers",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/suppliers"
+  },
+  {
+   "rule": "/suppliers",
+   "endpoint": "suppliers",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/suppliers"
+  },
+  {
+   "rule": "/system_report",
+   "endpoint": "misc.system_report",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/system_report"
+  },
+  {
+   "rule": "/system_report",
+   "endpoint": "system_report",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/system_report"
+  },
+  {
+   "rule": "/tenants",
+   "endpoint": "system.tenants_dashboard",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/tenants"
+  },
+  {
+   "rule": "/tenants",
+   "endpoint": "tenants_dashboard",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/tenants"
+  },
+  {
+   "rule": "/tenants/<tenant_id>/backup_history",
+   "endpoint": "system.tenants_backup_history",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/tenants/<tenant_id>/backup_history",
+   "endpoint": "tenants_backup_history",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/tenants/backup_history/download/<int:history_id>",
+   "endpoint": "system.tenants_backup_history_download",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/tenants/backup_history/download/<int:history_id>",
+   "endpoint": "tenants_backup_history_download",
+   "status": null,
+   "verdict": "skipped"
+  },
+  {
+   "rule": "/tracking",
+   "endpoint": "ops.tracking",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/tracking"
+  },
+  {
+   "rule": "/tracking",
+   "endpoint": "tracking",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/tracking"
+  },
+  {
+   "rule": "/unpaid_transactions",
+   "endpoint": "reports.unpaid_transactions_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/unpaid_transactions"
+  },
+  {
+   "rule": "/uploads/<path:filename>",
+   "endpoint": "misc.uploaded_file",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/uploads/test"
+  },
+  {
+   "rule": "/uploads/<path:filename>",
+   "endpoint": "uploaded_file",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/uploads/test"
+  },
+  {
+   "rule": "/view_bill/<path:bill_no>",
+   "endpoint": "sales.view_bill",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/view_bill/test"
+  },
+  {
+   "rule": "/view_bill/<path:bill_no>",
+   "endpoint": "view_bill",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/view_bill/test"
+  },
+  {
+   "rule": "/view_bill_detail/<string:type>/<int:id>",
+   "endpoint": "sales.view_bill_detail",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/view_bill_detail/test/1"
+  },
+  {
+   "rule": "/view_bill_detail/<string:type>/<int:id>",
+   "endpoint": "view_bill_detail",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/view_bill_detail/test/1"
+  },
+  {
+   "rule": "/void_audit",
+   "endpoint": "system.void_audit_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/void_audit"
+  },
+  {
+   "rule": "/void_audit",
+   "endpoint": "void_audit_page",
+   "status": 302,
+   "verdict": "redirect",
+   "url": "/void_audit"
+  }
+ ]
+}
