@@ -61,6 +61,8 @@ from app.services.grn_costing import (
     charge_supplier_billed_minor,
     charge_effective_minor,
     active_charges,
+    supplier_material_minor,
+    supplier_billed_charge_minor,
 )
 
 
@@ -198,6 +200,7 @@ def _sort_rows(rows, *, supplier=False):
         "Direct Sale": 10,
         "Pending Bill": 10,
         "GRN": 10,
+        "GRN Expenses": 11,
         "Delivery Rent": 10,
         "Payment": 20,
         "Receipt": 20,
@@ -1290,6 +1293,8 @@ def _supplier_rows(supplier):
             # Keep a zero-value adjustment out of balances, but historical
             # detail remains available in the GRN page itself.
             continue
+        material_minor = int(supplier_material_minor(grn))
+        billed_minor = int(supplier_billed_charge_minor(grn))
         item_lines = [
             {
                 "name": getattr(item, "mat_name", "") or "",
@@ -1300,12 +1305,25 @@ def _supplier_rows(supplier):
             for item in (getattr(grn, "items", None) or [])
             if not bool(getattr(item, "is_void", False))
         ]
+        billed_names = []
+        for charge in active_charges(grn):
+            charge_minor = charge_supplier_billed_minor(charge, grn)
+            if charge_minor <= 0:
+                continue
+            name = (getattr(charge, "label", None) or getattr(charge, "charge_type", None) or "GRN cost")
+            billed_names.append(name)
+            item_lines.append({
+                "name": f"{name} (GRN expense billed to supplier)",
+                "qty": 0.0,
+                "rate": 0.0,
+                "amount": _float(Decimal(charge_minor) / Decimal(100)),
+            })
         row = _row(
             date_value=getattr(grn, "date_posted", None),
             row_type="GRN",
             reference=_bill_ref(grn, "manual_bill_no", "auto_bill_no", fallback=f"GRN-{grn.id}"),
             description="Goods Receipt",
-            credit=total,
+            credit=_float(Decimal(material_minor) / Decimal(100)),
             source_type="GRN",
             source_id=grn.id,
             party_id=supplier.id,
@@ -1313,19 +1331,44 @@ def _supplier_rows(supplier):
             account=getattr(getattr(grn, "payment_account", None), "name", "") or "",
             source=grn,
         )
-        for charge in active_charges(grn):
-            billed_minor = charge_supplier_billed_minor(charge, grn)
-            if billed_minor <= 0:
-                continue
-            item_lines.append({
-                "name": (getattr(charge, "label", None) or getattr(charge, "charge_type", None) or "GRN cost") + " (billed to supplier)",
-                "qty": 0.0,
-                "rate": 0.0,
-                "amount": _float(Decimal(billed_minor) / Decimal(100)),
-            })
         row["item_lines"] = item_lines
         row["supplier_invoice_no"] = getattr(grn, "supplier_invoice_no", "") or ""
+        row["grn_material"] = _float(Decimal(material_minor) / Decimal(100))
+        row["grn_expenses"] = _float(Decimal(billed_minor) / Decimal(100))
+        row["pay_url"] = f"/accounts/pay_grn?grn_id={grn.id}"
         rows.append(row)
+        # A3: ticked GRN expenses are their own supplier bill line, so the
+        # ledger itself shows material and expenses as two payables instead of
+        # one blended figure the operator has to take apart by hand.
+        if billed_minor > 0:
+            expense_row = _row(
+                date_value=getattr(grn, "date_posted", None),
+                row_type="GRN Expenses",
+                reference=f"GRN-EXP-{grn.id}",
+                description="GRN expenses billed to supplier" + (
+                    f" ({', '.join(billed_names)})" if billed_names else ""),
+                credit=_float(Decimal(billed_minor) / Decimal(100)),
+                source_type="GRNCharge",
+                source_id=grn.id,
+                party_id=supplier.id,
+                note=getattr(grn, "note", "") or "",
+                source=grn,
+            )
+            expense_row["item_lines"] = [
+                {
+                    "name": f"{name} (GRN expense billed to supplier)",
+                    "qty": 0.0, "rate": 0.0,
+                    "amount": _float(Decimal(charge_supplier_billed_minor(charge, grn)) / Decimal(100)),
+                }
+                for charge, name in zip(
+                    [c for c in active_charges(grn) if charge_supplier_billed_minor(c, grn) > 0],
+                    billed_names,
+                )
+            ]
+            expense_row["grn_material"] = 0.0
+            expense_row["grn_expenses"] = _float(Decimal(billed_minor) / Decimal(100))
+            expense_row["pay_url"] = f"/accounts/pay_grn?grn_id={grn.id}&obligation=EXPENSES"
+            rows.append(expense_row)
 
         # Older GRNs predate the canonical SupplierPayment auto-row.  Preserve
         # their paid amount as one read-side debit only when no linked active
@@ -1359,6 +1402,9 @@ def _supplier_rows(supplier):
         supplier_id=supplier.id, is_void=False
     ).order_by(SupplierPayment.date_posted.asc(), SupplierPayment.id.asc()).all()
         if _is_supplier_ledger_payment(p)]
+    # A3: a payment keeps its own identity (material / expenses / advance) so
+    # the ledger shows which payable it settled instead of one anonymous debit.
+    applied_by_grn = {}
     for payment in payments:
         amount = _decimal(getattr(payment, "amount", 0))
         if amount == 0:
@@ -1367,11 +1413,26 @@ def _supplier_rows(supplier):
         is_credit = amount < 0 or ptype in {"refund", "return", "credit", "supplier return"}
         debit = Decimal("0.00") if is_credit else abs(amount)
         credit = abs(amount) if is_credit else Decimal("0.00")
-        rows.append(_row(
+        kind = (getattr(payment, "payment_kind", None) or "").strip().upper()
+        grn = db.session.get(GRN, payment.grn_id) if getattr(payment, "grn_id", None) else None
+        material_share = expense_share = 0.0
+        if grn is not None and not is_credit and kind == "GRN_EXPENSES":
+            expense_share = _float(abs(amount))
+        elif grn is not None and not is_credit and kind in ("GRN_MATERIAL", "ADVANCE", ""):
+            material_share = _float(abs(amount))
+        if is_credit:
+            description = "Supplier refund/credit"
+        elif grn is not None and kind == "GRN_EXPENSES":
+            description = f"GRN expenses paid ({getattr(payment, 'method', None) or 'Cash'})"
+        elif grn is not None:
+            description = f"Stock / material paid ({getattr(payment, 'method', None) or 'Cash'})"
+        else:
+            description = f"Payment ({getattr(payment, 'method', None) or 'Cash'})"
+        row = _row(
             date_value=getattr(payment, "date_posted", None),
             row_type="Supplier Refund" if is_credit else "Payment",
             reference=_bill_ref(payment, "manual_bill_no", "auto_bill_no", fallback=f"PAY-{payment.id}"),
-            description=("Supplier refund/credit" if is_credit else f"Payment ({getattr(payment, 'method', None) or 'Cash'})"),
+            description=description,
             debit=debit,
             credit=credit,
             source_type="SupplierPayment",
@@ -1380,7 +1441,14 @@ def _supplier_rows(supplier):
             note=getattr(payment, "note", "") or "",
             account=getattr(getattr(payment, "payment_account", None), "name", "") or "",
             source=payment,
-        ))
+        )
+        row["grn_material"] = material_share
+        row["grn_expenses"] = expense_share
+        if grn is not None:
+            if not is_credit:
+                applied_by_grn[grn.id] = applied_by_grn.get(grn.id, 0.0) + _float(abs(amount))
+            row["pay_url"] = f"/accounts/pay_grn?grn_id={grn.id}"
+        rows.append(row)
     _sort_rows(rows, supplier=True)
     closing = _apply_running_balance(rows, convention="supplier")
     total_debit = _float(sum((_decimal(r["debit"]) for r in rows), Decimal("0.00")))

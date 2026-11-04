@@ -23,7 +23,11 @@
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <div>
       <h3 class="mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>PAY EXISTING GRN / GRN PAYMENT</h3>
-      <div class="text-muted small">All purchase payments are made here. A GRN only records what was received and what is owed.</div>
+      <div class="text-muted small">
+        Every obligation of this GRN with its own paid / remaining balance: stock, the GRN expenses ticked for the
+        supplier, and each expense recipient. A GRN only records what was received and what is owed.
+        Prefer the split screen? <a href="{{ url_for('accounts.pay_grn', grn_id=selected.id) if selected else url_for('accounts.pay_grn') }}">Pay GRN (stock / expenses)</a>.
+      </div>
     </div>
     <div class="d-flex gap-2">
       <a href="{{ url_for('accounts.purchase_payables') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-list-check"></i> Outstanding Payables</a>
@@ -57,7 +61,7 @@
   {% if breakdown %}
   <div class="row g-2 mb-3 small">
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Material</div><b>Rs. {{ '{:,.2f}'.format(breakdown.supplier_material_amount) }}</b></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Ledger Bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b><div class="small text-muted">{{ 'Material + selected expenses' if breakdown.supplier_billed_charge_count else 'Material only' }}</div></div></div></div>
+    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Ledger Bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b><div class="small text-muted">Stock {{ '{:,.2f}'.format(breakdown.material_original) }} + expenses {{ '{:,.2f}'.format(breakdown.expenses_original) }}</div></div></div></div>
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Additional Charges</div><b>Rs. {{ '{:,.2f}'.format(breakdown.capitalised_charge_total + breakdown.expense_charge_total) }}</b></div></div></div>
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Total Actual Cost</div><b class="text-success">Rs. {{ '{:,.2f}'.format(breakdown.landed_cost_total) }}</b></div></div></div>
     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Avg Actual Rate</div><b>Rs. {{ '{:,.2f}'.format(breakdown.average_actual_rate) }}</b></div></div></div>
@@ -78,7 +82,9 @@
                   data-grn-obligation-row="{{ ob.key }}" data-remaining="{{ '%.2f'|format(ob.remaining) }}">
                 <td>
                   <b>{{ ob.label }}</b>
+                  {% if ob.kind in ['MATERIAL', 'EXPENSES'] %}<span class="badge bg-dark border border-secondary ms-1">supplier</span>{% endif %}
                   <span class="d-block small text-muted">{{ ob.recipient_label }}{% if ob.recipient_name %} — {{ ob.recipient_name }}{% endif %}</span>
+                  {% if ob.hint %}<span class="d-block small text-muted fst-italic">{{ ob.hint }}</span>{% endif %}
                 </td>
                 <td class="text-end">{{ '{:,.2f}'.format(ob.original) }}</td>
                 <td class="text-end">{{ '{:,.2f}'.format(ob.paid) }}</td>
@@ -101,7 +107,7 @@
             {% for pay in breakdown.payment_rows %}
               <tr class="{{ 'text-decoration-line-through text-muted' if pay.is_void else '' }}">
                 <td>{{ pay.date_posted.strftime('%d/%b/%Y') if pay.date_posted else '—' }}</td>
-                <td>{{ pay.recipient_name or pay.recipient_type }}</td>
+                <td>{{ pay.obligation_label }} <span class="text-muted">→ {{ pay.recipient_name or pay.recipient_type }}</span></td>
                 <td class="text-end">{{ '{:,.2f}'.format(pay.amount) }}</td>
                 <td>{{ pay.method }}</td>
                 <td>{{ pay.reference }}</td>
@@ -151,7 +157,10 @@
                   </option>
                 {% endfor %}
               </select>
-              <div class="form-text">Choose the supplier, vehicle/transporter, loading/unloading team, or other GRN expense recipient.</div>
+              <div class="form-text">
+                Stock and the GRN expenses billed to the supplier are separate payables: paying one never
+                settles the other.
+              </div>
             </div>
 
             <div class="grn-payment-live-summary p-3 mb-3" id="grnPaymentLiveSummary" aria-live="polite">

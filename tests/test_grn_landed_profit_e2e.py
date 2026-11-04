@@ -393,9 +393,14 @@ def test_selecting_every_expense_moves_all_grn_costs_into_supplier_ledger_and_ac
         assert bd["supplier_billed_charges"] == 6500
         assert bd["supplier_bill_amount"] == 156500
         assert bd["average_actual_rate"] == 1565
-        assert len(bd["obligations"]) == 1
-        assert bd["obligations"][0]["kind"] == "SUPPLIER"
-        assert bd["obligations"][0]["original"] == 156500
+        # A3: stock and the ticked GRN expenses are TWO supplier payables, so
+        # either can be paid without silently settling the other.
+        assert len(bd["obligations"]) == 2
+        assert [o["kind"] for o in bd["obligations"]] == ["MATERIAL", "EXPENSES"]
+        assert [o["original"] for o in bd["obligations"]] == [150000, 6500]
+        assert [o["key"] for o in bd["obligations"]] == [f"MATERIAL:{gid}", f"EXPENSES:{gid}"]
+        assert bd["material_remaining"] == 150000
+        assert bd["expenses_remaining"] == 6500
         assert bd["total_remaining"] == 156500
         supplier = Supplier.query.one()
         assert build_supplier_financial_ledger(supplier)["closing_balance"] == 156500
@@ -417,7 +422,11 @@ def test_selecting_every_expense_moves_all_grn_costs_into_supplier_ledger_and_ac
         assert bd["total_remaining"] == 0
         assert bd["total_cash_paid"] == 156500
         assert build_supplier_financial_ledger(Supplier.query.one())["closing_balance"] == 0
-        assert AccountTransaction.query.count() == 1
+        # A3: material and the ticked expenses are settled by TWO vouchers, each
+        # with its own cash-out row; the cash total is unchanged.
+        assert AccountTransaction.query.count() == 2
+        kinds = {p.payment_kind for p in SupplierPayment.query.all()}
+        assert kinds == {"GRN_MATERIAL", "GRN_EXPENSES"}
     assert report(app)["summary"] == rep["summary"]
 
 
@@ -456,8 +465,13 @@ def test_mixed_expense_selection_splits_supplier_and_recipient_payables_exactly(
         assert bd["expense_charge_total"] == 700
         assert bd["landed_cost_total"] == 156500
         assert bd["total_obligations"] == 157200
-        assert len(bd["obligations"]) == 3
-        assert {o["kind"] for o in bd["obligations"]} == {"SUPPLIER", "CHARGE"}
+        # material + supplier-billed expenses + the two unreleased recipient
+        # charges (loading 1,000 and the separate expense 700 both keep their
+        # own payee once they are not ticked... only Loading is unticked here).
+        assert len(bd["obligations"]) == 4
+        assert {o["kind"] for o in bd["obligations"]} == {"MATERIAL", "EXPENSES", "CHARGE"}
+        assert bd["material_remaining"] == 150000
+        assert bd["expenses_remaining"] == 5500
         assert bd["additional_remaining"] == 1700
 
         from app.services.financial_ledgers import (
@@ -495,7 +509,9 @@ def test_mixed_expense_selection_splits_supplier_and_recipient_payables_exactly(
         assert bd["supplier_paid"] == 155500
         assert bd["additional_paid"] == 1700
         assert bd["total_cash_paid"] == 157200
-        assert AccountTransaction.query.count() == 3
+        # material + expenses + the two unpaid recipient charges (Loading 1,000,
+        # separate expense 700) = four vouchers, four separate cash-out rows.
+        assert AccountTransaction.query.count() == 4
         assert build_supplier_financial_ledger(Supplier.query.one())["closing_balance"] == 0
     assert report(app)["summary"] == rep["summary"]
 

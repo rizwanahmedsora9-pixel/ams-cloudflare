@@ -294,9 +294,15 @@
                             </a>
                         </div>
                         <div class="col-md-6 col-xl-3">
+                            <a href="{{ url_for('accounts.pay_grn') }}" class="quick-action">
+                                <div class="qa-icon qa-8"><i class="bi bi-receipt"></i></div>
+                                <div><div class="qa-title">Pay GRN — Stock &amp; Expenses</div><div class="qa-sub">Stock (qty × rate) and GRN expenses paid separately</div></div>
+                            </a>
+                        </div>
+                        <div class="col-md-6 col-xl-3">
                             <a href="{{ url_for('accounts.supplier_payments') }}" class="quick-action">
                                 <div class="qa-icon qa-2"><i class="bi bi-truck"></i></div>
-                                <div><div class="qa-title">Supplier Payments</div><div class="qa-sub">Money paid to suppliers</div></div>
+                                <div><div class="qa-title">Supplier Payments</div><div class="qa-sub">Vouchers — each settles a GRN payable</div></div>
                             </a>
                         </div>
                         <div class="col-md-6 col-xl-3">

@@ -46,6 +46,21 @@
 >   row or frozen sale cost is rewritten. Legacy charges are backfilled into
 >   `grn_charge` as their own party obligations, so total purchase payables stay
 >   correct. This is disclosed in the implementation report.
+>
+> **A3 — "Pay supplier" and "pay GRN expenses" are two separate payables
+> (owner, 2026-11-04).** A GRN has *one stock payable* (`Σ qty × rate`, paid to
+> the supplier) and, separately, *the GRN expenses that were ticked "add to
+> supplier ledger"*. Paying one must never settle the other, and each carries
+> its own amount, paid figure and remaining balance. The GRN screen shows them
+> as two boxes, each with its own **Pay full**. Expenses that were **not**
+> ticked are never part of the supplier balance at all — they are payable to
+> their own recipient (vehicle owner, labour team, other) from **PAY EXISTING
+> GRN**. Implemented as `MATERIAL:<grn_id>` and `EXPENSES:<grn_id>` obligation
+> keys in `app/services/grn_costing.py`, with `SupplierPayment.payment_kind`
+> `GRN_MATERIAL` / `GRN_EXPENSES` (plus one `AccountTransaction` each), and the
+> new **Accounts → PAY GRN (STOCK / EXPENSES)** screen at `/accounts/pay_grn`.
+> The legacy lumped key `SUPPLIER:<grn_id>` still works: the amount is split
+> stock-first, then supplier-billed expenses, posted as separate vouchers.
 
 ---
 

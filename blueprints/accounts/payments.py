@@ -1,5 +1,8 @@
 """payments — split from accounts.py."""
 from ._common import *  # noqa
+from app.services.grn_costing import OBLIGATION_LABEL
+from app.services.grn_costing import payment_obligation_label
+from app.services.grn_payments import supplier_open_obligation_options
 
 def _payment_page_size():
     try:
@@ -208,8 +211,17 @@ def supplier_payments():
     from app.services.payments_crud import _supplier_payment_source
     for p in payments.items:
         source_type, source_id = _supplier_payment_source(p)
-        payment_meta[p.id] = {'source_type': source_type, 'source_id': source_id}
+        payment_meta[p.id] = {
+            'source_type': source_type,
+            'source_id': source_id,
+            'grn_payment': bool(getattr(p, 'grn_id', None)
+                                or (getattr(p, 'source_type', None) or '') == 'GRN_PAYMENT'),
+            'obligation_label': payment_obligation_label(p),
+        }
     payments_readonly = not _payments_permission_ok()
+    # The form pays a real GRN payable; it never posts a free-floating voucher
+    # that the receiving GRN would not know about (owner rule A3).
+    pay_obligations = supplier_open_obligation_options(state['party_id']) if state['party_id'] else []
 
     return render_template(
         'accounts/supplier_payments.html', payments=payments,
@@ -225,6 +237,8 @@ def supplier_payments():
         filter_party_name=(next((s.name for s in all_suppliers if s.id == state['party_id']), '')),
         filter_account_name=(next((_account_option_label(a) for a in all_accounts if a.id == state['account_id']), '')),
         payments_readonly=payments_readonly, payment_meta=payment_meta,
+        pay_obligations=pay_obligations,
+        obligation_labels=OBLIGATION_LABEL,
     )
 
 
@@ -402,22 +416,36 @@ def expenditures():
     # unpaid).  They are shown separately from cash-based expenditure totals
     # so nothing is double counted.
     from models import GRNCharge, GRN
+    from app.services.grn_costing import (
+        charge_billed_to_supplier, charge_supplier_billed_minor, charge_effective_minor,
+    )
     accrued = []
-    for charge in GRNCharge.query.filter(GRNCharge.cost_treatment == 'EXPENSE',
+    for charge in GRNCharge.query.filter(GRNCharge.cost_treatment.in_(['EXPENSE', 'INVENTORY']),
                                          GRNCharge.is_void == False).all():
         grn = db.session.get(GRN, charge.grn_id)
         if grn is None or bool(getattr(grn, 'is_void', False)):
             continue
         posted = getattr(grn, 'date_posted', None)
-        if date_from and posted and posted < date_from:
+        # date_posted is a datetime; the filter bounds are dates.
+        posted_day = posted.date() if hasattr(posted, 'date') else posted
+        if date_from and posted_day and posted_day < date_from:
             continue
-        if posted and posted >= date_to_excl:
+        if posted_day and posted_day >= date_to_excl:
+            continue
+        treatment = (getattr(charge, 'cost_treatment', None) or 'INVENTORY').upper()
+        billed_to_supplier = charge_billed_to_supplier(charge, grn)
+        if treatment == 'INVENTORY' and not billed_to_supplier:
+            # Material costs are inside the stock value; only the GRN expenses
+            # that were billed to the supplier are recognised here, and never
+            # twice with the cash-based rows above.
             continue
         accrued.append({
             'date_posted': posted,
             'category': charge.charge_type or 'GRN Charge',
-            'amount': float(getattr(charge, 'amount', 0) or 0),
-            'note': f"GRN #{charge.grn_id} · {getattr(charge, 'recipient_name', '') or ''}",
+            'amount': float(charge_effective_minor(charge)) / 100.0,
+            'note': f"GRN #{charge.grn_id} · {getattr(charge, 'recipient_name', '') or ''}"
+                    + (' · billed to supplier' if billed_to_supplier else ''),
+            'paid_minor': charge_supplier_billed_minor(charge, grn) if billed_to_supplier else 0,
         })
     accrued.sort(key=lambda x: x['date_posted'] or date_from, reverse=True)
 
@@ -572,26 +600,53 @@ def supplier_payment_save():
     payment_id = request.form.get('payment_id', type=int)
     try:
         from app.services.payments_crud import save_supplier_payment
-        payment, created = save_supplier_payment(
-            payment_id=payment_id,
-            supplier_id=request.form.get('supplier_id'),
-            amount=request.form.get('amount', 0),
-            method=request.form.get('method', 'Cash'),
-            payment_account_id=request.form.get('payment_account_id'),
-            bank_name=request.form.get('bank_name', ''),
-            account_name=request.form.get('account_name', ''),
-            account_no=request.form.get('account_no', ''),
-            manual_bill_no=request.form.get('manual_bill_no', ''),
-            date_posted=request.form.get('date', ''),
-            note=request.form.get('note', ''),
-            idempotency_key=request.form.get('idempotency_key'),
-            expected_revision=request.form.get('revision'),
-            actor=current_user,
-        )
-        replay = bool(getattr(payment, '_idempotent_replay', False))
+        from app.services.grn_payments import post_supplier_payment
+        obligation_key = (request.form.get('obligation_key') or '').strip()
+        if payment_id:
+            # Editing an existing (standalone) voucher keeps its own path.
+            payment, created = save_supplier_payment(
+                payment_id=payment_id,
+                supplier_id=request.form.get('supplier_id'),
+                amount=request.form.get('amount', 0),
+                method=request.form.get('method', 'Cash'),
+                payment_account_id=request.form.get('payment_account_id'),
+                bank_name=request.form.get('bank_name', ''),
+                account_name=request.form.get('account_name', ''),
+                account_no=request.form.get('account_no', ''),
+                manual_bill_no=request.form.get('manual_bill_no', ''),
+                date_posted=request.form.get('date', ''),
+                note=request.form.get('note', ''),
+                idempotency_key=request.form.get('idempotency_key'),
+                expected_revision=request.form.get('revision'),
+                actor=current_user,
+            )
+            payments, created_any = [payment], created
+        else:
+            # New payments MUST settle a GRN payable (material, GRN expenses or
+            # a charge recipient) so no GRN is left showing money as unpaid.
+            payments, created_any = post_supplier_payment(
+                supplier_id=request.form.get('supplier_id'),
+                amount=request.form.get('amount', 0),
+                method=request.form.get('method', 'Cash'),
+                payment_account_id=request.form.get('payment_account_id'),
+                date_posted=request.form.get('date', ''),
+                reference=(request.form.get('manual_bill_no') or '').strip(),
+                note=request.form.get('note', ''),
+                manual_bill_no=(request.form.get('manual_bill_no') or '').strip(),
+                obligation_key=obligation_key or None,
+                allow_advance=bool(request.form.get('allow_advance')),
+                idempotency_key=request.form.get('idempotency_key'),
+                actor=current_user,
+            )
+            created = created_any
+        replay = any(bool(getattr(p, '_idempotent_replay', False)) for p in payments)
         db.session.commit()
         if replay:
             flash('This supplier-payment submission was already processed; no duplicate was created.', 'info')
+        elif created and not payment_id:
+            total = sum(float(getattr(p, 'amount', 0) or 0) for p in payments)
+            detail = ', '.join(sorted({payment_obligation_label(p) for p in payments}))
+            flash(f'Rs. {total:,.2f} paid — {detail}. The GRN payable, Cash Flow and the ledgers are updated.', 'success')
         else:
             flash('Supplier payment saved successfully.' if created else 'Supplier payment updated. All balances recalculated.', 'success')
     except ValueError as exc:
@@ -631,6 +686,9 @@ def supplier_payment_data(id):
         'is_void': bool(p.is_void),
         'source_type': source_type,
         'source_id': source_id,
+        'grn_payment': bool(getattr(p, 'grn_id', None)
+                            or (getattr(p, 'source_type', None) or '') == 'GRN_PAYMENT'),
+        'obligation_label': payment_obligation_label(p),
     })
 
 

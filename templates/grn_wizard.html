@@ -1244,12 +1244,12 @@
                                                     <span>Avg Actual Rate: <b>{{ '{:,.2f}'.format(bd.average_actual_rate) }}</b></span>
                                                 </div>
                                                 <div class="d-flex flex-wrap gap-3 small mb-2">
-                                                    <span>Supplier Paid: <b>{{ '{:,.2f}'.format(bd.supplier_paid) }}</b></span>
-                                                    <span>Supplier Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.supplier_remaining) }}</b></span>
-                                                    <span>Charges Paid: <b>{{ '{:,.2f}'.format(bd.additional_paid) }}</b></span>
-                                                    <span>Charges Due: <b class="text-warning">{{ '{:,.2f}'.format(bd.additional_remaining) }}</b></span>
+                                                    <span class="px-2 py-1 rounded" style="background:rgba(56,189,248,.12)">Stock due: <b class="text-warning">{{ '{:,.2f}'.format(bd.material_remaining) }}</b> <span class="text-muted">of {{ '{:,.2f}'.format(bd.material_original) }}</span></span>
+                                                    <span class="px-2 py-1 rounded" style="background:rgba(245,158,11,.12)">GRN expenses due to supplier: <b class="text-warning">{{ '{:,.2f}'.format(bd.expenses_remaining) }}</b> <span class="text-muted">of {{ '{:,.2f}'.format(bd.expenses_original) }}</span></span>
+                                                    <span>Charges Due (own recipients): <b class="text-warning">{{ '{:,.2f}'.format(bd.additional_remaining) }}</b></span>
                                                     <span>Total Cash Actually Paid: <b class="text-success">{{ '{:,.2f}'.format(bd.total_cash_paid) }}</b></span>
-                                                    <a class="btn btn-sm btn-outline-info py-0" href="{{ url_for('accounts.grn_payments', grn_id=grn.id) }}"><i class="bi bi-cash-coin"></i> Pay this GRN</a>
+                                                    <a class="btn btn-sm btn-success py-0" href="{{ url_for('accounts.pay_grn', grn_id=grn.id) }}"><i class="bi bi-cash-coin"></i> Pay stock / expenses</a>
+                                                    <a class="btn btn-sm btn-outline-info py-0" href="{{ url_for('accounts.grn_payments', grn_id=grn.id) }}"><i class="bi bi-receipt"></i> All obligations</a>
                                                 </div>
                                                 <div class="small mb-1">
                                                     <div class="row g-1 fw-bold text-muted border-bottom pb-1">
@@ -1261,21 +1261,32 @@
                                                     </div>
                                                     {% for ob in bd.obligations %}
                                                     <div class="row g-1 border-bottom py-1">
-                                                        <div class="col-md-4">{{ ob.label }}{% if ob.kind == 'CHARGE' %} <span class="text-muted">→ {{ ob.recipient_name or ob.recipient_label }}</span>{% endif %}</div>
+                                                        <div class="col-md-4">{{ ob.label }}{% if ob.kind == 'CHARGE' %} <span class="text-muted">→ {{ ob.recipient_name or ob.recipient_label }}</span>{% endif %}{% if ob.kind in ['MATERIAL', 'EXPENSES'] %} <span class="badge bg-secondary">supplier</span>{% endif %}</div>
                                                         <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.original) }}</div>
                                                         <div class="col-md-2 text-end">{{ '{:,.2f}'.format(ob.paid) }}</div>
                                                         <div class="col-md-2 text-end fw-bold">{{ '{:,.2f}'.format(ob.remaining) }}</div>
-                                                        <div class="col-md-2">{{ ob.status }} <span class="text-muted">/ {{ ob.cost_treatment if ob.cost_treatment else 'Supplier material' }}</span></div>
+                                                        <div class="col-md-2">{{ ob.status }} <span class="text-muted">/ {{ ob.cost_treatment if ob.cost_treatment else ('Stock value' if ob.kind == 'MATERIAL' else 'Supplier-billed expenses' if ob.kind == 'EXPENSES' else 'Supplier') }}</span></div>
                                                     </div>
                                                     {% endfor %}
                                                 </div>
                                                 {% if bd.payment_rows %}
                                                 <div class="small fw-bold mt-2"><i class="bi bi-clock-history me-1"></i>Payment history</div>
                                                 <div class="small">
+                                                    <div class="row g-1 fw-bold text-muted border-bottom pb-1">
+                                                        <div class="col-md-2">Date</div>
+                                                        <div class="col-md-3">Paid for</div>
+                                                        <div class="col-md-2 text-end">Amount</div>
+                                                        <div class="col-md-2">Method</div>
+                                                        <div class="col-md-2">Reference</div>
+                                                        <div class="col-md-1"></div>
+                                                    </div>
                                                     {% for pay in bd.payment_rows %}
                                                     <div class="row g-1 border-bottom py-1">
                                                         <div class="col-md-2">{{ pay.date_posted.strftime('%d/%b/%Y') if pay.date_posted else '—' }}</div>
-                                                        <div class="col-md-3">{{ pay.recipient_name or pay.recipient_type }}</div>
+                                                        <div class="col-md-3">
+                                                            {{ pay.obligation_label }}
+                                                            {% if pay.recipient_type == 'SUPPLIER' %}<span class="badge bg-secondary">supplier</span>{% endif %}
+                                                        </div>
                                                         <div class="col-md-2 text-end">{{ '{:,.2f}'.format(pay.amount) }}</div>
                                                         <div class="col-md-2">{{ pay.method }}</div>
                                                         <div class="col-md-2">{{ pay.reference }}</div>

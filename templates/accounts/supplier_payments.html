@@ -24,7 +24,7 @@
     <div class="acc-page-header">
         <div>
             <h2><i class="bi bi-truck me-2 text-danger"></i>Supplier Payments</h2>
-            <div class="subtitle">Money paid out to suppliers. Filters work together – date, supplier, account, method & search.</div>
+            <div class="subtitle">Money paid out to suppliers. Every voucher settles a real GRN payable — stock and GRN expenses stay separate. Filters work together – date, supplier, account, method &amp; search.</div>
         </div>
         <div class="acc-toolbar">
             <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
@@ -32,6 +32,7 @@
             <a href="{{ url_for('supplier_ledger_shift_page', id=party_id_f) }}" class="btn btn-outline-primary btn-sm fw-bold" title="Move every ledger entry of the filtered supplier to another supplier"><i class="bi bi-arrow-left-right me-1"></i>Shift this supplier's ledger</a>
             {% endif %}
             {% if not payments_readonly %}
+            <a href="{{ url_for('accounts.pay_grn') }}" class="btn btn-success btn-sm fw-bold"><i class="bi bi-receipt me-1"></i>PAY GRN (stock / expenses)</a>
             <button type="button" class="btn btn-danger btn-sm" onclick="openSupplierPaymentModal()"><i class="bi bi-plus-lg me-1"></i>New Payment</button>
             {% endif %}
         </div>
@@ -84,7 +85,7 @@
                 <tr class="{% if p.is_void %}table-danger{% endif %}">
                     <td class="small">{{ p.date_posted.strftime('%Y-%m-%d %H:%M') }}</td>
                     {% set meta = payment_meta.get(p.id, {}) %}
-                    <td><strong class="d-block text-truncate" style="max-width:180px;" title="{{ p.supplier.name if p.supplier else '' }}">{{ p.supplier.name if p.supplier else '—' }}</strong>{% if p.is_void %} <span class="badge bg-danger ms-1">VOIDED</span>{% endif %}{% if meta.source_type %}<div class="small text-muted">{{ meta.source_type }} #{{ meta.source_id }} (linked)</div>{% endif %}</td>
+                    <td><strong class="d-block text-truncate" style="max-width:180px;" title="{{ p.supplier.name if p.supplier else '' }}">{{ p.supplier.name if p.supplier else '—' }}</strong>{% if p.is_void %} <span class="badge bg-danger ms-1">VOIDED</span>{% endif %}{% if p.grn_id %}<div class="small text-muted"><i class="bi bi-receipt me-1"></i>{{ meta.obligation_label }}{% if p.grn %} · {{ p.grn.manual_bill_no or p.grn.auto_bill_no or ('GRN-' ~ p.grn.id) }}{% endif %}</div>{% elif meta.source_type %}<div class="small text-muted">{{ meta.source_type }} #{{ meta.source_id }} (linked)</div>{% else %}<div class="small text-muted">{{ meta.obligation_label }}</div>{% endif %}</td>
                     <td><span class="small text-truncate d-block" style="max-width:180px;" title="{{ p.payment_account.name if p.payment_account else (p.account_name or '') }}">{{ p.payment_account.name if p.payment_account else (p.account_name or '—') }}</span></td>
                     <td class="text-end fw-bold text-danger">Rs. {{ "%.2f"|format(p.amount) }}</td>
                     <td><span class="badge bg-secondary">{{ p.method }}</span></td>
@@ -92,7 +93,9 @@
                     <td class="small text-muted"><span class="d-block text-truncate" style="max-width:240px;" title="{{ p.note or '' }}">{{ p.note or '' }}</span></td>
                     <td class="text-end text-nowrap">
                         <a href="{{ url_for('download_supplier_payment', payment_id=p.id, action='print') }}" class="btn btn-outline-info btn-sm me-1" title="View"><i class="bi bi-eye"></i></a>
-                        {% if meta.source_type %}
+                        {% if meta.grn_payment %}
+                            <a href="{{ url_for('accounts.pay_grn', grn_id=p.grn_id) }}" class="btn btn-outline-success btn-sm me-1" title="Open the GRN payables (stock / GRN expenses)"><i class="bi bi-receipt"></i></a>
+                        {% elif meta.source_type %}
                             <button type="button" class="btn btn-outline-secondary btn-sm me-1" disabled title="Controlled by {{ meta.source_type }} #{{ meta.source_id }}"><i class="bi bi-link-45deg"></i></button>
                             <button type="button" class="btn btn-outline-primary btn-sm me-1" title="Move the {{ meta.source_type }} #{{ meta.source_id }} behind this payment to another supplier"
                                     onclick="openSupplierPaymentShift('{{ url_for('shift_grn_supplier', id=meta.source_id) }}', '{{ meta.source_type }} #{{ meta.source_id }}')"><i class="bi bi-arrow-left-right"></i></button>

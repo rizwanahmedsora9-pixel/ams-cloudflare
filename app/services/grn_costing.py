@@ -13,6 +13,13 @@ A2  Supplier Ledger credit for a GRN is material
     discount and adjustment are never added.  Billing choices do not change
     inventory, COGS or expense recognition.
 
+A3  Material and supplier-billed expenses are SEPARATE payment obligations.
+    ``GRN_MATERIAL`` settles stock value only; ``GRN_EXPENSES`` settles the
+    ticked GRN costs only.  Both are paid from Accounts, neither can be paid
+    twice, and the supplier ledger / payables total is unchanged by how the
+    operator splits the payment.  (An older single lumped obligation is still
+    accepted and is always applied to material first.)
+
 Everything else (landed FIFO cost, COGS, expense recognition, payables, cash
 actually paid, GRN detail screens) is derived from this module so no screen can
 compute its own version of the truth.
@@ -59,6 +66,32 @@ DEFAULT_RECIPIENT_BY_CHARGE = {
 COST_TREATMENTS = ('INVENTORY', 'EXPENSE', 'NON_MATERIAL', 'UNTRACKED_LEGACY')
 DECLARED_STATUSES = ('PAID', 'UNPAID', 'NOT_APPLICABLE')
 ALLOCATION_BASES = ('VALUE', 'QUANTITY', 'MANUAL')
+
+#: Supplier payment obligations.  Material (stock value) and supplier-billed
+#: GRN expenses are paid separately; GRN_CHARGE is a non-supplier recipient.
+OBLIGATION_SUPPLIER = 'SUPPLIER'
+OBLIGATION_MATERIAL = 'MATERIAL'
+OBLIGATION_EXPENSES = 'EXPENSES'
+OBLIGATION_CHARGE = 'CHARGE'
+
+OBLIGATION_PREFIX = {
+    OBLIGATION_SUPPLIER: 'SUPPLIER',
+    OBLIGATION_MATERIAL: 'MATERIAL',
+    OBLIGATION_EXPENSES: 'EXPENSES',
+    OBLIGATION_CHARGE: 'CHARGE',
+}
+#: payment_kind written on the SupplierPayment row for each obligation.
+PAYMENT_KIND_BY_OBLIGATION = {
+    OBLIGATION_SUPPLIER: 'GRN_MATERIAL',   # legacy lumped obligation
+    OBLIGATION_MATERIAL: 'GRN_MATERIAL',
+    OBLIGATION_EXPENSES: 'GRN_EXPENSES',
+    OBLIGATION_CHARGE: 'GRN_CHARGE',
+}
+OBLIGATION_LABEL = {
+    OBLIGATION_SUPPLIER: 'Supplier bill',
+    OBLIGATION_MATERIAL: 'Stock / material amount',
+    OBLIGATION_EXPENSES: 'GRN expenses billed to supplier',
+}
 
 LEGACY_MIRRORS = (
     ('freight_cost', ('VEHICLE_FARE', 'TRANSPORT')),
@@ -297,6 +330,70 @@ def supplier_ledger_credit_minor(grn):
     return supplier_material_minor(grn) + supplier_billed_charge_minor(grn)
 
 
+def parse_obligation_key(obligation_key):
+    """Split ``"<HEAD>[:<id>]"`` into ``(head, id)``; never raises."""
+    key = (obligation_key or '').strip()
+    if not key:
+        return '', None
+    head, _, tail = key.partition(':')
+    try:
+        tail_id = int(tail) if tail.strip() else None
+    except (TypeError, ValueError):
+        tail_id = None
+    return head.strip().upper(), tail_id
+
+
+def make_obligation_key(kind, grn_id=None):
+    prefix = OBLIGATION_PREFIX.get(kind, kind)
+    return f'{prefix}:{grn_id}' if grn_id is not None else prefix
+
+
+def supplier_obligation_paid_minor(grn, obligation_kind):
+    """How much of ONE supplier obligation has actually been paid.
+
+    Payments are allocated in a fixed order, so a single cash voucher can
+    never settle two obligations and the same rupee can never pay twice:
+
+      * ``MATERIAL``  -> material-only payments, then any older lumped
+                         ``SUPPLIER`` voucher (unapplied part only);
+      * ``EXPENSES``  -> expense-only payments, then any remaining lumped
+                         voucher (after material has taken its share);
+      * ``SUPPLIER`` (legacy lumped) -> everything paid to the supplier.
+
+    The three figures always add up to :func:`supplier_ledger_credit_minor`.
+    """
+    rows = _payment_rows(grn) if getattr(grn, 'id', None) else []
+    supplier_rows = [p for p in rows if _is_supplier_payment(p)]
+    material_paid = 0
+    expense_paid = 0
+    lumped = 0
+    for p in supplier_rows:
+        amount = int(getattr(p, 'amount_minor', None)
+                     if getattr(p, 'amount_minor', None) is not None
+                     else _minor(getattr(p, 'amount', 0)))
+        if amount <= 0:
+            continue
+        kind = (getattr(p, 'payment_kind', None) or '').strip().upper()
+        if kind == 'GRN_EXPENSES':
+            expense_paid += amount
+        elif kind == 'ADVANCE' and getattr(p, 'grn_charge_id', None) is None:
+            material_paid += amount
+        elif getattr(p, 'grn_charge_id', None) is None and kind in ('GRN_MATERIAL', '', 'LEGACY_GRN_AUTO'):
+            material_paid += amount
+        else:
+            lumped += amount
+    supplier_minor = supplier_material_minor(grn)
+    billed_minor = supplier_billed_charge_minor(grn)
+    if obligation_kind == OBLIGATION_MATERIAL:
+        return min(material_paid, supplier_minor)
+    if obligation_kind == OBLIGATION_EXPENSES:
+        # Older lumped vouchers paid the material part first.
+        leftover = max(0, lumped - max(0, supplier_minor - material_paid))
+        return min(expense_paid + leftover, billed_minor)
+    # The legacy lumped obligation (and any "whole supplier bill" query).
+    return min(material_paid + lumped + expense_paid, supplier_minor + billed_minor)
+
+
 def _charge_minor(charge):
     current = getattr(charge, 'amount_minor', None)
     if current is None:
@@ -346,6 +443,27 @@ def _is_supplier_payment(row):
         return False
     # NULL recipient_type means a legacy/standalone supplier payment.
     return recipient in ('', 'SUPPLIER')
+
+
+def payment_obligation_label(payment, grn=None):
+    """Plain-language name of what one payment settled (display only)."""
+    if payment is None:
+        return ''
+    if (getattr(payment, 'grn_charge_id', None) or getattr(payment, 'payment_kind', '') == 'GRN_CHARGE'):
+        charge = getattr(payment, 'grn_charge', None)
+        if charge is not None:
+            base = CHARGE_TYPE_LABELS.get(getattr(charge, 'charge_type', ''), 'GRN charge')
+            label = getattr(charge, 'label', '') or getattr(payment, 'recipient_name', '')
+            return f'{base} — {label}'.strip(' —') if label else base
+        return getattr(payment, 'recipient_name', '') or 'GRN charge'
+    kind = (getattr(payment, 'payment_kind', None) or '').strip().upper()
+    if kind == 'GRN_EXPENSES':
+        return OBLIGATION_LABEL[OBLIGATION_EXPENSES]
+    if kind == 'ADVANCE':
+        return 'Supplier advance'
+    if kind == 'LEGACY_GRN_AUTO':
+        return 'Legacy GRN payment'
+    return OBLIGATION_LABEL[OBLIGATION_MATERIAL]
 
 
 def grn_breakdown(grn):
@@ -433,32 +551,59 @@ def grn_breakdown(grn):
     # A single "average rate" only makes sense for one material/one unit.
     avg_rate = (float(from_minor(landed_minor)) / total_qty) if total_qty > 0 else 0.0
 
-    obligations = [{
-        'key': f'SUPPLIER:{grn_id}',
-        'kind': 'SUPPLIER',
-        'charge_id': None,
-        'label': ('Supplier bill (material + selected GRN costs)' if include_charges else 'Supplier material amount'),
-        'recipient_type': 'SUPPLIER',
-        'recipient_label': 'Supplier',
-        'recipient_name': getattr(grn, 'supplier', '') or '',
-        'recipient_party_id': None,
-        'original': _f(supplier_bill_minor),
-        'original_minor': supplier_bill_minor,
-        'paid': _f(supplier_paid),
-        'paid_minor': supplier_paid,
-        'remaining': _f(max(0, supplier_bill_minor - supplier_paid)),
-        'remaining_minor': max(0, supplier_bill_minor - supplier_paid),
-        'status': ('Paid' if supplier_paid >= supplier_bill_minor and supplier_bill_minor > 0 else
-                   ('Partially Paid' if supplier_paid > 0 else 'Unpaid')),
-    }]
+    material_paid_minor = supplier_obligation_paid_minor(grn, OBLIGATION_MATERIAL)
+    expenses_paid_minor = supplier_obligation_paid_minor(grn, OBLIGATION_EXPENSES)
+
+    def _supplier_obligation(kind, original_minor, paid_minor, label, hint):
+        return {
+            'key': make_obligation_key(kind, grn_id),
+            'kind': kind,
+            'charge_id': None,
+            'label': label,
+            'hint': hint,
+            'recipient_type': 'SUPPLIER',
+            'recipient_label': 'Supplier',
+            'recipient_name': getattr(grn, 'supplier', '') or '',
+            'recipient_party_id': None,
+            'original': _f(original_minor),
+            'original_minor': original_minor,
+            'paid': _f(paid_minor),
+            'paid_minor': paid_minor,
+            'remaining': _f(max(0, original_minor - paid_minor)),
+            'remaining_minor': max(0, original_minor - paid_minor),
+            'status': ('Paid' if paid_minor >= original_minor and original_minor > 0 else
+                       ('Partially Paid' if paid_minor > 0 else 'Unpaid')),
+            # The two parts of this payee's total, so a lumped legacy voucher
+            # can be booked against whichever part is still open.
+            'material_original_minor': supplier_minor,
+            'expenses_original_minor': billed_charge_minor,
+        }
+
+    # A3: stock value and supplier-billed GRN expenses are SEPARATE payables,
+    # so the operator can pay the material now and the expenses later (or the
+    # other way round) without either being silently settled by the other.
+    obligations = [
+        _supplier_obligation(
+            OBLIGATION_MATERIAL, supplier_minor, material_paid_minor,
+            'Stock / material amount',
+            'Qty × purchase rate only — never a GRN expense.',
+        ),
+    ]
+    if billed_charge_minor > 0:
+        obligations.append(_supplier_obligation(
+            OBLIGATION_EXPENSES, billed_charge_minor, expenses_paid_minor,
+            'GRN expenses billed to supplier',
+            'Only the charges ticked "Add to supplier ledger" on this GRN.',
+        ))
     for row in charge_rows:
         if not row['applicable'] or row['amount_minor'] <= 0 or row['included_in_supplier_bill']:
             continue
         obligations.append({
-            'key': f'CHARGE:{row["id"]}',
+            'key': make_obligation_key(OBLIGATION_CHARGE, row['id']),
             'kind': 'CHARGE',
             'charge_id': row['id'],
             'label': f"{row['charge_label']}{(' — ' + row['label']) if row['label'] else ''}",
+            'hint': 'Paid to its own recipient. It is NOT part of the supplier bill.',
             'recipient_type': row['recipient_type'],
             'recipient_label': row['recipient_label'],
             'recipient_name': row['recipient_name'],
@@ -489,9 +634,9 @@ def grn_breakdown(grn):
     total_obligations = supplier_bill_minor + sum(
         r['amount_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill']
     )
-    total_remaining = max(0, supplier_bill_minor - supplier_paid) + sum(
-        r['remaining_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill']
-    )
+    # Every obligation's remaining is derived from the same allocation, so the
+    # GRN total is simply the sum of what is still open.
+    total_remaining = sum(o['remaining_minor'] for o in obligations)
 
     return {
         'grn_id': grn_id,
@@ -526,6 +671,13 @@ def grn_breakdown(grn):
         'supplier_paid': _f(supplier_paid),
         'supplier_paid_minor': supplier_paid,
         'supplier_remaining': _f(max(0, supplier_bill_minor - supplier_paid)),
+        # A3: the two supplier payables of this GRN, kept separately.
+        'material_original': _f(supplier_minor),
+        'material_paid': _f(material_paid_minor),
+        'material_remaining': _f(max(0, supplier_minor - material_paid_minor)),
+        'expenses_original': _f(billed_charge_minor),
+        'expenses_paid': _f(expenses_paid_minor),
+        'expenses_remaining': _f(max(0, billed_charge_minor - expenses_paid_minor)),
         'additional_paid': _f(charge_paid),
         'additional_remaining': _f(sum(r['remaining_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill'])),
         'total_obligations': _f(total_obligations),
@@ -544,6 +696,9 @@ def grn_breakdown(grn):
                 'recipient_name': getattr(p, 'recipient_name', '') or getattr(grn, 'supplier', '') or '',
                 'charge_id': getattr(p, 'grn_charge_id', None),
                 'payment_kind': getattr(p, 'payment_kind', None) or '',
+                # What the operator sees: material / supplier expenses / one
+                # recipient charge. Never a document type code.
+                'obligation_label': payment_obligation_label(p, grn),
                 'cash_posted': bool(getattr(p, 'cash_posted', False)),
                 'is_void': bool(getattr(p, 'is_void', False)),
                 'note': getattr(p, 'note', '') or '',
@@ -554,6 +709,51 @@ def grn_breakdown(grn):
         'tax_amount': float(getattr(grn, 'tax_amount', 0) or 0),
         'discount': float(getattr(grn, 'discount', 0) or 0),
         'adjustment_amount': float(getattr(grn, 'adjustment_amount', 0) or 0),
+    }
+
+
+def supplier_bill_breakdown(grn):
+    """One GRN's supplier payables, split the way the operator pays them (A3).
+
+    Returns the four numbers the Accounts screens show side by side:
+
+      * ``material``   stock only (Σ qty × rate);
+      * ``expenses``   GRN costs ticked "Add to supplier ledger";
+      * ``charges``    unticked expiry costs owed to their own recipients;
+      * ``paid`` / ``remaining`` for each, from the one allocation authority.
+
+    This is a projection: it never writes and never changes the supplier
+    ledger total, it only explains it.
+    """
+    breakdown = grn_breakdown(grn)
+    material = next((o for o in breakdown['obligations'] if o['kind'] == OBLIGATION_MATERIAL), None)
+    expenses = next((o for o in breakdown['obligations'] if o['kind'] == OBLIGATION_EXPENSES), None)
+    recipient_charges = [o for o in breakdown['obligations'] if o['kind'] == OBLIGATION_CHARGE]
+    return {
+        'grn_id': breakdown.get('grn_id'),
+        'bill_ref': breakdown.get('bill_ref'),
+        'supplier': breakdown.get('supplier'),
+        'supplier_id': breakdown.get('supplier_id'),
+        'date_posted': getattr(grn, 'date_posted', None),
+        'material': material,
+        'expenses': expenses,
+        'recipient_charges': recipient_charges,
+        'material_original': breakdown['material_original'],
+        'material_paid': breakdown['material_paid'],
+        'material_remaining': breakdown['material_remaining'],
+        'expenses_original': breakdown['expenses_original'],
+        'expenses_paid': breakdown['expenses_paid'],
+        'expenses_remaining': breakdown['expenses_remaining'],
+        'recipient_original': _f(sum(o['original_minor'] for o in recipient_charges)),
+        'recipient_paid': _f(sum(o['paid_minor'] for o in recipient_charges)),
+        'recipient_remaining': _f(sum(o['remaining_minor'] for o in recipient_charges)),
+        'supplier_bill_amount': breakdown['supplier_bill_amount'],
+        'supplier_remaining': breakdown['supplier_remaining'],
+        'landed_cost_total': breakdown['landed_cost_total'],
+        'total_remaining': breakdown['total_remaining'],
+        'supplier_billed_charge_count': breakdown['supplier_billed_charge_count'],
+        'payment_rows': breakdown['payment_rows'],
+        'charged_to_supplier': breakdown['charges'],
     }
 
 
@@ -858,6 +1058,11 @@ __all__ = [
     'get_or_create_party', 'supplier_material_minor', 'charge_billed_to_supplier',
     'charge_supplier_billed_minor', 'charges_billed_to_supplier',
     'supplier_billed_charge_minor', 'supplier_ledger_credit_minor', 'grn_breakdown',
+    'parse_obligation_key', 'make_obligation_key', 'supplier_obligation_paid_minor',
+    'supplier_bill_breakdown',
+    'payment_obligation_label', 'OBLIGATION_SUPPLIER', 'OBLIGATION_MATERIAL',
+    'OBLIGATION_EXPENSES', 'OBLIGATION_CHARGE', 'PAYMENT_KIND_BY_OBLIGATION',
+    'OBLIGATION_LABEL',
     'recompute_landed_costs', 'mirror_legacy_charge_columns',
     'sync_charges_from_form', 'calculate_grn_total',
 ]

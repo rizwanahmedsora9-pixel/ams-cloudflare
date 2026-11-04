@@ -169,7 +169,10 @@
       <a class="btn btn-outline-success fw-bold" href="{{ url_for('download_delivery_person_ledger', id=entity.id, action='download', start_date=filters.start_date, end_date=filters.end_date, type=filters.type_filter, q=filters.query, amount_min=filters.amount_min, amount_max=filters.amount_max, account=filters.account_filter, status=filters.status_filter) }}"><i class="bi bi-download me-1"></i>Export / download</a>
     {% endif %}
     {% if is_client %}<a class="btn btn-outline-success" href="{{ url_for('accounts.client_payments', client=entity.code or entity.name) }}"><i class="bi bi-cash-stack me-1"></i>Payments</a>{% endif %}
-    {% if is_supplier %}<a class="btn btn-outline-info" href="{{ url_for('accounts.supplier_payments', supplier=entity.id) }}"><i class="bi bi-cash-stack me-1"></i>Payments</a>{% endif %}
+    {% if is_supplier %}
+      <a class="btn btn-success fw-bold" href="{{ url_for('accounts.pay_grn', supplier_id=entity.id) }}" title="Stock and GRN expenses are paid as separate payables"><i class="bi bi-receipt me-1"></i>Pay GRN (stock / expenses)</a>
+      <a class="btn btn-outline-info" href="{{ url_for('accounts.supplier_payments', party_id=entity.id) }}"><i class="bi bi-cash-stack me-1"></i>Payments</a>
+    {% endif %}
     {% if is_supplier %}
       <a class="btn btn-outline-primary fw-bold" href="{{ url_for('supplier_ledger_shift_page', id=entity.id) }}" title="Move every entry of this ledger to another supplier and update the Accounts section"><i class="bi bi-arrow-left-right me-1"></i>Shift entire ledger</a>
       {% if entity.transferred_to_id %}
@@ -462,7 +465,7 @@
           <td class="ps-4 text-white-50">{{ row.date.strftime('%Y-%m-%d %H:%M') if row.date and row.date.year > 1 else '—' }}</td>
           <td><span class="badge bg-dark border border-secondary">{{ row.type }}</span></td>
           <td class="text-warning fw-bold">{% if is_supplier and row.source_type == 'SupplierPayment' and row.source_id %}<a class="text-warning text-decoration-none" href="{{ url_for('download_supplier_payment', payment_id=row.source_id, action='print') }}" title="View this supplier payment">{{ row.reference }}</a>{% elif is_supplier and row.source_type == 'GRN' and row.source_id %}<a class="text-warning text-decoration-none" href="{{ url_for('view_bill', bill_no=row.reference, src='grn', src_id=row.source_id) }}" title="View this GRN">{{ row.reference }}</a>{% elif row.reference and row.type not in ['OPENING', 'Carry Forward'] %}<a class="text-warning text-decoration-none" href="{{ url_for('view_bill', bill_no=row.reference) }}">{{ row.reference }}</a>{% elif row.reference %}{{ row.reference }}{% else %}—{% endif %}</td>
-          <td class="description">{% if is_supplier and row.item_lines %}<div class="ledger-item-line">{{ row.description }}</div>{% for li in row.item_lines %}<div class="ledger-item-line text-info" title="{{ li.name }}">{{ li.name }}</div>{% endfor %}{% else %}{{ row.description }}{% endif %}</td>
+          <td class="description">{% if is_supplier and row.item_lines %}<div class="ledger-item-line">{{ row.description }}</div>{% for li in row.item_lines %}<div class="ledger-item-line text-info" title="{{ li.name }}">{{ li.name }}</div>{% endfor %}{% else %}{{ row.description }}{% endif %}{% if is_supplier and row.grn_material %}<div class="small text-white-50 mt-1">Stock {{ '{:,.2f}'.format(row.grn_material) }}{% if row.grn_expenses %} · Expenses {{ '{:,.2f}'.format(row.grn_expenses) }}{% endif %}</div>{% endif %}</td>
           <td class="text-white-50 small">{{ row.account or '—' }}</td>
           <td class="text-white-50 small"><span class="ledger-note" title="{{ row.note or '' }}">{{ row.note or '—' }}</span></td>
           {% if is_supplier %}
@@ -485,8 +488,12 @@
                 <input type="hidden" name="id" value="{{ row.source_id }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete GRN"><i class="bi bi-trash"></i></button>
               </form>
+              <a href="{{ url_for('accounts.pay_grn', grn_id=row.source_id) }}" class="btn btn-sm btn-success ms-1" title="Pay this GRN — stock and expenses separately"><i class="bi bi-cash-coin"></i> Pay</a>
               <button type="button" class="btn btn-sm btn-outline-primary ms-1" title="Move only this GRN (with its auto-payment) to another supplier"
                       onclick="openLedgerRowShift('grn', {{ row.source_id }}, '{{ row.reference|e }}')"><i class="bi bi-arrow-left-right"></i></button>
+            {% elif is_supplier and row.type == 'GRN Expenses' and row.source_id %}
+              {# GRN expenses billed to the supplier: their own payable, paid apart from stock #}
+              <a href="{{ url_for('accounts.pay_grn', grn_id=row.source_id, obligation='EXPENSES') }}" class="btn btn-sm btn-warning text-dark" title="Pay the GRN expenses (separate from stock)"><i class="bi bi-cash-coin"></i> Pay expenses</a>
             {% elif is_supplier and row.source_type == 'GRN' and row.source_id and row.type == 'Payment' %}
               {# --- legacy paid-amount projection: manage it on the GRN itself --- #}
               <a href="{{ url_for('edit_grn', id=row.source_id) }}" class="btn btn-sm btn-outline-warning" title="This is the GRN's paid amount — edit it on the GRN"><i class="bi bi-pencil"></i> Edit GRN</a>

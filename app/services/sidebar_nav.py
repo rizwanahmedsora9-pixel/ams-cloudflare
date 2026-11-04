@@ -236,7 +236,8 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
         endpoint="accounts.dashboard",
         fallback_url="/accounts",
         prefix=("/accounts",),
-        exclude_prefix=("/accounts/payments/suppliers", "/pay_supplier"),
+        exclude_prefix=("/accounts/payments/suppliers", "/pay_supplier",
+                        "/accounts/pay_grn"),
         perm=_any_permission("can_manage_accounts", "can_manage_payments"),
         default_category="accounts",
         description="Financial accounts dashboard.",
@@ -264,6 +265,17 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
         description="Daily cash / drawer reconciliation.",
     ),
     NavLink(
+        key="pay_grn",
+        label="PAY GRN (STOCK / EXPENSES)",
+        icon="bi-receipt",
+        endpoint="accounts.pay_grn",
+        fallback_url="/accounts/pay_grn",
+        prefix=("/accounts/pay_grn",),
+        perm=lambda can, user: can("can_manage_payments") or can("can_manage_accounts"),
+        default_category="accounts",
+        description="Pay one GRN: stock (qty × rate) and its expenses as separate payables.",
+    ),
+    NavLink(
         key="pay_supplier",
         label="Pay Supplier",
         icon="bi-cash-coin",
@@ -273,7 +285,7 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
         perm=lambda can, user: can("can_view_supplier_ledger")
         and (can("can_manage_accounts") or can("can_manage_payments")),
         default_category="accounts",
-        description="Supplier payment vouchers.",
+        description="Supplier payment vouchers — each settles a GRN payable.",
     ),
     NavLink(
         key="grn_payments",
@@ -284,7 +296,7 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
         prefix=("/accounts/grn_payments",),
         perm=lambda can, user: can("can_manage_payments") or can("can_manage_accounts"),
         default_category="accounts",
-        description="Pay supplier / transporter / loading / other GRN obligations.",
+        description="Full obligation breakdown: supplier, expenses and every charge recipient.",
     ),
     NavLink(
         key="profit_reports",
