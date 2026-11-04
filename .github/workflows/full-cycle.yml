@@ -2,6 +2,11 @@ name: full cycle test
 
 # The mechanism is exit-code driven: known defects never fail the build,
 # unexpected failures always do.
+# `contents: write` is what lets the last step commit the ledger back to main.
+# Without it the token is read-only and `git push` fails with exit 128.
+permissions:
+  contents: write
+
 on:
   pull_request:
   push:
@@ -50,12 +55,22 @@ jobs:
           retention-days: 30
 
       # Commit the updated skill ledger + index back so history accumulates.
+      # Bookkeeping only. If this fails (fork PR, protected branch, expired
+      # token) the *results are still valid* — the cycle already passed above.
+      # `continue-on-error` keeps a green suite green.
       - name: Persist the skill ledger
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: |
+          set -euo pipefail
+          LEDGER="full cycle test mechanism/2.skills/ledger.jsonl"
+          INDEX="full cycle test mechanism/2.skills/skills-index.md"
           git config user.name  "full-cycle-bot"
           git config user.email "bot@example.invalid"
-          git add "full cycle test mechanism/2.skills/ledger.jsonl" \
-                  "full cycle test mechanism/2.skills/skills-index.md"
-          git diff --cached --quiet || git commit -m "chore(full-cycle): record run"
-          git push
+          git add "$LEDGER" "$INDEX"
+          if git diff --cached --quiet; then
+            echo "::notice::ledger already up to date - nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore(full-cycle): record run $(date -u +%Y%m%dT%H%M)"
+          git push && echo "::notice::ledger committed to main"
