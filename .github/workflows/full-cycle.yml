@@ -1,0 +1,61 @@
+name: full cycle test
+
+# The mechanism is exit-code driven: known defects never fail the build,
+# unexpected failures always do.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -q -r requirements.txt
+          .venv/bin/pip install -q pypdf
+
+      - name: Run the full cycle
+        id: cycle
+        run: |
+          .venv/bin/python "full cycle test mechanism/1.all files/shared/run.py" \
+            --label "pr-${{ github.event.pull_request.number || github.ref_name }}"
+
+      - name: Publish the report
+        if: always()
+        run: |
+          latest=$(ls -d "full cycle test mechanism/1.all files"/run-* | sort | tail -1)
+          cat "$latest/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-cycle-report
+          path: |
+            full cycle test mechanism/1.all files/run-*/report.md
+            full cycle test mechanism/1.all files/run-*/results.json
+            full cycle test mechanism/1.all files/run-*/counts.json
+          retention-days: 30
+
+      # Commit the updated skill ledger + index back so history accumulates.
+      - name: Persist the skill ledger
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name  "full-cycle-bot"
+          git config user.email "bot@example.invalid"
+          git add "full cycle test mechanism/2.skills/ledger.jsonl" \
+                  "full cycle test mechanism/2.skills/skills-index.md"
+          git diff --cached --quiet || git commit -m "chore(full-cycle): record run"
+          git push
