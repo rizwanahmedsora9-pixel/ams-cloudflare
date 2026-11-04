@@ -1,0 +1,9 @@
+# Scratch databases and derived machine output.
+# Evidence that matters (report.md, results.json, META.json, counts.json) IS committed;
+# the 1.7 MB SQLite file is not — regenerate it with `run.py --keep-db`.
+*.db
+*.db-wal
+*.db-shm
+health.json
+*.health.json
+cycle.db.health.json

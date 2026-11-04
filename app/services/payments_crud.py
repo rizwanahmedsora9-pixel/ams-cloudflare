@@ -89,6 +89,16 @@ def _payment_payload_hash(*, client_code="", client_name="", amount=0, discount=
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
+def _supplier_payment_payload_hash(*, amount=0, method="", payment_account_id=None,
+                                    manual_bill_no="", date_posted=None, note="", **_):
+    """Fingerprint for a supplier payment, hashed from the raw submission."""
+    return _payment_payload_hash(
+        client_code="", client_name="", amount=amount, method=method,
+        payment_account_id=payment_account_id, manual_bill_no=manual_bill_no,
+        date_posted=date_posted, note=note,
+    )
+
+
 def _normalise_method(value, *, legacy_refund=False):
     raw = (value or ("Cash" if legacy_refund else "")).strip().lower()
     if legacy_refund and raw == "refund":
@@ -278,15 +288,19 @@ def save_client_payment(
     from app.services.waive import _sync_payment_waive_off
 
     key = _normalise_key(idempotency_key)
+    # Fingerprint the submission exactly as received.  The replay branch below
+    # hashes the same raw arguments, so an identical retry is recognised as a
+    # replay instead of being reported as "a different payment".
+    raw_fingerprint = _payment_payload_hash(
+        client_code=client_code, client_name=client_name, amount=amount,
+        discount=discount, method=method, payment_type=payment_type,
+        payment_account_id=payment_account_id, manual_bill_no=manual_bill_no,
+        date_posted=date_posted, note=note,
+    )
     if not payment_id and key:
         replay = Payment.query.filter_by(idempotency_key=key).first()
         if replay:
-            payload_hash = _payment_payload_hash(
-                client_code=client_code, client_name=client_name, amount=amount,
-                discount=discount, method=method, payment_type=payment_type,
-                payment_account_id=payment_account_id, manual_bill_no=manual_bill_no,
-                date_posted=date_posted, note=note,
-            )
+            payload_hash = raw_fingerprint
             stored = getattr(replay, "idempotency_payload_hash", None)
             if stored and stored != payload_hash:
                 raise ValueError(
@@ -453,14 +467,8 @@ def save_client_payment(
     payment.is_void = False
     payment.idempotency_key = key if created else payment.idempotency_key
     if created and key:
-        payment.idempotency_payload_hash = _payment_payload_hash(
-            client_code=payment.client_code, client_name=payment.client_name,
-            amount=payment.amount, discount=payment.discount,
-            method=payment.method, payment_type=payment.payment_type,
-            payment_account_id=payment.payment_account_id,
-            manual_bill_no=payment.manual_bill_no,
-            date_posted=payment.date_posted, note=payment.note,
-        )
+        # Store the same raw fingerprint the replay branch computes.
+        payment.idempotency_payload_hash = raw_fingerprint
     payment.updated_by = _actor(actor)
     payment.revision = revision + 1
     if created:
@@ -574,9 +582,9 @@ def save_supplier_payment(
     if not payment_id and key:
         replay = SupplierPayment.query.filter_by(idempotency_key=key).first()
         if replay:
-            payload_hash = _payment_payload_hash(
-                client_code="", client_name="", amount=amount,
-                method=method, payment_account_id=payment_account_id,
+            payload_hash = _supplier_payment_payload_hash(
+                amount=amount, method=method,
+                payment_account_id=payment_account_id,
                 manual_bill_no=manual_bill_no, date_posted=date_posted, note=note,
             )
             stored = getattr(replay, "idempotency_payload_hash", None)
@@ -682,11 +690,11 @@ def save_supplier_payment(
     payment.is_void = False
     payment.idempotency_key = key if created else payment.idempotency_key
     if created and key:
-        payment.idempotency_payload_hash = _payment_payload_hash(
-            amount=payment.amount, method=payment.method,
-            payment_account_id=payment.payment_account_id,
-            manual_bill_no=payment.manual_bill_no,
-            date_posted=payment.date_posted, note=payment.note,
+        # Same raw fingerprint the replay branch uses (see save_client_payment).
+        payment.idempotency_payload_hash = _supplier_payment_payload_hash(
+            amount=amount, method=method,
+            payment_account_id=payment_account_id,
+            manual_bill_no=manual_bill_no, date_posted=date_posted, note=note,
         )
     payment.updated_by = _actor(actor)
     payment.revision = revision + 1
