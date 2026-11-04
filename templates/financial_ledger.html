@@ -37,6 +37,108 @@
   .row-star-btn.starred {
     color: #eab308 !important;
   }
+
+  /* ---- Expandable daily rows for Delivery Person Ledger ---------- */
+  .driver-day-row {
+    cursor: pointer;
+    background: #1e293b;
+    border-color: #334155 !important;
+    transition: background-color 0.15s ease;
+  }
+  .driver-day-row:hover > td {
+    background-color: #24344b !important;
+  }
+  .driver-day-row.is-open {
+    box-shadow: inset 3px 0 0 #fbbf24;
+  }
+  .driver-day-row.is-open > td {
+    background-color: #24344b !important;
+  }
+  .driver-day-row > td {
+    padding-top: 0.78rem;
+    padding-bottom: 0.78rem;
+    vertical-align: middle;
+  }
+  .driver-day-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    flex: 0 0 auto;
+    background: #0f172a;
+    border: 1px solid #475569;
+    color: #fbbf24;
+    transition: transform 0.18s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+  }
+  .driver-day-row:hover .driver-day-chevron {
+    border-color: #fbbf24;
+  }
+  .driver-day-row.is-open .driver-day-chevron {
+    transform: rotate(90deg);
+    background: #fbbf24;
+    color: #0f172a;
+    border-color: #fbbf24;
+  }
+  .driver-day-title {
+    font-weight: 700;
+    color: #e2e8f0;
+  }
+  .driver-day-row.is-open .driver-day-title {
+    color: #fbbf24;
+  }
+  .driver-day-detail-row[hidden] {
+    display: none !important;
+  }
+  .driver-day-detail-row > td {
+    padding: 0 !important;
+    background: #0f172a !important;
+    border-top: 0 !important;
+  }
+  .driver-day-detail-wrap {
+    padding: 0.55rem 0.85rem 0.85rem 2.85rem;
+    border-bottom: 1px solid #334155;
+  }
+  .driver-day-detail-table {
+    --bs-table-bg: transparent;
+    color: #e2e8f0;
+    font-size: 0.84rem;
+  }
+  .driver-day-detail-table thead th {
+    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #334155;
+    background: transparent;
+  }
+  .driver-day-detail-table tbody td {
+    border-color: rgba(51, 65, 85, 0.65);
+  }
+  .driver-day-detail-table tbody tr:hover > td {
+    background: rgba(148, 163, 184, 0.06);
+  }
+  .driver-day-foot td {
+    border-top: 1px solid #475569 !important;
+    border-bottom: 0 !important;
+    background: rgba(15, 23, 42, 0.65) !important;
+  }
+  @media (max-width: 767.98px) {
+    .driver-day-detail-wrap { padding-left: 0.75rem; }
+    .driver-day-summary-meta { display: none; }
+  }
+  html[data-theme="light"] .driver-day-row { background: #ffffff; border-color: #cbd5e1 !important; }
+  html[data-theme="light"] .driver-day-row:hover > td,
+  html[data-theme="light"] .driver-day-row.is-open > td { background-color: #f8fafc !important; }
+  html[data-theme="light"] .driver-day-title { color: #0f172a; }
+  html[data-theme="light"] .driver-day-row.is-open .driver-day-title { color: #b45309; }
+  html[data-theme="light"] .driver-day-chevron { background: #f1f5f9; border-color: #cbd5e1; color: #b45309; }
+  html[data-theme="light"] .driver-day-row.is-open .driver-day-chevron { background: #f59e0b; border-color: #f59e0b; color: #ffffff; }
+  html[data-theme="light"] .driver-day-detail-row > td { background: #f8fafc !important; }
+  html[data-theme="light"] .driver-day-detail-table { color: #1e293b; }
+  html[data-theme="light"] .driver-day-foot td { background: #f1f5f9 !important; border-top-color: #cbd5e1 !important; }
 </style>
 
 {% set is_client = entity_type == 'client' %}
@@ -219,8 +321,134 @@
 {% endif %}
 
 <div class="card ledger-card shadow-sm">
-  <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center"><h5 class="mb-0 text-success"><i class="bi bi-journal-text me-2"></i>Financial transaction ledger</h5><span class="badge bg-success">{{ total }} movements</span></div>
+  <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h5 class="mb-0 text-success"><i class="bi bi-journal-text me-2"></i>Financial transaction ledger</h5>
+      {% if is_driver and day_groups %}
+      <div class="text-white-50 small mt-1"><i class="bi bi-chevron-right me-1"></i>Click a date (or its arrow) to view detailed entries; collapse to show only the total.</div>
+      {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      {% if is_driver and day_groups %}
+      <button type="button" class="btn btn-sm btn-outline-warning" id="driverLedgerToggleAll" data-expanded="0" aria-expanded="false">
+        <i class="bi bi-arrows-expand me-1"></i><span>Expand all</span>
+      </button>
+      <span class="badge bg-dark border border-secondary text-info">{{ total_days or 0 }} {{ 'day' if (total_days or 0) == 1 else 'days' }}</span>
+      {% endif %}
+      <span class="badge bg-success">{{ total }} {{ 'movement' if total == 1 else 'movements' }}</span>
+    </div>
+  </div>
   <div class="table-responsive">
+    {% if is_driver %}
+    <table class="table table-dark align-middle mb-0" id="driverLedgerTable">
+      <thead class="bg-slate-900">
+        <tr>
+          <th class="ps-4">Date</th>
+          <th>Entries</th>
+          <th class="text-end">Total debit</th>
+          <th class="text-end">Total credit</th>
+          <th class="text-end pe-4">Running balance</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for group in day_groups or [] %}
+        {% set detail_id = 'driverDayDetail_' ~ loop.index %}
+        <tr class="driver-day-row" data-group-key="{{ group.key }}" data-target="{{ detail_id }}" tabindex="0" aria-expanded="false" aria-controls="{{ detail_id }}">
+          <td class="ps-4">
+            <div class="d-flex align-items-center gap-2">
+              <span class="driver-day-chevron" aria-hidden="true"><i class="bi bi-chevron-right"></i></span>
+              <span class="driver-day-title">{{ group.label }}</span>
+              <i class="bi bi-star-fill text-warning small driver-day-star-dot" hidden title="Contains highlighted entry"></i>
+            </div>
+          </td>
+          <td>
+            <span class="badge bg-dark border border-secondary">{{ group.entry_count }} {{ 'entry' if group.entry_count == 1 else 'entries' }}</span>
+            <span class="text-white-50 small ms-2 driver-day-summary-meta">{{ group.summary_text }}</span>
+          </td>
+          <td class="text-end text-warning fw-semibold ledger-number">{{ "Rs. {:,.2f}".format(group.total_debit or 0) if group.total_debit else '—' }}</td>
+          <td class="text-end text-success fw-semibold ledger-number">{{ "Rs. {:,.2f}".format(group.total_credit or 0) if group.total_credit else '—' }}</td>
+          <td class="text-end pe-4 fw-bold ledger-number">Rs. {{ "{:,.2f}".format(group.closing_balance or 0) }}</td>
+        </tr>
+        <tr class="driver-day-detail-row" id="{{ detail_id }}" data-group-key="{{ group.key }}" hidden>
+          <td colspan="5">
+            <div class="driver-day-detail-wrap">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0 driver-day-detail-table ledger-table">
+                  <thead>
+                    <tr>
+                      <th class="text-center" style="width: 42px;"><i class="bi bi-star text-warning" title="Click star to highlight line"></i></th>
+                      <th>Date / Time</th>
+                      <th>Type</th>
+                      <th>Reference</th>
+                      <th class="description">Description</th>
+                      <th>Account</th>
+                      <th>Notes</th>
+                      <th class="text-end">Debit</th>
+                      <th class="text-end">Credit</th>
+                      <th class="text-end">Running balance</th>
+                      <th class="text-end pe-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  {% for row in group.entries %}
+                    <tr>
+                      <td class="text-center" style="width: 42px;">
+                        <span class="row-star-btn" data-row-id="{{ row.source_type ~ '-' ~ (row.source_id or loop.index) ~ '-' ~ (row.date.strftime('%Y%m%d%H%M%S') if row.date else '') }}" title="Highlight entry">
+                          <i class="bi bi-star"></i>
+                        </span>
+                      </td>
+                      <td class="text-white-50">{{ row.date.strftime('%Y-%m-%d %H:%M') if row.date and row.date.year > 1 else '—' }}</td>
+                      <td><span class="badge bg-dark border border-secondary">{{ row.type }}</span></td>
+                      <td class="text-warning fw-bold">
+                        {% if row.source_type in ['SaleDeliveryPerson', 'DeliveryRent'] and row.reference %}
+                          <a class="text-warning text-decoration-none" href="{{ url_for('view_bill', bill_no=row.reference, src='direct_sale', src_id=row.source.sale_id) if row.source and row.source.sale_id else url_for('view_bill', bill_no=row.reference) }}">{{ row.reference }}</a>
+                        {% elif row.reference %}
+                          {{ row.reference }}
+                        {% else %}
+                          —
+                        {% endif %}
+                      </td>
+                      <td class="description">{{ row.description }}</td>
+                      <td class="text-white-50 small">{{ row.account or '—' }}</td>
+                      <td class="text-white-50 small"><span class="ledger-note" title="{{ row.note or '' }}">{{ row.note or '—' }}</span></td>
+                      <td class="text-end text-warning ledger-number">{{ "{:,.2f}".format(row.debit or 0) if row.debit else '—' }}</td>
+                      <td class="text-end text-success ledger-number">{{ "{:,.2f}".format(row.credit or 0) if row.credit else '—' }}</td>
+                      <td class="text-end fw-bold ledger-number">{{ "{:,.2f}".format(row.balance or 0) }}</td>
+                      <td class="text-end pe-3">
+                        {% if row.source_type == 'DeliveryPersonPayment' and row.source_id %}
+                          {% if not row.source.is_void %}
+                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editDriverPayment{{ row.source_id }}" title="Edit settlement"><i class="bi bi-pencil"></i></button>
+                            <form method="POST" action="{{ url_for('void_delivery_person_payment', id=row.source_id) }}" class="d-inline" onsubmit="return confirm('Reverse this settlement? The historical row will be preserved.');"><button class="btn btn-sm btn-outline-danger" title="Reverse settlement"><i class="bi bi-arrow-counterclockwise"></i></button></form>
+                          {% else %}
+                            <form method="POST" action="{{ url_for('restore_delivery_person_payment', id=row.source_id) }}" class="d-inline"><button class="btn btn-sm btn-outline-success" title="Restore settlement"><i class="bi bi-arrow-repeat"></i></button></form>
+                          {% endif %}
+                        {% else %}
+                          <span class="text-white-50">—</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                  </tbody>
+                  <tfoot>
+                    <tr class="driver-day-foot">
+                      <td colspan="7" class="ps-3 text-white-50 small fw-semibold">{{ group.label }} · {{ group.entry_count }} {{ 'entry' if group.entry_count == 1 else 'entries' }}</td>
+                      <td class="text-end text-warning fw-bold ledger-number">{{ "Rs. {:,.2f}".format(group.total_debit or 0) if group.total_debit else '—' }}</td>
+                      <td class="text-end text-success fw-bold ledger-number">{{ "Rs. {:,.2f}".format(group.total_credit or 0) if group.total_credit else '—' }}</td>
+                      <td class="text-end fw-bold ledger-number">Rs. {{ "{:,.2f}".format(group.closing_balance or 0) }}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="text-center py-5 text-white-50">No ledger movements match these filters.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
     <table class="table table-dark table-hover align-middle mb-0 ledger-table">
       <thead class="bg-slate-900"><tr><th class="text-center" style="width: 42px;"><i class="bi bi-star text-warning" title="Click star to highlight line"></i></th><th class="ps-4">Date</th><th>Type</th><th>Reference</th><th class="description">Description</th><th>Account</th><th>Notes</th>{% if is_supplier %}<th class="text-end">Qty</th><th class="text-end">Rate</th><th class="text-end">Amount</th>{% endif %}<th class="text-end">Debit</th><th class="text-end">Credit</th><th class="text-end">Running balance</th><th class="text-end pe-4">Actions</th></tr></thead>
       <tbody>
@@ -278,16 +506,15 @@
                   <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete payment"><i class="bi bi-trash"></i></button>
                 </form>
               {% endif %}
-            {% elif is_driver and row.source_type == 'DeliveryPersonPayment' and row.source_id %}
-              {% if not row.source.is_void %}<button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editDriverPayment{{ row.source_id }}" title="Edit settlement"><i class="bi bi-pencil"></i></button><form method="POST" action="{{ url_for('void_delivery_person_payment', id=row.source_id) }}" class="d-inline" onsubmit="return confirm('Reverse this settlement? The historical row will be preserved.');"><button class="btn btn-sm btn-outline-danger" title="Reverse settlement"><i class="bi bi-arrow-counterclockwise"></i></button></form>{% else %}<form method="POST" action="{{ url_for('restore_delivery_person_payment', id=row.source_id) }}" class="d-inline"><button class="btn btn-sm btn-outline-success" title="Restore settlement"><i class="bi bi-arrow-repeat"></i></button></form>{% endif %}
             {% else %}<span class="text-white-50">—</span>{% endif %}
           </td>
         </tr>
       {% else %}<tr><td colspan="{{ 14 if is_supplier else 11 }}" class="text-center py-5 text-white-50">No ledger movements match these filters.</td></tr>{% endfor %}
       </tbody>
     </table>
+    {% endif %}
   </div>
-  <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2"><span class="text-white-50 small">{{ total }} filtered movements · complete history remains in the source tables</span><span class="text-white-50 small">Page {{ page }} of {{ total_pages }}</span></div>
+  <div class="card-footer bg-transparent border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2"><span class="text-white-50 small">{% if is_driver %}{{ total_days or 0 }} {{ 'day' if (total_days or 0) == 1 else 'days' }} · {% endif %}{{ total }} filtered movements · complete history remains in the source tables</span><span class="text-white-50 small">Page {{ page }} of {{ total_pages }}</span></div>
 </div>
 
 {% if total_pages > 1 %}
@@ -511,10 +738,20 @@ document.addEventListener('DOMContentLoaded', function () {
           localStorage.setItem(storageKey, JSON.stringify(Array.from(starred)));
         } catch (e) {}
       }
+      if (window.DriverLedger && window.DriverLedger.syncDayStars) {
+        window.DriverLedger.syncDayStars();
+      }
     });
   });
+
+  if (window.DriverLedger && window.DriverLedger.syncDayStars) {
+    window.DriverLedger.syncDayStars();
+  }
 });
 </script>
+{% if is_driver %}
+<script src="{{ url_for('static', filename='driver_ledger.js') }}?v=1"></script>
+{% endif %}
 {% if is_supplier %}
 <div class="modal fade" id="ledgerRowShiftModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

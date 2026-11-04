@@ -10,6 +10,7 @@ from uuid import uuid4
 from app.services.financial_ledgers import (
     build_delivery_person_financial_ledger,
     filter_ledger_rows,
+    group_ledger_rows_by_day,
     ledger_page_closing,
 )
 
@@ -29,16 +30,21 @@ def _driver_filters():
 
 def _driver_page(ledger, filters):
     selected = ledger['filtered_rows']
+    all_day_groups = ledger.get('day_groups')
+    if all_day_groups is None:
+        all_day_groups = group_ledger_rows_by_day(selected)
     page = max(request.args.get('page', 1, type=int) or 1, 1)
     per_page = min(max(request.args.get('per_page', 25, type=int) or 25, 10), 100)
     total = len(selected)
-    pages = max(1, (total + per_page - 1) // per_page)
+    total_days = len(all_day_groups)
+    pages = max(1, (total_days + per_page - 1) // per_page)
     page = min(page, pages)
-    rows = selected[(page - 1) * per_page: page * per_page]
+    day_groups = all_day_groups[(page - 1) * per_page: page * per_page]
+    rows = [row for group in day_groups for row in group['entries']]
     # Same rule as the supplier ledger: the closing balance belongs to the
     # whole ledger, never to the page currently on screen.
     closing = ledger_page_closing(ledger, filters)
-    return rows, page, per_page, total, pages, closing
+    return rows, day_groups, page, per_page, total, total_days, pages, closing
 
 
 def _driver_payment_accounts():
@@ -52,7 +58,7 @@ def _driver_payment_accounts():
 def _render_driver_ledger(person, *, filters=None):
     filters = filters or _driver_filters()
     ledger = build_delivery_person_financial_ledger(person, **filters)
-    rows, page, per_page, total, pages, closing = _driver_page(ledger, filters)
+    rows, day_groups, page, per_page, total, total_days, pages, closing = _driver_page(ledger, filters)
     people = DeliveryPerson.query.order_by(DeliveryPerson.name.asc(), DeliveryPerson.id.asc()).all()
     return render_template(
         'financial_ledger.html',
@@ -60,6 +66,8 @@ def _render_driver_ledger(person, *, filters=None):
         entity_type='delivery_person',
         ledger=ledger,
         rows=rows,
+        day_groups=day_groups,
+        total_days=total_days,
         all_rows=ledger['rows'],
         obligations=[],
         filters=filters,
@@ -313,6 +321,18 @@ def delivery_person_ledger_api(id):
         'total_credit': ledger['total_credit'],
         'closing_balance': ledger['closing_balance'],
         'status': ledger['status'],
+        'day_groups': [{
+            'key': grp['key'],
+            'kind': grp['kind'],
+            'date': grp['date'],
+            'label': grp['label'],
+            'entry_count': grp['entry_count'],
+            'summary_text': grp['summary_text'],
+            'total_debit': grp['total_debit'],
+            'total_credit': grp['total_credit'],
+            'net': grp['net'],
+            'closing_balance': grp['closing_balance'],
+        } for grp in ledger.get('day_groups', [])],
         'rows': [{
             'date': row['date'].isoformat() if row.get('date') and row['date'] != datetime.min else None,
             'type': row.get('type'), 'reference': row.get('reference'),
