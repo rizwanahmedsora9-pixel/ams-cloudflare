@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """AMS maintenance CLI for cron/hosting scheduled tasks.
 
-Recommended hourly scheduler entry (from the repository root):
+Daily database backup (one file per day, outside instance/, emailed):
+    .venv/bin/python tools/maintenance.py backup-daily
+
+The legacy full-folder backup (still due-interval based):
     .venv/bin/python tools/maintenance.py backup-if-due
 
-The command is idempotent within the configured interval and uses a
-cross-process lock, so overlapping scheduler and WSGI fallback runs are safe.
+Both commands are idempotent for the period and use a cross-process lock, so
+overlapping scheduler and WSGI fallback runs are safe.
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ from app.services.maintenance import (
     run_backup_if_due,
     validate_backup,
 )
+from app.services import daily_backup as daily
 
 
 def main() -> int:
@@ -34,6 +38,14 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("backup-if-due", help="create one current backup only when due")
     sub.add_parser("backup-now", help="create and validate a backup immediately")
+    daily_run = sub.add_parser(
+        "backup-daily",
+        help="create today's single database file (outside instance/) and email it",
+    )
+    daily_run.add_argument("--force", action="store_true",
+                           help="run even if today's backup already exists")
+    daily_run.add_argument("--no-email", action="store_true", help="save the file without emailing it")
+    sub.add_parser("daily-status", help="print the daily backup folder and files as JSON")
     sub.add_parser("status", help="print storage and backup health as JSON")
     sub.add_parser("cleanup-temp", help="remove only stale maintenance-owned temp paths")
     verify = sub.add_parser("verify", help="fully validate one backup without restoring it")
@@ -50,6 +62,10 @@ def main() -> int:
                 result = run_backup_if_due(app)
             elif args.command == "backup-now":
                 result = create_backup(app, reason="manual-cli")
+            elif args.command == "backup-daily":
+                result = daily.run_daily_backup(app, force=args.force, send_email=not args.no_email)
+            elif args.command == "daily-status":
+                result = daily.status_snapshot(app)
             elif args.command == "status":
                 result = maintenance_status(app)
             elif args.command == "cleanup-temp":

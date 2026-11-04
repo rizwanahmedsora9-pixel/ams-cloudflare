@@ -18,6 +18,9 @@ env/
 # --- Runtime data: SQLite databases, secret_key, logs, backups, import artefacts ---
 # Everything under instance/ is created and managed by the running app.
 instance/
+# Automatic daily database backups live OUTSIDE instance/ on purpose (they must
+# survive a deleted/rebuild runtime folder), so they are ignored explicitly.
+backups/
 *.db
 *.sqlite
 *.sqlite3

@@ -127,7 +127,13 @@ def create_app(test_config: dict | None = None) -> Flask:
             os.environ.get("IMPORT_ARTIFACT_RETENTION_SECONDS", str(7 * 24 * 3600)) or "0"
         ),
         UPLOAD_DIR=os.environ.get("UPLOAD_DIR", str(root / "static" / "uploads")),
-        BACKUP_DIR=os.environ.get("BACKUP_DIR", str(instance_dir / "storage" / "backups")),
+        # Daily database backups deliberately live OUTSIDE instance/ so they
+        # survive someone deleting or rebuilding the runtime folder.
+        BACKUP_DIR=os.environ.get("BACKUP_DIR", str(root / "backups" / "db")),
+        DAILY_BACKUP_SCHEDULER=(
+            os.environ.get("AMS_DAILY_BACKUP_SCHEDULER", "1").strip().lower()
+            not in ("0", "false", "no")
+        ),
         MAINTENANCE_TEMP_DIR=os.environ.get("MAINTENANCE_TEMP_DIR", str(instance_dir / "storage" / "temp")),
         BACKUP_INTERVAL_SECONDS=int(os.environ.get("BACKUP_INTERVAL_SECONDS", "3600") or "3600"),
         BACKUP_RETENTION=int(os.environ.get("BACKUP_RETENTION", "3") or "3"),
@@ -359,6 +365,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     # cross-process filesystem lock prevents duplicate work under Gunicorn.
     from app.services.maintenance import start_embedded_scheduler
     start_embedded_scheduler(app)
+
+    # Daily database backup (outside instance/, optionally emailed). Disabled
+    # by default in tests; the per-day check + file lock make a cron job safe
+    # alongside this thread.
+    from app.services.daily_backup import start_daily_backup_scheduler
+    start_daily_backup_scheduler(app)
 
     return app
 
