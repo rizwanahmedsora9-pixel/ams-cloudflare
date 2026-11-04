@@ -1538,7 +1538,9 @@ def _delivery_person_rows(person):
             party_id=person.id,
         ))
 
-    allocations = SaleDeliveryPerson.query.filter_by(
+    allocations = SaleDeliveryPerson.query.options(
+        selectinload(SaleDeliveryPerson.sale),
+    ).filter_by(
         delivery_person_id=person.id, is_void=False
     ).join(DirectSale, SaleDeliveryPerson.sale_id == DirectSale.id).filter(
         DirectSale.is_void == False
@@ -1551,11 +1553,18 @@ def _delivery_person_rows(person):
             continue
         sale = getattr(alloc, "sale", None)
         ref = _bill_ref(sale, "manual_bill_no", "auto_bill_no", fallback=f"DS-{alloc.sale_id}")
+        client_label = getattr(sale, "client_name", "") or "sale"
+        bags_val = float(getattr(alloc, "bags_delivered", 0) or 0)
+        if bags_val > 0:
+            bags_txt = str(int(bags_val)) if bags_val == int(bags_val) else f"{bags_val:g}"
+            desc = f"Delivery rent ({client_label}) · {bags_txt} bags"
+        else:
+            desc = f"Delivery rent ({client_label})"
         rows.append(_row(
             date_value=getattr(alloc, "created_at", None) or getattr(sale, "date_posted", None),
             row_type="Delivery Rent",
             reference=ref,
-            description=f"Delivery rent ({getattr(sale, 'client_name', '') or 'sale'})",
+            description=desc,
             debit=rent,
             source_type="SaleDeliveryPerson",
             source_id=alloc.id,
@@ -1589,7 +1598,11 @@ def _delivery_person_rows(person):
             source=rent,
         ))
 
-    payments = DeliveryPersonPayment.query.filter_by(
+    payments = DeliveryPersonPayment.query.options(
+        selectinload(DeliveryPersonPayment.allocation).selectinload(SaleDeliveryPerson.sale),
+        selectinload(DeliveryPersonPayment.sale),
+        selectinload(DeliveryPersonPayment.payment_account),
+    ).filter_by(
         delivery_person_id=person.id, is_void=False
     ).order_by(DeliveryPersonPayment.date_posted.asc(), DeliveryPersonPayment.id.asc()).all()
     for payment in payments:
@@ -1605,15 +1618,23 @@ def _delivery_person_rows(person):
         # transaction is visible from the driver side and the account side.
         pay_account = getattr(payment, "payment_account", None)
         account_label = getattr(pay_account, "name", "") or ""
+        linked_sale = getattr(allocation, "sale", None) or getattr(payment, "sale", None)
+        sale_id = getattr(allocation, "sale_id", None) or getattr(payment, "sale_id", None)
+        sale_ref = _bill_ref(
+            linked_sale, "manual_bill_no", "auto_bill_no",
+            fallback=(f"DS-{sale_id}" if sale_id else ""),
+        ) if (linked_sale is not None or sale_id) else ""
+        bill_suffix = f" · Bill {sale_ref}" if sale_ref else ""
         if amount_paid > 0:
+            base_desc = (
+                f"Driver service payment from {account_label}" if account_label
+                else "Driver service payment"
+            )
             rows.append(_row(
                 date_value=getattr(payment, "date_posted", None),
                 row_type="Payment",
                 reference=ref,
-                description=(
-                    f"Driver service payment from {account_label}" if account_label
-                    else "Driver service payment"
-                ),
+                description=f"{base_desc}{bill_suffix}",
                 credit=amount_paid,
                 source_type="DeliveryPersonPayment",
                 source_id=payment.id,
@@ -1627,7 +1648,7 @@ def _delivery_person_rows(person):
                 date_value=getattr(payment, "date_posted", None),
                 row_type="Waive-Off",
                 reference=ref,
-                description="Driver settlement waive-off (no cash movement)",
+                description=f"Driver settlement waive-off (no cash movement){bill_suffix}",
                 credit=waive,
                 source_type="DeliveryPersonPayment",
                 source_id=payment.id,
@@ -1653,9 +1674,115 @@ def _delivery_person_rows(person):
     }
 
 
+def group_ledger_rows_by_day(rows):
+    """Group chronological ledger movements by calendar date without mutating rows.
+
+    Opening balances and carry-forward markers stay in standalone groups so a
+    day's operational debit/credit totals strictly reflect that day's entries.
+    Every group total is summed in ``Decimal`` and rounded once to paisa, and
+    ``closing_balance`` is the authoritative cumulative running balance of the
+    group's final entry.
+    """
+    groups = []
+    by_key = {}
+
+    for idx, row in enumerate(rows or ()):
+        row_type = (row.get("type") or "").strip()
+        dt = row.get("date")
+        if isinstance(dt, datetime) and dt != datetime.min and dt.year > 1:
+            day_iso = dt.strftime("%Y-%m-%d")
+        elif isinstance(dt, date) and dt.year > 1:
+            day_iso = dt.isoformat()
+        else:
+            day_iso = ""
+
+        if row_type == "Carry Forward":
+            gkey = f"carry-forward:{idx}"
+            kind = "carry_forward"
+            label = f"Carry Forward ({day_iso})" if day_iso else "Carry Forward"
+            group = {
+                "key": gkey,
+                "kind": kind,
+                "date": day_iso,
+                "label": label,
+                "entries": [row],
+            }
+            groups.append(group)
+            continue
+
+        if row_type in ("OPENING", "Opening"):
+            gkey = f"opening:{idx}"
+            kind = "opening"
+            label = f"Opening Balance ({day_iso})" if day_iso else "Opening Balance"
+            group = {
+                "key": gkey,
+                "kind": kind,
+                "date": day_iso,
+                "label": label,
+                "entries": [row],
+            }
+            groups.append(group)
+            continue
+
+        if day_iso:
+            gkey = f"day:{day_iso}"
+            kind = "day"
+            label = day_iso
+        else:
+            gkey = "day:undated"
+            kind = "undated"
+            label = "Undated"
+
+        group = by_key.get(gkey)
+        if group is None:
+            group = {
+                "key": gkey,
+                "kind": kind,
+                "date": day_iso,
+                "label": label,
+                "entries": [],
+            }
+            by_key[gkey] = group
+            groups.append(group)
+        group["entries"].append(row)
+
+    for group in groups:
+        entries = group["entries"]
+        debit_sum = sum((_decimal(r.get("debit", 0)) for r in entries), Decimal("0.00"))
+        credit_sum = sum((_decimal(r.get("credit", 0)) for r in entries), Decimal("0.00"))
+        net_sum = debit_sum - credit_sum
+        if abs(net_sum) < EPS:
+            net_sum = Decimal("0.00")
+        closing_bal = _float(entries[-1].get("balance", 0)) if entries else 0.0
+
+        counts = {}
+        for r in entries:
+            t = (r.get("type") or "Transaction").strip()
+            counts[t] = counts.get(t, 0) + 1
+        type_counts = list(counts.items())
+
+        if group["kind"] == "carry_forward":
+            summary_text = (entries[0].get("description") or "Carry Forward") if entries else "Carry Forward"
+        elif group["kind"] == "opening":
+            summary_text = "Opening Balance"
+        else:
+            summary_text = " · ".join(f"{cnt} {t}" for t, cnt in type_counts)
+
+        group["entry_count"] = len(entries)
+        group["total_debit"] = _float(debit_sum)
+        group["total_credit"] = _float(credit_sum)
+        group["net"] = _float(net_sum)
+        group["closing_balance"] = closing_bal
+        group["type_counts"] = type_counts
+        group["summary_text"] = summary_text
+
+    return groups
+
+
 def build_delivery_person_financial_ledger(person, **filters):
     ledger = _delivery_person_rows(person)
     ledger["filtered_rows"] = filter_ledger_rows(ledger["rows"], **filters)
+    ledger["day_groups"] = group_ledger_rows_by_day(ledger["filtered_rows"])
     return ledger
 
 
@@ -1873,5 +2000,6 @@ __all__ = [
     "build_party_financial_ledger",
     "build_purchase_payables",
     "filter_ledger_rows",
+    "group_ledger_rows_by_day",
     "financial_integrity_audit",
 ]
