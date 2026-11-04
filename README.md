@@ -56,7 +56,8 @@ tools/                  Maintenance, audit, migration and health scripts
 tests/                  pytest (backend + frontend)
 full_db_sync/           SQLite .amsdb snapshot export/import (stdlib only)
 dummy_data/             Sample workbook generator / verifier
-instance/               Runtime: SQLite DB, secret_key, logs, backups (git-ignored)
+instance/               Runtime: SQLite DB, secret_key, logs (git-ignored)
+backups/db/             Daily DB backup files — outside instance/ (git-ignored)
 ```
 
 `utils/module_loader.py` discovers blueprints at startup.
@@ -109,6 +110,11 @@ Default first-run admin (empty DB): `Admin` / `Admin@fbm12345`. Change it.
 | `SQLITE_JOURNAL_MODE` | auto | `DELETE` is forced on PythonAnywhere (no POSIX shm for WAL) |
 | `ALLOW_EMPTY_DB` | `1` | Missing DB is a valid first run |
 | `MIGRATIONS_ALLOW_DESTRUCTIVE` | `0` | Permit `DROP`/`DELETE` in SQL migration files |
+| `BACKUP_DIR` | `backups/db` (outside `instance/`) | Folder for the daily database backup files |
+| `AMS_DAILY_BACKUP_SCHEDULER` | `1` | `0` disables the in-app daily backup thread (use cron instead) |
+| `AMS_BACKUP_SMTP_PASSWORD` | unset | SMTP password for emailing backups (never stored in the DB) |
+| `DAILY_BACKUP_POLL_SECONDS` | `120` | How often the in-app thread checks whether today's backup is due |
+| `DAILY_BACKUP_LOCK_STALE_SECONDS` | `7200` | A backup lock older than this, owned by a dead process, is cleared |
 
 ---
 
@@ -276,6 +282,56 @@ path is full-history SQLite.
 
 **Adding schema later:** drop `app/migrations/0002_short_name.sql` (never edit
 an already-applied file). See `app/migrations/README.md`.
+
+---
+
+## Daily database backup (outside `instance/`, emailed)
+
+Settings → **Daily Database Backup** (`/settings/daily-backup`, admin only).
+
+Once per Pakistan calendar day the app copies the live SQLite database with
+SQLite's own online backup API (safe while the shop keeps working), checks
+`PRAGMA integrity_check` plus the presence of the application tables, and only
+then publishes the file:
+
+```text
+backups/db/ams_db_2026-11-04_131500.db     <- outside instance/ on purpose
+```
+
+* **One file per day.** `keep_days = 1` (the default) keeps only the newest
+  file: the new backup replaces the old one, so disk use stays flat. Raise it
+  to keep a history (e.g. `7`).
+* **Never a partial file.** The copy is written to `backups/db/.partial-*` and
+  renamed only after validation. A failure leaves the previous good file
+  untouched and is recorded in the run history.
+* **One self-contained file.** The copy is sealed to a rollback journal before
+  publishing, so a WAL database never produces a `.db` whose data still sits in
+  a stray `.db-wal`; the single file is what gets emailed and what can be
+  restored on its own. Stale locks from a killed process are cleared after
+  `DAILY_BACKUP_LOCK_STALE_SECONDS`, so a crash cannot stop future backups.
+* **Emailed.** Fill in recipients + SMTP host on the same page. The database
+  file is attached (uncheck *Attach the database file* for big databases and
+  use the download button instead). The SMTP **password is never stored in the
+  database** — set `AMS_BACKUP_SMTP_PASSWORD` in the server environment.
+  Gmail requires an *App password*.
+* **When it runs.** `auto` = at whatever time the app is first running that
+  day; `23:30` = at that clock time. The in-app thread starts with the app
+  (`AMS_DAILY_BACKUP_SCHEDULER=0` turns it off). To keep backing up even when
+  the app is stopped, add a cron entry instead — both use the same per-day
+  check and a cross-process lock, so they never duplicate work:
+
+  ```bash
+  # crontab -e  (every day at 23:30)
+  30 23 * * * cd /path/to/project && .venv/bin/python tools/maintenance.py backup-daily >> instance/logs/backup.log 2>&1
+  ```
+
+  Windows: Task Scheduler → daily → `python tools\maintenance.py backup-daily`.
+  Useful flags: `--force` (run even if today's backup exists) and `--no-email`.
+  `tools/maintenance.py daily-status` prints the folder and files as JSON.
+
+Before enabling it, press **Send test email** to prove the SMTP settings work.
+Note the daily file holds the **whole database**, including password hashes —
+keep the recipient mailbox private.
 
 ---
 

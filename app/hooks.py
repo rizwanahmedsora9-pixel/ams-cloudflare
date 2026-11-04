@@ -249,6 +249,8 @@ def register_hooks(app):
         if _AUTO_BACKUP_ENABLED:
             _start_hourly_backup_worker()
         _start_reconcile_worker()
+        from app.services.daily_backup import ensure_worker_started
+        ensure_worker_started(app)
 
     @app.before_request
     def _enforce_user_permissions():

@@ -1,0 +1,263 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h2 class="fw-bold text-warning mb-0"><i class="bi bi-database-check me-2"></i>Daily Database Backup</h2>
+        <p class="text-white-50 small mb-0">
+            One copy of the database file every day, saved outside the
+            <code>instance/</code> folder and emailed to you.
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('system.daily_backup_run_now') }}"
+              onsubmit="return confirm('Create a database backup now and email it?');">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-warning btn-sm fw-bold" type="submit">
+                <i class="bi bi-cloud-arrow-up me-1"></i> Backup &amp; email now
+            </button>
+        </form>
+        <a href="{{ url_for('settings') }}" class="btn btn-outline-light btn-sm fw-bold">
+            <i class="bi bi-arrow-left me-1"></i> Back to Settings
+        </a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-clock-history me-2 text-warning"></i>Schedule</h6>
+            </div>
+            <div class="card-body p-3">
+                <div class="alert alert-secondary py-2 px-3 small mb-3">
+                    <div><strong>Backup folder:</strong> <code>{{ snapshot.dir }}</code>
+                        <span class="text-white-50">(outside <code>instance/</code>)</span></div>
+                    <div><strong>Files kept:</strong> {{ row.keep_days or 1 }}
+                        {% if (row.keep_days or 1) == 1 %}
+                        <span class="text-white-50">— the newest file replaces the old one on every run</span>
+                        {% endif %}
+                    </div>
+                    <div><strong>Latest backup:</strong>
+                        {% if snapshot.files %}
+                        {{ snapshot.files[0].name }} ({{ (snapshot.files[0].size_bytes / 1048576) | round(2) }} MB, {{ snapshot.files[0].modified }})
+                        {% else %}
+                        <span class="text-warning">none yet</span>
+                        {% endif %}
+                    </div>
+                    {% if row.last_run_at %}
+                    <div><strong>Last run:</strong> {{ row.last_run_at.strftime('%Y-%m-%d %H:%M') }}
+                        — <span class="fw-bold">{{ row.last_status or 'n/a' }}</span></div>
+                    {% endif %}
+                    {% if row.last_message %}<div class="text-white-50">{{ row.last_message }}</div>{% endif %}
+                </div>
+
+                <form method="POST" action="{{ url_for('system.daily_backup_settings_save') }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="enabled"
+                               name="enabled" {% if row.enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-bold text-white" for="enabled">
+                            Enable the daily automatic backup
+                        </label>
+                        <div class="form-text text-white-50">
+                            When off, nothing is copied and no email is sent. “Backup &amp; email now” still works.
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small text-white-50">Run at (Pakistan time)</label>
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="run_at" value="{{ row.run_at or 'auto' }}" placeholder="auto or 23:30">
+                            <div class="form-text text-white-50">
+                                <code>auto</code> = once per day, at whatever time the app first runs that day.
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-white-50">Keep how many daily files?</label>
+                            <input type="number" min="1" max="365" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="keep_days" value="{{ row.keep_days or 1 }}">
+                            <div class="form-text text-white-50">
+                                1 = newest replaces the old (minimum disk). The email copy always stays.
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-3">
+                    <h6 class="fw-bold text-white mb-2"><i class="bi bi-envelope me-2 text-warning"></i>Email delivery</h6>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-white-50">Send backup to (comma-separated)</label>
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary"
+                               name="recipient_emails" value="{{ row.recipient_emails or '' }}"
+                               placeholder="owner@example.com, accounts@example.com">
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small text-white-50">SMTP server</label>
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="mail_host" value="{{ row.mail_host or '' }}" placeholder="smtp.gmail.com">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-white-50">Port</label>
+                            <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="mail_port" value="{{ row.mail_port or 0 }}" placeholder="0 = default">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small text-white-50">Security</label>
+                            <select class="form-select form-select-sm bg-dark text-white border-secondary" name="mail_security">
+                                <option value="starttls" {% if row.mail_security == 'starttls' %}selected{% endif %}>STARTTLS (587)</option>
+                                <option value="ssl" {% if row.mail_security == 'ssl' %}selected{% endif %}>SSL (465)</option>
+                                <option value="none" {% if row.mail_security == 'none' %}selected{% endif %}>None (25)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-white-50">Username (login)</label>
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="mail_username" value="{{ row.mail_username or '' }}" placeholder="you@gmail.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-white-50">From address</label>
+                            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="mail_from" value="{{ row.mail_from or '' }}" placeholder="you@gmail.com">
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning py-2 px-3 small mt-3 mb-3">
+                        <strong>Password is not stored in the database.</strong>
+                        Set it once as an environment variable on the server and restart:
+                        <code>{{ default_smtp_password_env }}=your-app-password</code><br>
+                        Status: {% if password_configured %}
+                        <span class="badge bg-success">password set</span>
+                        {% else %}
+                        <span class="badge bg-danger">password missing</span>
+                        {% endif %}
+                        <span class="text-dark-50">(Gmail needs an “App password”, not your normal login.)</span>
+                    </div>
+
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" id="email_db_attachment"
+                               name="email_db_attachment" {% if row.email_db_attachment %}checked{% endif %}>
+                        <label class="form-check-label text-white" for="email_db_attachment">
+                            Attach the database file to the email
+                        </label>
+                        <div class="form-text text-white-50">
+                            Attach when the file is small enough (under ~20 MB). For big databases use a
+                            download link instead — the file is always saved on disk.
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-4">
+                            <label class="form-label small text-white-50">SMTP timeout (seconds)</label>
+                            <input type="number" min="5" max="600" class="form-control form-control-sm bg-dark text-white border-secondary"
+                                   name="smtp_timeout_seconds" value="{{ row.smtp_timeout_seconds or 60 }}">
+                        </div>
+                        <div class="col-md-8 d-flex align-items-end gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="include_uploads"
+                                       name="include_uploads" {% if row.include_uploads %}checked{% endif %}>
+                                <label class="form-check-label small text-white-50" for="include_uploads">
+                                    Also copy uploaded files
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="include_db"
+                                       name="include_db" {% if row.include_db %}checked{% endif %}>
+                                <label class="form-check-label small text-white-50" for="include_db">
+                                    Include the database
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning btn-sm w-100 fw-bold mt-3">Save backup settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-secondary bg-dark shadow-sm mb-3" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-hdd me-2 text-warning"></i>Backup files on disk</h6>
+                {% if snapshot.files %}
+                <a class="btn btn-sm btn-outline-info fw-bold" href="{{ url_for('system.daily_backup_download') }}">Download</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-3">
+                {% if snapshot.files %}
+                <ul class="list-unstyled small mb-0">
+                    {% for f in snapshot.files %}
+                    <li class="d-flex justify-content-between border-bottom border-secondary py-1">
+                        <span class="text-white">{{ f.name }}</span>
+                        <span class="text-white-50">{{ (f.size_bytes / 1048576) | round(2) }} MB</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-white-50 small mb-0">
+                    No backup file yet. It is created the first time the daily run happens, or when you press
+                    <em>Backup &amp; email now</em>.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card border-secondary bg-dark shadow-sm" style="border-radius: 12px;">
+            <div class="card-header bg-transparent border-secondary py-2 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-white mb-0"><i class="bi bi-envelope-check me-2 text-warning"></i>Recent runs</h6>
+                <form method="POST" action="{{ url_for('system.daily_backup_test_email') }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <button class="btn btn-sm btn-outline-warning fw-bold" type="submit">Send test email</button>
+                </form>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>Backup</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for h in history %}
+                            <tr>
+                                <td class="small">{{ h.finished_at.strftime('%Y-%m-%d %H:%M') if h.finished_at else '' }}</td>
+                                <td class="small">
+                                    {% if h.status == 'success' %}
+                                    <span class="badge bg-success">saved</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">failed</span>
+                                    {% endif %}
+                                    {% if h.size_bytes %}<span class="text-white-50">{{ (h.size_bytes / 1048576) | round(2) }} MB</span>{% endif %}
+                                </td>
+                                <td class="small">
+                                    {% if h.email_status == 'sent' %}
+                                    <span class="badge bg-success">sent</span>
+                                    {% elif h.email_status == 'failed' %}
+                                    <span class="badge bg-danger">failed</span>
+                                    {% else %}
+                                    <span class="text-white-50">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if h.message and h.status != 'success' %}
+                            <tr><td colspan="3" class="small text-danger">{{ h.message }}</td></tr>
+                            {% elif h.email_error %}
+                            <tr><td colspan="3" class="small text-danger">{{ h.email_error }}</td></tr>
+                            {% endif %}
+                            {% else %}
+                            <tr><td colspan="3" class="text-center text-white-50 py-3 small">No runs yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
