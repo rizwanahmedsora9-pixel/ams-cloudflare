@@ -1,0 +1,3104 @@
+{
+ "label": "run-007-20261104T0636",
+ "prepared": {
+  "created": [
+   "cash_flow_party: Walkthrough Party"
+  ]
+ },
+ "pages": {
+  "pages": 58,
+  "pass": 58,
+  "partial": 0,
+  "fail": 0,
+  "forms_documented": 209,
+  "forms_found": 209,
+  "missing_form_count": 0,
+  "missing_field_groups": 0,
+  "rows": [
+   {
+    "path": "/",
+    "title": "System Dashboard",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 130012,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/inventory/stock_summary",
+    "title": "Stock Summary",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 132191,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/inventory/daily_transactions",
+    "title": "Daily Breakdown",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 131504,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/tracking",
+    "title": "History / Tracking",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 135303,
+    "title_ok": false,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/grn",
+    "title": "GRN (Receiving) - records tab",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 301838,
+    "title_ok": true,
+    "forms_documented": 15,
+    "forms_found": 15,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/grn?tab=costs",
+    "title": "GRN - costs tab",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 207692,
+    "title_ok": true,
+    "forms_documented": 3,
+    "forms_found": 3,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/bookings",
+    "title": "Bookings",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 156502,
+    "title_ok": true,
+    "forms_documented": 3,
+    "forms_found": 3,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/direct_sales",
+    "title": "Sales (direct sales)",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 293600,
+    "title_ok": true,
+    "forms_documented": 5,
+    "forms_found": 5,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/material_returns",
+    "title": "Material Return",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 147106,
+    "title_ok": true,
+    "forms_documented": 2,
+    "forms_found": 2,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/pending_bills",
+    "title": "Pending Bills",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 153657,
+    "title_ok": true,
+    "forms_documented": 6,
+    "forms_found": 6,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/delivery_rents",
+    "title": "Delivery Rent",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 156632,
+    "title_ok": true,
+    "forms_documented": 9,
+    "forms_found": 9,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/payments",
+    "title": "Payments",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 142651,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/",
+    "title": "Accounts dashboard",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 190044,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/accounts",
+    "title": "Manage accounts",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 145066,
+    "title_ok": true,
+    "forms_documented": 5,
+    "forms_found": 5,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/accounts/add",
+    "title": "Add account",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 157590,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/categories",
+    "title": "Account groups",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 145666,
+    "title_ok": true,
+    "forms_documented": 11,
+    "forms_found": 11,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/transfers",
+    "title": "Transfers",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 126646,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/receipts",
+    "title": "Receipts",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 127210,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/expenditures",
+    "title": "Expenditures",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 127924,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/reconciliations",
+    "title": "Reconciliations",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 129442,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/audit",
+    "title": "Account audit trail",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 154818,
+    "title_ok": true,
+    "forms_documented": 12,
+    "forms_found": 12,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/purchase_payables",
+    "title": "Purchase payables",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 124541,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/payments/clients",
+    "title": "Client payments",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 157606,
+    "title_ok": true,
+    "forms_documented": 4,
+    "forms_found": 4,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/payments/suppliers",
+    "title": "Supplier payments",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 156452,
+    "title_ok": true,
+    "forms_documented": 4,
+    "forms_found": 4,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/accounts/grn_payments",
+    "title": "Pay existing GRN",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 125493,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/cash_flow",
+    "title": "Cash Flow",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 218107,
+    "title_ok": true,
+    "forms_documented": 13,
+    "forms_found": 13,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/cash_flow_differences",
+    "title": "Cash Flow differences",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 126068,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/daily_reconciliation",
+    "title": "Daily reconciliation",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 144628,
+    "title_ok": true,
+    "forms_documented": 7,
+    "forms_found": 7,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/profit_reports",
+    "title": "Profit & Loss",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 184059,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/financial_details",
+    "title": "Financial details",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 129271,
+    "title_ok": false,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/suppliers",
+    "title": "Suppliers",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 176791,
+    "title_ok": true,
+    "forms_documented": 10,
+    "forms_found": 10,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/clients",
+    "title": "Clients",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 147527,
+    "title_ok": true,
+    "forms_documented": 5,
+    "forms_found": 5,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/materials",
+    "title": "Material Brands",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 155521,
+    "title_ok": true,
+    "forms_documented": 13,
+    "forms_found": 13,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/services",
+    "title": "Services & Charges",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 137517,
+    "title_ok": true,
+    "forms_documented": 7,
+    "forms_found": 7,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/delivery_persons",
+    "title": "Delivery Persons",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 126937,
+    "title_ok": true,
+    "forms_documented": 3,
+    "forms_found": 3,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/ledger",
+    "title": "Ledger (client list)",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 124584,
+    "title_ok": false,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/client-ledger/categories",
+    "title": "Client categories",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 131074,
+    "title_ok": true,
+    "forms_documented": 7,
+    "forms_found": 7,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/decision_ledger",
+    "title": "Decision Ledger",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 133154,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/current_payables",
+    "title": "Current Payables",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 132129,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/notifications",
+    "title": "Notifications",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 132634,
+    "title_ok": true,
+    "forms_documented": 2,
+    "forms_found": 2,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/notifications/upcoming",
+    "title": "Upcoming reminders",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 125513,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/settings",
+    "title": "Settings",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 208292,
+    "title_ok": true,
+    "forms_documented": 18,
+    "forms_found": 18,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/settings/activity",
+    "title": "Settings - Who did what",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 138194,
+    "title_ok": false,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/settings/sessions",
+    "title": "Settings - sessions",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 126209,
+    "title_ok": false,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/settings/sidebar",
+    "title": "Sidebar settings",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 148246,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/import_export/",
+    "title": "Import / Export",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 160401,
+    "title_ok": true,
+    "forms_documented": 5,
+    "forms_found": 5,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/legacy-migration/",
+    "title": "Legacy data migration",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 129803,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/data_lab/",
+    "title": "Data Lab",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 2259,
+    "title_ok": true,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/admin/",
+    "title": "Admin dashboard",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 126473,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/admin/modules",
+    "title": "Admin modules",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 125896,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/system_report",
+    "title": "System report",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 125317,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/void_audit",
+    "title": "Void audit",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 126395,
+    "title_ok": false,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/dashboard",
+    "title": "dashboard alias",
+    "verdict": "PASS",
+    "status": 404,
+    "status_expected": 404,
+    "bytes": 207,
+    "title_ok": false,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/dispatching",
+    "title": "Dispatching",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 134215,
+    "title_ok": false,
+    "forms_documented": 1,
+    "forms_found": 1,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/receiving",
+    "title": "Receiving",
+    "verdict": "PASS",
+    "status": 404,
+    "status_expected": 404,
+    "bytes": 207,
+    "title_ok": false,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/supplier_ledger/1",
+    "title": "Supplier ledger",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 158329,
+    "title_ok": true,
+    "forms_documented": 10,
+    "forms_found": 10,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/delivery_person_ledger/1",
+    "title": "Delivery person ledger",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 156686,
+    "title_ok": true,
+    "forms_documented": 9,
+    "forms_found": 9,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   },
+   {
+    "path": "/client_ledger/2",
+    "title": "Client ledger",
+    "verdict": "PASS",
+    "status": 200,
+    "status_expected": 200,
+    "bytes": 128603,
+    "title_ok": true,
+    "forms_documented": 0,
+    "forms_found": 0,
+    "missing_forms": [],
+    "missing_fields": {},
+    "missing_columns": [],
+    "missing_buttons": [],
+    "errors": []
+   }
+  ]
+ },
+ "routes": {
+  "routes": 243,
+  "skipped": [
+   "/generate_dummy_data",
+   "/logout",
+   "/root/backup-settings",
+   "/root/backup-settings/history/download/<int:history_id>",
+   "/settings/sessions",
+   "/static/<path:filename>",
+   "/tenants/<tenant_id>/backup_history",
+   "/tenants/backup_history/download/<int:history_id>"
+  ],
+  "ok": 193,
+  "redirect": 23,
+  "not_found": 21,
+  "bad": [],
+  "smallest": [
+   {
+    "rule": "/accounts/api/kpi/client_payments",
+    "url": "/accounts/api/kpi/client_payments",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/expenditures",
+    "url": "/accounts/api/kpi/expenditures",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/receipts",
+    "url": "/accounts/api/kpi/receipts",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/supplier_payments",
+    "url": "/accounts/api/kpi/supplier_payments",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_booking_status/<client_code>",
+    "url": "/api/client_booking_status/test",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_booking_status/<client_code>",
+    "url": "/api/client_booking_status/test",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/notifications/contact_history/<int:bill_id>",
+    "url": "/api/notifications/contact_history/1",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/notifications/contact_history/<int:bill_id>",
+    "url": "/api/notifications/contact_history/1",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   }
+  ],
+  "rows": [
+   {
+    "rule": "/",
+    "url": "/",
+    "status": 200,
+    "bytes": 130078,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/",
+    "url": "/",
+    "status": 200,
+    "bytes": 130078,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/",
+    "url": "/accounts/",
+    "status": 200,
+    "bytes": 190120,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/<int:account_id>/data",
+    "url": "/accounts/1/data",
+    "status": 200,
+    "bytes": 582,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/accounts",
+    "url": "/accounts/accounts",
+    "status": 200,
+    "bytes": 145126,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/api/grn_obligations/<int:grn_id>",
+    "url": "/accounts/api/grn_obligations/1",
+    "status": 200,
+    "bytes": 895,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/api/kpi/client_payments",
+    "url": "/accounts/api/kpi/client_payments",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/company_money",
+    "url": "/accounts/api/kpi/company_money",
+    "status": 200,
+    "bytes": 184,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/expenditures",
+    "url": "/accounts/api/kpi/expenditures",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/receipts",
+    "url": "/accounts/api/kpi/receipts",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/api/kpi/supplier_payments",
+    "url": "/accounts/api/kpi/supplier_payments",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/accounts/audit",
+    "url": "/accounts/audit",
+    "status": 200,
+    "bytes": 154933,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/expenditures",
+    "url": "/accounts/expenditures",
+    "status": 200,
+    "bytes": 127982,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/grn_payments",
+    "url": "/accounts/grn_payments",
+    "status": 200,
+    "bytes": 125579,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/bank_accounts",
+    "url": "/accounts/kpi/bank_accounts",
+    "status": 200,
+    "bytes": 125205,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/cash_accounts",
+    "url": "/accounts/kpi/cash_accounts",
+    "status": 200,
+    "bytes": 125215,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/cash_money",
+    "url": "/accounts/kpi/cash_money",
+    "status": 200,
+    "bytes": 125956,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/client_payments",
+    "url": "/accounts/kpi/client_payments",
+    "status": 200,
+    "bytes": 126831,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/company_money",
+    "url": "/accounts/kpi/company_money",
+    "status": 200,
+    "bytes": 126059,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/expenditures",
+    "url": "/accounts/kpi/expenditures",
+    "status": 200,
+    "bytes": 126805,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/receipts",
+    "url": "/accounts/kpi/receipts",
+    "status": 200,
+    "bytes": 126225,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/kpi/supplier_payments",
+    "url": "/accounts/kpi/supplier_payments",
+    "status": 200,
+    "bytes": 126851,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/ledger/<int:account_id>",
+    "url": "/accounts/ledger/1",
+    "status": 200,
+    "bytes": 143063,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/payments/clients",
+    "url": "/accounts/payments/clients",
+    "status": 200,
+    "bytes": 157692,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/payments/clients/<int:id>/data",
+    "url": "/accounts/payments/clients/1/data",
+    "status": 200,
+    "bytes": 521,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/payments/suppliers",
+    "url": "/accounts/payments/suppliers",
+    "status": 200,
+    "bytes": 156548,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/payments/suppliers/<int:id>/data",
+    "url": "/accounts/payments/suppliers/1/data",
+    "status": 200,
+    "bytes": 467,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/purchase_payables",
+    "url": "/accounts/purchase_payables",
+    "status": 200,
+    "bytes": 124599,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/receipts",
+    "url": "/accounts/receipts",
+    "status": 200,
+    "bytes": 127268,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/reconciliations",
+    "url": "/accounts/reconciliations",
+    "status": 200,
+    "bytes": 129500,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/accounts/transfers",
+    "url": "/accounts/transfers",
+    "status": 200,
+    "bytes": 126704,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/admin/",
+    "url": "/admin/",
+    "status": 200,
+    "bytes": 126531,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/admin/api/health",
+    "url": "/admin/api/health",
+    "status": 200,
+    "bytes": 81,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/admin/api/modules",
+    "url": "/admin/api/modules",
+    "status": 200,
+    "bytes": 485,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/admin/modules",
+    "url": "/admin/modules",
+    "status": 200,
+    "bytes": 125954,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/audit/financial-integrity",
+    "url": "/api/audit/financial-integrity",
+    "status": 200,
+    "bytes": 297,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/audit/financial-integrity",
+    "url": "/api/audit/financial-integrity",
+    "status": 200,
+    "bytes": 297,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/check_bill/<path:bill_no>",
+    "url": "/api/check_bill/x",
+    "status": 200,
+    "bytes": 17,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/check_bill/<path:bill_no>",
+    "url": "/api/check_bill/x",
+    "status": 200,
+    "bytes": 17,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_booking_status/<client_code>",
+    "url": "/api/client_booking_status/test",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_booking_status/<client_code>",
+    "url": "/api/client_booking_status/test",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_financial_summary/<client_code>",
+    "url": "/api/client_financial_summary/test",
+    "status": 200,
+    "bytes": 53,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_financial_summary/<client_code>",
+    "url": "/api/client_financial_summary/test",
+    "status": 200,
+    "bytes": 53,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_next_code",
+    "url": "/api/client_next_code",
+    "status": 200,
+    "bytes": 38,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/client_next_code",
+    "url": "/api/client_next_code",
+    "status": 200,
+    "bytes": 38,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/clients/search",
+    "url": "/api/clients/search",
+    "status": 200,
+    "bytes": 151,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/clients/search",
+    "url": "/api/clients/search",
+    "status": 200,
+    "bytes": 151,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/current_payables",
+    "url": "/api/current_payables",
+    "status": 200,
+    "bytes": 536,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/current_payables",
+    "url": "/api/current_payables",
+    "status": 200,
+    "bytes": 536,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/current_payables/<int:client_id>",
+    "url": "/api/current_payables/1",
+    "status": 200,
+    "bytes": 180,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/current_payables/<int:client_id>",
+    "url": "/api/current_payables/1",
+    "status": 200,
+    "bytes": 180,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/delivery_person_ledger/<int:id>",
+    "url": "/api/delivery_person_ledger/1",
+    "status": 200,
+    "bytes": 1670,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/delivery_person_ledger/<int:id>",
+    "url": "/api/delivery_person_ledger/1",
+    "status": 200,
+    "bytes": 1670,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/delivery_persons/search",
+    "url": "/api/delivery_persons/search",
+    "status": 200,
+    "bytes": 73,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/delivery_persons/search",
+    "url": "/api/delivery_persons/search",
+    "status": 200,
+    "bytes": 73,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/grn_consumption",
+    "url": "/api/grn_consumption",
+    "status": 200,
+    "bytes": 6696,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/grn_consumption",
+    "url": "/api/grn_consumption",
+    "status": 200,
+    "bytes": 6696,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/last_sold_price",
+    "url": "/api/last_sold_price",
+    "status": 200,
+    "bytes": 29,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/last_sold_price",
+    "url": "/api/last_sold_price",
+    "status": 200,
+    "bytes": 29,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/ledger_revision",
+    "url": "/api/ledger_revision",
+    "status": 200,
+    "bytes": 93,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/ledger_revision",
+    "url": "/api/ledger_revision",
+    "status": 200,
+    "bytes": 93,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/material_next_code",
+    "url": "/api/material_next_code",
+    "status": 200,
+    "bytes": 104,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/material_next_code",
+    "url": "/api/material_next_code",
+    "status": 200,
+    "bytes": 104,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/notifications/contact_history/<int:bill_id>",
+    "url": "/api/notifications/contact_history/1",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/notifications/contact_history/<int:bill_id>",
+    "url": "/api/notifications/contact_history/1",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/notifications/due",
+    "url": "/api/notifications/due",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/notifications/due",
+    "url": "/api/notifications/due",
+    "status": 200,
+    "bytes": 3,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/supplier_balance/<int:id>",
+    "url": "/api/supplier_balance/1",
+    "status": 200,
+    "bytes": 95,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/supplier_balance/<int:id>",
+    "url": "/api/supplier_balance/1",
+    "status": 200,
+    "bytes": 95,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/supplier_ledger_shift_preview/<int:id>",
+    "url": "/api/supplier_ledger_shift_preview/1",
+    "status": 200,
+    "bytes": 737,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/supplier_ledger_shift_preview/<int:id>",
+    "url": "/api/supplier_ledger_shift_preview/1",
+    "status": 200,
+    "bytes": 737,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/api/suppliers/search",
+    "url": "/api/suppliers/search",
+    "status": 200,
+    "bytes": 119,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/api/suppliers/search",
+    "url": "/api/suppliers/search",
+    "status": 200,
+    "bytes": 119,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/bookings",
+    "url": "/bookings",
+    "status": 200,
+    "bytes": 156562,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/bookings",
+    "url": "/bookings",
+    "status": 200,
+    "bytes": 156562,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/bookings/<int:booking_id>/edit-modal",
+    "url": "/bookings/1/edit-modal",
+    "status": 200,
+    "bytes": 10666,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/bookings/<int:booking_id>/edit-modal",
+    "url": "/bookings/1/edit-modal",
+    "status": 200,
+    "bytes": 10666,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/cash_flow/entry/<int:entry_id>.json",
+    "url": "/cash_flow/entry/1.json",
+    "status": 200,
+    "bytes": 597,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/cash_flow/entry/<int:entry_id>.json",
+    "url": "/cash_flow/entry/1.json",
+    "status": 200,
+    "bytes": 597,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/cash_flow_differences",
+    "url": "/cash_flow_differences",
+    "status": 200,
+    "bytes": 126126,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/cash_flow_differences",
+    "url": "/cash_flow_differences",
+    "status": 200,
+    "bytes": 126126,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/cash_flow_differences/<int:rec_id>",
+    "url": "/cash_flow_differences/1",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/cash_flow_differences/<int:rec_id>",
+    "url": "/cash_flow_differences/1",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/client-ledger/categories",
+    "url": "/client-ledger/categories",
+    "status": 200,
+    "bytes": 131132,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/client-ledger/categories",
+    "url": "/client-ledger/categories",
+    "status": 200,
+    "bytes": 131132,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/client_ledger/<int:id>",
+    "url": "/client_ledger/1",
+    "status": 200,
+    "bytes": 125901,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/client_ledger/<int:id>",
+    "url": "/client_ledger/1",
+    "status": 200,
+    "bytes": 125901,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/clients",
+    "url": "/clients",
+    "status": 200,
+    "bytes": 147589,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/clients",
+    "url": "/clients",
+    "status": 200,
+    "bytes": 147589,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/clients/<int:client_id>/modals",
+    "url": "/clients/1/modals",
+    "status": 200,
+    "bytes": 7010,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/clients/<int:client_id>/modals",
+    "url": "/clients/1/modals",
+    "status": 200,
+    "bytes": 7010,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/current_payables",
+    "url": "/current_payables",
+    "status": 200,
+    "bytes": 132191,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/current_payables",
+    "url": "/current_payables",
+    "status": 200,
+    "bytes": 132191,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/daily_transactions",
+    "url": "/daily_transactions",
+    "status": 302,
+    "bytes": 245,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/daily_transactions",
+    "url": "/daily_transactions",
+    "status": 302,
+    "bytes": 245,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/data_lab/basket",
+    "url": "/data_lab/basket",
+    "status": 200,
+    "bytes": 3454,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/debug/db",
+    "url": "/debug/db",
+    "status": 200,
+    "bytes": 42,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/debug/db",
+    "url": "/debug/db",
+    "status": 200,
+    "bytes": 42,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/decision_ledger",
+    "url": "/decision_ledger",
+    "status": 200,
+    "bytes": 133222,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/decision_ledger",
+    "url": "/decision_ledger",
+    "status": 200,
+    "bytes": 133222,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_ledger/<int:id>",
+    "url": "/delivery_ledger/1",
+    "status": 200,
+    "bytes": 156793,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_ledger/<int:id>",
+    "url": "/delivery_ledger/1",
+    "status": 200,
+    "bytes": 156793,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_person_ledger/<int:id>",
+    "url": "/delivery_person_ledger/1",
+    "status": 200,
+    "bytes": 156800,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_persons",
+    "url": "/delivery_persons",
+    "status": 200,
+    "bytes": 126995,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_persons",
+    "url": "/delivery_persons",
+    "status": 200,
+    "bytes": 126995,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_rents",
+    "url": "/delivery_rents",
+    "status": 200,
+    "bytes": 156727,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_rents",
+    "url": "/delivery_rents",
+    "status": 200,
+    "bytes": 156727,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/delivery_rents/group/<path:group_key>",
+    "url": "/delivery_rents/group/x",
+    "status": 404,
+    "bytes": 59,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/delivery_rents/group/<path:group_key>",
+    "url": "/delivery_rents/group/x",
+    "status": 404,
+    "bytes": 59,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/direct_sales",
+    "url": "/direct_sales",
+    "status": 200,
+    "bytes": 293698,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/direct_sales",
+    "url": "/direct_sales",
+    "status": 200,
+    "bytes": 293698,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/direct_sales/<int:sale_id>/edit-modal",
+    "url": "/direct_sales/1/edit-modal",
+    "status": 200,
+    "bytes": 38127,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/direct_sales/<int:sale_id>/edit-modal",
+    "url": "/direct_sales/1/edit-modal",
+    "status": 200,
+    "bytes": 38127,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/dispatching",
+    "url": "/dispatching",
+    "status": 200,
+    "bytes": 134273,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/dispatching",
+    "url": "/dispatching",
+    "status": 200,
+    "bytes": 134273,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_client_clearance/<int:id>",
+    "url": "/download_client_clearance/1",
+    "status": 200,
+    "bytes": 44313,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_client_clearance/<int:id>",
+    "url": "/download_client_clearance/1",
+    "status": 200,
+    "bytes": 44313,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_client_ledger/<int:id>",
+    "url": "/download_client_ledger/1",
+    "status": 200,
+    "bytes": 44352,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_client_ledger/<int:id>",
+    "url": "/download_client_ledger/1",
+    "status": 200,
+    "bytes": 44352,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_delivery_person_ledger/<int:id>",
+    "url": "/download_delivery_person_ledger/1",
+    "status": 200,
+    "bytes": 716,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_delivery_person_ledger/<int:id>",
+    "url": "/download_delivery_person_ledger/1",
+    "status": 200,
+    "bytes": 716,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_full_client_history/<int:id>",
+    "url": "/download_full_client_history/1",
+    "status": 200,
+    "bytes": 45837,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_full_client_history/<int:id>",
+    "url": "/download_full_client_history/1",
+    "status": 200,
+    "bytes": 45837,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_invoice/<path:bill_no>",
+    "url": "/download_invoice/x",
+    "status": 302,
+    "bytes": 189,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/download_invoice/<path:bill_no>",
+    "url": "/download_invoice/x",
+    "status": 302,
+    "bytes": 189,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/download_supplier_ledger/<int:id>",
+    "url": "/download_supplier_ledger/1",
+    "status": 200,
+    "bytes": 630,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_supplier_ledger/<int:id>",
+    "url": "/download_supplier_ledger/1",
+    "status": 200,
+    "bytes": 630,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_supplier_payment/<int:payment_id>",
+    "url": "/download_supplier_payment/1",
+    "status": 200,
+    "bytes": 44478,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/download_supplier_payment/<int:payment_id>",
+    "url": "/download_supplier_payment/1",
+    "status": 200,
+    "bytes": 44439,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_clients",
+    "url": "/export_clients",
+    "status": 200,
+    "bytes": 5175,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_clients",
+    "url": "/export_clients",
+    "status": 200,
+    "bytes": 5175,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_current_payables",
+    "url": "/export_current_payables",
+    "status": 200,
+    "bytes": 185,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/export_current_payables",
+    "url": "/export_current_payables",
+    "status": 200,
+    "bytes": 185,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/export_grn",
+    "url": "/export_grn",
+    "status": 200,
+    "bytes": 5628,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_grn",
+    "url": "/export_grn",
+    "status": 200,
+    "bytes": 5628,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_pending_bills",
+    "url": "/export_pending_bills",
+    "status": 302,
+    "bytes": 273,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_pending_bills",
+    "url": "/export_pending_bills",
+    "status": 302,
+    "bytes": 273,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_unpaid_transactions",
+    "url": "/export_unpaid_transactions",
+    "status": 302,
+    "bytes": 285,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/export_unpaid_transactions",
+    "url": "/export_unpaid_transactions",
+    "status": 302,
+    "bytes": 285,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/financial_details",
+    "url": "/financial_details",
+    "status": 200,
+    "bytes": 129329,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/financial_details",
+    "url": "/financial_details",
+    "status": 200,
+    "bytes": 129329,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/financial_ledger/<int:client_id>",
+    "url": "/financial_ledger/1",
+    "status": 302,
+    "bytes": 205,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/financial_ledger/<int:client_id>",
+    "url": "/financial_ledger/1",
+    "status": 302,
+    "bytes": 205,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/financial_tracker",
+    "url": "/financial_tracker",
+    "status": 200,
+    "bytes": 132403,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/financial_tracker",
+    "url": "/financial_tracker",
+    "status": 200,
+    "bytes": 132403,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/fix_system_issues",
+    "url": "/fix_system_issues",
+    "status": 302,
+    "bytes": 215,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/fix_system_issues",
+    "url": "/fix_system_issues",
+    "status": 302,
+    "bytes": 215,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/import_export/",
+    "url": "/import_export/",
+    "status": 200,
+    "bytes": 161185,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/import_export/app_upgrade/status/<job_id>",
+    "url": "/import_export/app_upgrade/status/test",
+    "status": 302,
+    "bytes": 189,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/export",
+    "url": "/import_export/export",
+    "status": 400,
+    "bytes": 15,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/export_excel_all",
+    "url": "/import_export/export_excel_all",
+    "status": 302,
+    "bytes": 243,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/import_export/full_db_export",
+    "url": "/import_export/full_db_export",
+    "status": 200,
+    "bytes": 1753088,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/import_export/full_db_import_report/<report_name>",
+    "url": "/import_export/full_db_import_report/test",
+    "status": 400,
+    "bytes": 15,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/full_raw_export",
+    "url": "/import_export/full_raw_export",
+    "status": 200,
+    "bytes": 64154,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/import_export/full_raw_import_history_export",
+    "url": "/import_export/full_raw_import_history_export",
+    "status": 200,
+    "bytes": 117,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/full_raw_import_report/<report_name>",
+    "url": "/import_export/full_raw_import_report/test",
+    "status": 400,
+    "bytes": 14,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/history",
+    "url": "/import_export/history",
+    "status": 200,
+    "bytes": 39,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/jobs/<int:job_id>/history",
+    "url": "/import_export/jobs/1/history",
+    "status": 404,
+    "bytes": 22,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/jobs/<int:job_id>/progress",
+    "url": "/import_export/jobs/1/progress",
+    "status": 404,
+    "bytes": 22,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/master/export",
+    "url": "/import_export/master/export",
+    "status": 200,
+    "bytes": 17861,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/import_export/master/import/status/<job_id>",
+    "url": "/import_export/master/import/status/test",
+    "status": 404,
+    "bytes": 27,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/template/<dataset>",
+    "url": "/import_export/template/test",
+    "status": 400,
+    "bytes": 15,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/tenant_db_export",
+    "url": "/import_export/tenant_db_export",
+    "status": 404,
+    "bytes": 9,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/uploads",
+    "url": "/import_export/uploads",
+    "status": 200,
+    "bytes": 48,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/import_export/uploads/<upload_id>",
+    "url": "/import_export/uploads/test",
+    "status": 404,
+    "bytes": 22,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/inventory/daily_transactions",
+    "url": "/inventory/daily_transactions",
+    "status": 200,
+    "bytes": 131890,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/inventory/inventory_log",
+    "url": "/inventory/inventory_log",
+    "status": 302,
+    "bytes": 235,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/inventory/stock_summary",
+    "url": "/inventory/stock_summary",
+    "status": 200,
+    "bytes": 132255,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/ledger",
+    "url": "/ledger",
+    "status": 200,
+    "bytes": 124642,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/ledger",
+    "url": "/ledger",
+    "status": 200,
+    "bytes": 124642,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/ledger/<int:client_id>",
+    "url": "/ledger/1",
+    "status": 200,
+    "bytes": 171322,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/ledger/<int:client_id>",
+    "url": "/ledger/1",
+    "status": 200,
+    "bytes": 171322,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/",
+    "url": "/legacy-migration/",
+    "status": 200,
+    "bytes": 129871,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/",
+    "url": "/legacy-migration/",
+    "status": 200,
+    "bytes": 129871,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/run/<int:run_id>",
+    "url": "/legacy-migration/run/1",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/run/<int:run_id>",
+    "url": "/legacy-migration/run/1",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/run/<int:run_id>/errors.xlsx",
+    "url": "/legacy-migration/run/1/errors.xlsx",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/run/<int:run_id>/errors.xlsx",
+    "url": "/legacy-migration/run/1/errors.xlsx",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/template/<kind>",
+    "url": "/legacy-migration/template/test",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/legacy-migration/template/<kind>",
+    "url": "/legacy-migration/template/test",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/material_ledger/<int:mat_id>",
+    "url": "/material_ledger/1",
+    "status": 200,
+    "bytes": 126941,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/material_ledger/<int:mat_id>",
+    "url": "/material_ledger/1",
+    "status": 200,
+    "bytes": 126941,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/material_returns",
+    "url": "/material_returns",
+    "status": 200,
+    "bytes": 147164,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/material_returns",
+    "url": "/material_returns",
+    "status": 200,
+    "bytes": 147164,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/materials",
+    "url": "/materials",
+    "status": 200,
+    "bytes": 155579,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/materials",
+    "url": "/materials",
+    "status": 200,
+    "bytes": 155579,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/mixed_transactions",
+    "url": "/mixed_transactions",
+    "status": 302,
+    "bytes": 259,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/mixed_transactions",
+    "url": "/mixed_transactions",
+    "status": 302,
+    "bytes": 259,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/notifications",
+    "url": "/notifications",
+    "status": 200,
+    "bytes": 132692,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/notifications",
+    "url": "/notifications",
+    "status": 200,
+    "bytes": 132692,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/notifications/bill/<int:bill_id>",
+    "url": "/notifications/bill/1",
+    "status": 200,
+    "bytes": 132361,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/notifications/bill/<int:bill_id>",
+    "url": "/notifications/bill/1",
+    "status": 200,
+    "bytes": 132361,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/notifications/upcoming",
+    "url": "/notifications/upcoming",
+    "status": 200,
+    "bytes": 125571,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/notifications/upcoming",
+    "url": "/notifications/upcoming",
+    "status": 200,
+    "bytes": 125571,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/party_ledger/<int:id>",
+    "url": "/party_ledger/1",
+    "status": 200,
+    "bytes": 132069,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/party_ledger/<int:id>",
+    "url": "/party_ledger/1",
+    "status": 200,
+    "bytes": 132069,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/pay_supplier",
+    "url": "/pay_supplier",
+    "status": 302,
+    "bytes": 243,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/pay_supplier",
+    "url": "/pay_supplier",
+    "status": 302,
+    "bytes": 243,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/payments",
+    "url": "/payments",
+    "status": 200,
+    "bytes": 142711,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/payments",
+    "url": "/payments",
+    "status": 200,
+    "bytes": 142711,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/pending_bills",
+    "url": "/pending_bills",
+    "status": 200,
+    "bytes": 153701,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/pending_bills",
+    "url": "/pending_bills",
+    "status": 200,
+    "bytes": 153701,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/pending_bills/<int:bill_id>/modals",
+    "url": "/pending_bills/1/modals",
+    "status": 200,
+    "bytes": 7745,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/pending_bills/<int:bill_id>/modals",
+    "url": "/pending_bills/1/modals",
+    "status": 200,
+    "bytes": 7745,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports",
+    "url": "/profit_reports",
+    "status": 200,
+    "bytes": 184229,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports",
+    "url": "/profit_reports",
+    "status": 200,
+    "bytes": 184229,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports/export/excel",
+    "url": "/profit_reports/export/excel",
+    "status": 200,
+    "bytes": 19116,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports/export/excel",
+    "url": "/profit_reports/export/excel",
+    "status": 200,
+    "bytes": 19116,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports/export/pdf",
+    "url": "/profit_reports/export/pdf",
+    "status": 200,
+    "bytes": 52774,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports/export/pdf",
+    "url": "/profit_reports/export/pdf",
+    "status": 200,
+    "bytes": 52774,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+    "url": "/profit_reports/transaction/test/1",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+    "url": "/profit_reports/transaction/test/1",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/services",
+    "url": "/services",
+    "status": 200,
+    "bytes": 137599,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/services",
+    "url": "/services",
+    "status": 200,
+    "bytes": 137599,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/settings",
+    "url": "/settings",
+    "status": 200,
+    "bytes": 208359,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/settings",
+    "url": "/settings",
+    "status": 200,
+    "bytes": 208359,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/settings/activity",
+    "url": "/settings/activity",
+    "status": 200,
+    "bytes": 139031,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/settings/activity",
+    "url": "/settings/activity",
+    "status": 200,
+    "bytes": 139031,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/settings/sidebar",
+    "url": "/settings/sidebar",
+    "status": 200,
+    "bytes": 148310,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/settings/sidebar",
+    "url": "/settings/sidebar",
+    "status": 200,
+    "bytes": 148310,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/stock_summary",
+    "url": "/stock_summary",
+    "status": 302,
+    "bytes": 235,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/stock_summary",
+    "url": "/stock_summary",
+    "status": 302,
+    "bytes": 235,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/supplier_ledger/<int:id>",
+    "url": "/supplier_ledger/1",
+    "status": 200,
+    "bytes": 158458,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/supplier_ledger/<int:id>",
+    "url": "/supplier_ledger/1",
+    "status": 200,
+    "bytes": 158458,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/supplier_ledger_shift/<int:id>",
+    "url": "/supplier_ledger_shift/1",
+    "status": 200,
+    "bytes": 133941,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/supplier_ledger_shift/<int:id>",
+    "url": "/supplier_ledger_shift/1",
+    "status": 200,
+    "bytes": 133941,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/suppliers",
+    "url": "/suppliers",
+    "status": 200,
+    "bytes": 176892,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/suppliers",
+    "url": "/suppliers",
+    "status": 200,
+    "bytes": 176892,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/system_report",
+    "url": "/system_report",
+    "status": 200,
+    "bytes": 125375,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/system_report",
+    "url": "/system_report",
+    "status": 200,
+    "bytes": 125375,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/tenants",
+    "url": "/tenants",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/tenants",
+    "url": "/tenants",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/tracking",
+    "url": "/tracking",
+    "status": 200,
+    "bytes": 135361,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/tracking",
+    "url": "/tracking",
+    "status": 200,
+    "bytes": 135361,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/unpaid_transactions",
+    "url": "/unpaid_transactions",
+    "status": 200,
+    "bytes": 132191,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/uploads/<path:filename>",
+    "url": "/uploads/x",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/uploads/<path:filename>",
+    "url": "/uploads/x",
+    "status": 404,
+    "bytes": 207,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/view_bill/<path:bill_no>",
+    "url": "/view_bill/x",
+    "status": 302,
+    "bytes": 189,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/view_bill/<path:bill_no>",
+    "url": "/view_bill/x",
+    "status": 302,
+    "bytes": 189,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/view_bill_detail/<string:type>/<int:id>",
+    "url": "/view_bill_detail/test/1",
+    "status": 400,
+    "bytes": 17,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/view_bill_detail/<string:type>/<int:id>",
+    "url": "/view_bill_detail/test/1",
+    "status": 400,
+    "bytes": 17,
+    "errors": [],
+    "empty": true
+   },
+   {
+    "rule": "/void_audit",
+    "url": "/void_audit",
+    "status": 200,
+    "bytes": 131315,
+    "errors": [],
+    "empty": false
+   },
+   {
+    "rule": "/void_audit",
+    "url": "/void_audit",
+    "status": 200,
+    "bytes": 130779,
+    "errors": [],
+    "empty": false
+   }
+  ]
+ },
+ "links": {
+  "links": 214,
+  "dead": [],
+  "ok": 214,
+  "skipped": [
+   "/financial_tracker?preset=this_month&amp;direction=all&amp;category=&amp;account=&amp;client=&amp;supplier=&amp;partner=&amp;worker=&amp;vehicle=&amp;method=all&amp;q=&amp;export_csv=1",
+   "/logout"
+  ]
+ },
+ "tie_outs": {
+  "total": 10,
+  "passed": 10,
+  "rows": [
+   {
+    "id": "T-01",
+    "label": "company money: /accounts KPI == /daily_reconciliation",
+    "ok": true
+   },
+   {
+    "id": "T-02",
+    "label": "stock: /inventory/stock_summary Net == /tracking TOTAL BAGS",
+    "ok": true
+   },
+   {
+    "id": "T-03",
+    "label": "client net: /clients Payable == /ledger/2 Net Balance",
+    "ok": true
+   },
+   {
+    "id": "T-04",
+    "label": "rent due: /delivery_rents Remaining == /delivery_person_ledger/1",
+    "ok": true
+   },
+   {
+    "id": "T-05",
+    "label": "cash flow adds up: closing == opening + received - spent",
+    "ok": true
+   },
+   {
+    "id": "T-06",
+    "label": "money received: /financial_details cash TOTAL == P&L Money Received",
+    "ok": true
+   },
+   {
+    "id": "T-07",
+    "label": "P&L arithmetic: income - COGS == profit",
+    "ok": true
+   },
+   {
+    "id": "T-08",
+    "label": "suppliers: Total Purchase - Total Paid == Outstanding",
+    "ok": true
+   },
+   {
+    "id": "T-09",
+    "label": "payables page agrees with the suppliers page",
+    "ok": true
+   },
+   {
+    "id": "T-10",
+    "label": "invoice PDF 8,500 == the SB-SL-1000 row on /direct_sales == DB",
+    "ok": true
+   }
+  ]
+ },
+ "workflows": {
+  "total": 8,
+  "passed": 8,
+  "rows": [
+   {
+    "id": "W-01",
+    "label": "create supplier via /add_supplier -> row + listing",
+    "ok": true,
+    "observed": "db=True page=True",
+    "expected": "row and listing"
+   },
+   {
+    "id": "W-02",
+    "label": "create brand via /add_material -> row + listing",
+    "ok": true,
+    "observed": "db=True page=True",
+    "expected": "row and listing"
+   },
+   {
+    "id": "W-03",
+    "label": "material return 2 bags -> stock 195->197 and return listed",
+    "ok": true,
+    "observed": "stock 195.0->197.0 listed=True",
+    "expected": "stock 197 and CYC-RTN-1 listed"
+   },
+   {
+    "id": "W-04",
+    "label": "manual pending bill 4,500 -> row + /pending_bills",
+    "ok": true,
+    "observed": "row=True listed=True",
+    "expected": "row and listing"
+   },
+   {
+    "id": "W-05",
+    "label": "reconciliation 175,500 saved -> row(diff 17,000) + page",
+    "ok": true,
+    "observed": "row=True diff=17000.0 page=True",
+    "expected": "difference 17,000 shown"
+   },
+   {
+    "id": "W-06",
+    "label": "replaying a submitted sale is refused, no duplicate row",
+    "ok": true,
+    "observed": "flash='danger: This form token was already used for a different sale. Reload the page a' sales 3->3",
+    "expected": "rejection flash, count unchanged"
+   },
+   {
+    "id": "W-07",
+    "label": "toggle pending bill paid flips is_paid and back",
+    "ok": true,
+    "observed": "is_paid False -> True -> False",
+    "expected": "flips and returns"
+   },
+   {
+    "id": "W-08",
+    "label": "receipt 1,000 (+cash) then void (reversed, audited)",
+    "ok": true,
+    "observed": "cash 175500.0 -> 176500.0 -> 175500.0, listed=True, is_void=1",
+    "expected": "cash +1,000 then restored, payment voided and listed"
+   }
+  ]
+ }
+}

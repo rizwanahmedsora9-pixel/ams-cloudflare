@@ -1,0 +1,6857 @@
+{
+ "rules": 566,
+ "endpoints": 563,
+ "covered": 267,
+ "exact_only": 165,
+ "prefix_only": 102,
+ "gap": 299,
+ "coverage_pct": 47.17,
+ "read_only_rules": 258,
+ "covered_rows": [
+  {
+   "rule": "/",
+   "endpoint": "core.index",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/",
+   "endpoint": "index",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/",
+   "endpoint": "accounts.dashboard",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/<int:account_id>/data",
+   "endpoint": "accounts.account_data",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/<int:account_id>/delete",
+   "endpoint": "accounts.delete_account",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/<int:account_id>/edit",
+   "endpoint": "accounts.edit_account",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/<int:account_id>/reconcile",
+   "endpoint": "accounts.reconcile_account",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/<int:account_id>/toggle",
+   "endpoint": "accounts.toggle_account",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/accounts",
+   "endpoint": "accounts.manage_accounts",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/accounts"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/accounts/add",
+   "endpoint": "accounts.add_account",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/accounts/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/api/categories/add",
+   "endpoint": "accounts.api_add_account_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/api/categories/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/categories",
+   "endpoint": "accounts.manage_categories",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/categories",
+    "/accounts/categories/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/accounts/categories/<int:category_id>/delete",
+   "endpoint": "accounts.delete_account_category_route",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/categories/\u2026",
+    "/accounts/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/categories/<int:category_id>/edit",
+   "endpoint": "accounts.edit_account_category_route",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/categories/\u2026",
+    "/accounts/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/categories/<int:category_id>/toggle",
+   "endpoint": "accounts.toggle_account_category_route",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/categories/\u2026",
+    "/accounts/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/grn_payments",
+   "endpoint": "accounts.grn_payments",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/grn_payments",
+    "/accounts/grn_payments/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/accounts/grn_payments/<int:payment_id>/restore",
+   "endpoint": "accounts.grn_payment_restore",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/grn_payments/\u2026",
+    "/accounts/grn_payments\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/grn_payments/<int:payment_id>/void",
+   "endpoint": "accounts.grn_payment_void",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/grn_payments/\u2026",
+    "/accounts/grn_payments\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/grn_payments/save",
+   "endpoint": "accounts.grn_payment_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/grn_payments/save"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/payments/clients",
+   "endpoint": "accounts.client_payments",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/payments/clients"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/payments/clients/<int:id>/data",
+   "endpoint": "accounts.client_payment_data",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/payments/clients\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/payments/clients/save",
+   "endpoint": "accounts.client_payment_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/payments/clients/save"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/payments/suppliers",
+   "endpoint": "accounts.supplier_payments",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/payments/suppliers"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/payments/suppliers/<int:id>/data",
+   "endpoint": "accounts.supplier_payment_data",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/payments/suppliers\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/payments/suppliers/<int:id>/delete",
+   "endpoint": "accounts.supplier_payment_delete",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/payments/suppliers\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/payments/suppliers/<int:id>/restore",
+   "endpoint": "accounts.supplier_payment_restore",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/payments/suppliers\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/payments/suppliers/save",
+   "endpoint": "accounts.supplier_payment_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/payments/suppliers/save"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/purchase_payables",
+   "endpoint": "accounts.purchase_payables",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/purchase_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/receipts",
+   "endpoint": "accounts.receipts",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/accounts/receipts"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/accounts/transactions/new",
+   "endpoint": "accounts.add_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/accounts/transactions/new"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_booking",
+   "endpoint": "add_booking",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_booking"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_booking",
+   "endpoint": "sales.add_booking",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_booking"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_client",
+   "endpoint": "add_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_client"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_client",
+   "endpoint": "masters.add_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_client"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_direct_sale",
+   "endpoint": "add_direct_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_direct_sale"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_direct_sale",
+   "endpoint": "sales.add_direct_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_direct_sale"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_material",
+   "endpoint": "add_material",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_material"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_material",
+   "endpoint": "misc.add_material",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_material"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_material_return",
+   "endpoint": "add_material_return",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_material_return"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_material_return",
+   "endpoint": "sales.add_material_return",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_material_return"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_payment",
+   "endpoint": "add_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_payment"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_payment",
+   "endpoint": "sales.add_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_payment"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_pending_bill",
+   "endpoint": "add_pending_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_pending_bill"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_pending_bill",
+   "endpoint": "misc.add_pending_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_pending_bill"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_record",
+   "endpoint": "add_record",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_record"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_record",
+   "endpoint": "ops.add_record",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_record"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_supplier",
+   "endpoint": "add_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_supplier"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/add_supplier",
+   "endpoint": "masters.add_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/add_supplier"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/admin/",
+   "endpoint": "admin.dashboard",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/admin/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/check_bill/<path:bill_no>",
+   "endpoint": "api.check_bill_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/check_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/check_bill/<path:bill_no>",
+   "endpoint": "check_bill_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/check_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/client_booking_status/<client_code>",
+   "endpoint": "api.api_client_booking_status",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/client_booking_status/FBM-99001"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/client_booking_status/<client_code>",
+   "endpoint": "api_client_booking_status",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/client_booking_status/FBM-99001"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/current_payables",
+   "endpoint": "current_payables_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/current_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/current_payables",
+   "endpoint": "reports.current_payables_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/current_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/current_payables/<int:client_id>",
+   "endpoint": "current_payable_detail_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/current_payables\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/current_payables/<int:client_id>",
+   "endpoint": "reports.current_payable_detail_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/current_payables\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/grn_consumption",
+   "endpoint": "api.api_grn_consumption",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/grn_consumption"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/grn_consumption",
+   "endpoint": "api_grn_consumption",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/grn_consumption"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/ledger_revision",
+   "endpoint": "api.api_ledger_revision",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/ledger_revision"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/ledger_revision",
+   "endpoint": "api_ledger_revision",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/ledger_revision"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/notifications/due",
+   "endpoint": "api.api_notifications_due",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/notifications/due"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/notifications/due",
+   "endpoint": "api_notifications_due",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/notifications/due"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/api/supplier_ledger_shift_preview/<int:id>",
+   "endpoint": "api_supplier_ledger_shift_preview",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/supplier_ledger_shift_preview/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/supplier_ledger_shift_preview/<int:id>",
+   "endpoint": "masters.api_supplier_ledger_shift_preview",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/api/supplier_ledger_shift_preview/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/bookings",
+   "endpoint": "bookings_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/bookings",
+    "/bookings/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/bookings",
+   "endpoint": "sales.bookings_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/bookings",
+    "/bookings/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/bookings/<int:booking_id>/edit-modal",
+   "endpoint": "booking_edit_modal",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/bookings/\u2026",
+    "/bookings\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/bookings/<int:booking_id>/edit-modal",
+   "endpoint": "sales.booking_edit_modal",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/bookings/\u2026",
+    "/bookings\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow",
+   "endpoint": "cash_flow",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/cash_flow"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/cash_flow",
+   "endpoint": "reports.cash_flow",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/cash_flow"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/client-ledger/categories",
+   "endpoint": "manage_client_categories",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/client-ledger/categories",
+    "/client-ledger/categories/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/client-ledger/categories",
+   "endpoint": "masters.add_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories",
+    "/client-ledger/categories/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/client-ledger/categories",
+   "endpoint": "masters.manage_client_categories",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/client-ledger/categories",
+    "/client-ledger/categories/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/client-ledger/categories/<int:category_id>/delete",
+   "endpoint": "delete_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/\u2026",
+    "/client-ledger/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client-ledger/categories/<int:category_id>/delete",
+   "endpoint": "masters.delete_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/\u2026",
+    "/client-ledger/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client-ledger/categories/<int:category_id>/rename",
+   "endpoint": "masters.rename_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/\u2026",
+    "/client-ledger/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client-ledger/categories/<int:category_id>/rename",
+   "endpoint": "rename_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/\u2026",
+    "/client-ledger/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client-ledger/categories/<int:category_id>/toggle",
+   "endpoint": "masters.toggle_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/\u2026",
+    "/client-ledger/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client-ledger/categories/<int:category_id>/toggle",
+   "endpoint": "toggle_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/\u2026",
+    "/client-ledger/categories\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client-ledger/categories/add",
+   "endpoint": "add_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/client-ledger/categories/add",
+   "endpoint": "masters.add_client_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/client-ledger/categories/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/client_ledger/<int:id>",
+   "endpoint": "client_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/client_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_ledger/<int:id>",
+   "endpoint": "ledgers.client_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/client_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/clients",
+   "endpoint": "clients",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/clients"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/clients",
+   "endpoint": "masters.clients",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/clients"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/clients/<int:client_id>/modals",
+   "endpoint": "client_modals",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/clients\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/clients/<int:client_id>/modals",
+   "endpoint": "masters.client_modals",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/clients\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/current_payables",
+   "endpoint": "reports.unpaid_transactions_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/current_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/current_payables",
+   "endpoint": "unpaid_transactions_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/current_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/daily_reconciliation",
+   "endpoint": "daily_reconciliation",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/daily_reconciliation"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/daily_reconciliation",
+   "endpoint": "reports.daily_reconciliation",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/daily_reconciliation"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/decision_ledger",
+   "endpoint": "decision_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/decision_ledger"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/decision_ledger",
+   "endpoint": "ledgers.decision_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/decision_ledger"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delete_client/<int:id>",
+   "endpoint": "delete_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_client/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_client/<int:id>",
+   "endpoint": "masters.delete_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_client/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_material/<int:id>",
+   "endpoint": "delete_material",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_material/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_material/<int:id>",
+   "endpoint": "misc.delete_material",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_material/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_pending_bill/<int:id>",
+   "endpoint": "delete_pending_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_pending_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_pending_bill/<int:id>",
+   "endpoint": "misc.delete_pending_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_pending_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_selected_data",
+   "endpoint": "delete_selected_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_selected_data"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delete_selected_data",
+   "endpoint": "misc.delete_selected_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_selected_data"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delete_supplier/<int:id>",
+   "endpoint": "delete_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_supplier/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_supplier/<int:id>",
+   "endpoint": "masters.delete_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_supplier/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_transaction/<string:type>/<int:id>",
+   "endpoint": "delete_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_transaction/DirectSale/1"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delete_transaction/<string:type>/<int:id>",
+   "endpoint": "sales.delete_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delete_transaction/DirectSale/1"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_person_ledger/<int:id>",
+   "endpoint": "ledgers.delivery_person_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_person_ledger/1",
+    "/delivery_person_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_person_ledger/<int:id>/pay",
+   "endpoint": "ledgers.settle_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_person_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_ledger/<int:id>/pay",
+   "endpoint": "settle_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_person_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_persons",
+   "endpoint": "delivery_persons_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_persons"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_persons",
+   "endpoint": "masters.delivery_persons_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_persons"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_persons/add",
+   "endpoint": "add_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_persons/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_persons/add",
+   "endpoint": "masters.add_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_persons/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_persons/edit/<int:id>",
+   "endpoint": "edit_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_persons/edit/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_persons/edit/<int:id>",
+   "endpoint": "masters.edit_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_persons/edit/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_persons/toggle/<int:id>",
+   "endpoint": "masters.toggle_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_persons/toggle/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_persons/toggle/<int:id>",
+   "endpoint": "toggle_delivery_person",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_persons/toggle/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_rents",
+   "endpoint": "delivery_rents_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_rents"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_rents",
+   "endpoint": "ops.delivery_rents_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_rents"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/delivery_rents/group/<path:group_key>",
+   "endpoint": "delivery_rent_group",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_rents/group/person:",
+    "/delivery_rents/group/person:999999"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/delivery_rents/group/<path:group_key>",
+   "endpoint": "ops.delivery_rent_group",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/delivery_rents/group/person:",
+    "/delivery_rents/group/person:999999"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/delivery_rents/pay/<int:alloc_id>",
+   "endpoint": "ops.pay_delivery_rent",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_rents/pay/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_rents/pay/<int:alloc_id>",
+   "endpoint": "pay_delivery_rent",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_rents/pay/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_rents/pay_driver/<int:person_id>",
+   "endpoint": "ops.pay_delivery_person_rent",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_rents/pay_driver/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_rents/pay_driver/<int:person_id>",
+   "endpoint": "pay_delivery_person_rent",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_rents/pay_driver/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_rents/void/<int:id>",
+   "endpoint": "ops.void_delivery_rent",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_rents/void/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_rents/void/<int:id>",
+   "endpoint": "void_delivery_rent",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/delivery_rents/void/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales",
+   "endpoint": "direct_sales_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/direct_sales",
+    "/direct_sales/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/direct_sales",
+   "endpoint": "sales.direct_sales_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/direct_sales",
+    "/direct_sales/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/direct_sales/<int:sale_id>/edit-modal",
+   "endpoint": "direct_sale_edit_modal",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/direct_sales/\u2026",
+    "/direct_sales\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/<int:sale_id>/edit-modal",
+   "endpoint": "sales.direct_sale_edit_modal",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/direct_sales/\u2026",
+    "/direct_sales\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/dispatching",
+   "endpoint": "dispatching",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/dispatching"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/dispatching",
+   "endpoint": "ops.dispatching",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/dispatching"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_client_clearance/<int:id>",
+   "endpoint": "download_client_clearance",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_client_clearance/2",
+    "/download_client_clearance/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_client_clearance/<int:id>",
+   "endpoint": "ledgers.download_client_clearance",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_client_clearance/2",
+    "/download_client_clearance/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_client_ledger/<int:id>",
+   "endpoint": "download_client_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_client_ledger/2",
+    "/download_client_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_client_ledger/<int:id>",
+   "endpoint": "ledgers.download_client_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_client_ledger/2",
+    "/download_client_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_full_client_history/<int:id>",
+   "endpoint": "download_full_client_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_full_client_history/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/download_full_client_history/<int:id>",
+   "endpoint": "ledgers.download_full_client_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_full_client_history/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/download_invoice/<path:bill_no>",
+   "endpoint": "download_invoice",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_invoice/SB-SL-1000",
+    "/download_invoice/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_invoice/<path:bill_no>",
+   "endpoint": "sales.download_invoice",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_invoice/SB-SL-1000",
+    "/download_invoice/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_supplier_ledger/<int:id>",
+   "endpoint": "download_supplier_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_supplier_ledger/1",
+    "/download_supplier_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/download_supplier_ledger/<int:id>",
+   "endpoint": "misc.download_supplier_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/download_supplier_ledger/1",
+    "/download_supplier_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/edit_bill/Booking/<int:id>",
+   "endpoint": "edit_booking",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_bill/Booking/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_bill/Booking/<int:id>",
+   "endpoint": "sales.edit_booking",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_bill/Booking/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_bill/DirectSale/<int:id>",
+   "endpoint": "edit_direct_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_bill/DirectSale/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_bill/DirectSale/<int:id>",
+   "endpoint": "sales.edit_direct_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_bill/DirectSale/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_client/<int:id>",
+   "endpoint": "edit_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_client/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_client/<int:id>",
+   "endpoint": "masters.edit_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_client/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_grn/<int:id>",
+   "endpoint": "edit_grn",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_grn/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_grn/<int:id>",
+   "endpoint": "misc.edit_grn",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_grn/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_material/<int:id>",
+   "endpoint": "edit_material",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_material/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_material/<int:id>",
+   "endpoint": "misc.edit_material",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_material/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_pending_bill/<int:id>",
+   "endpoint": "edit_pending_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_pending_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_pending_bill/<int:id>",
+   "endpoint": "misc.edit_pending_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_pending_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_supplier/<int:id>",
+   "endpoint": "edit_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_supplier/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_supplier/<int:id>",
+   "endpoint": "masters.edit_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/edit_supplier/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/export_current_payables",
+   "endpoint": "export_current_payables",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/export_current_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/export_current_payables",
+   "endpoint": "reports.export_current_payables",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/export_current_payables"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/export_grn",
+   "endpoint": "export_grn",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/export_grn"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/export_grn",
+   "endpoint": "misc.export_grn",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/export_grn"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/export_unpaid_transactions",
+   "endpoint": "export_unpaid_transactions",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/export_unpaid_transactions"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/export_unpaid_transactions",
+   "endpoint": "misc.export_unpaid_transactions",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/export_unpaid_transactions"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/financial_details",
+   "endpoint": "financial_details",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/financial_details"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/financial_details",
+   "endpoint": "reports.financial_details",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/financial_details"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/financial_ledger/<int:client_id>",
+   "endpoint": "financial_ledger_details",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/financial_ledger/\u2026",
+    "/financial_ledger\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/financial_ledger/<int:client_id>",
+   "endpoint": "ledgers.financial_ledger_details",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/financial_ledger/\u2026",
+    "/financial_ledger\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/financial_tracker",
+   "endpoint": "financial_tracker",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/financial_tracker"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/financial_tracker",
+   "endpoint": "reports.financial_tracker",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/financial_tracker"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/grn",
+   "endpoint": "grn",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/grn"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/grn",
+   "endpoint": "ops.grn",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/grn"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/hard_delete_supplier/<int:id>",
+   "endpoint": "hard_delete_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/hard_delete_supplier/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/hard_delete_supplier/<int:id>",
+   "endpoint": "masters.hard_delete_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/hard_delete_supplier/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/",
+   "endpoint": "import_export.import_export_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/import_export/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/export",
+   "endpoint": "import_export.export_data",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/import_export/export"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/full_db_export",
+   "endpoint": "import_export.full_db_export",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/import_export/full_db_export"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/full_db_import",
+   "endpoint": "import_export.full_db_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/import_export/full_db_import"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/full_db_import_report/<report_name>",
+   "endpoint": "import_export.full_db_import_report",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/import_export/full_db_import_report/anything.json"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/full_raw_import",
+   "endpoint": "import_export.full_raw_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/import_export/full_raw_import"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/full_raw_import_report/<report_name>",
+   "endpoint": "import_export.full_raw_import_report",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/import_export/full_raw_import_report/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/transfer/export",
+   "endpoint": "import_export.transfer_export",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/import_export/transfer/export"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/import_export/transfer/import",
+   "endpoint": "import_export.transfer_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/import_export/transfer/import"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/inventory/daily_transactions",
+   "endpoint": "inventory.daily_transactions",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/inventory/daily_transactions"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/inventory/stock_summary",
+   "endpoint": "inventory.stock_summary",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/inventory/stock_summary"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/ledger",
+   "endpoint": "ledger_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/ledger",
+    "/ledger/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/ledger",
+   "endpoint": "ledgers.ledger_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/ledger",
+    "/ledger/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/ledger/<int:client_id>",
+   "endpoint": "financial_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/ledger/2",
+    "/ledger/\u2026",
+    "/ledger\u2026"
+   ],
+   "hits": 3,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/ledger/<int:client_id>",
+   "endpoint": "ledgers.financial_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/ledger/2",
+    "/ledger/\u2026",
+    "/ledger\u2026"
+   ],
+   "hits": 3,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/legacy-migration/",
+   "endpoint": "dashboard",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/legacy-migration/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/legacy-migration/",
+   "endpoint": "legacy_migration.dashboard",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/legacy-migration/"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/login",
+   "endpoint": "auth.login",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/login"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/login",
+   "endpoint": "login",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/login"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/logout",
+   "endpoint": "auth.logout",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/logout"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/logout",
+   "endpoint": "logout",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/logout"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/material_categories/add",
+   "endpoint": "add_material_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/material_categories/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/material_categories/add",
+   "endpoint": "misc.add_material_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/material_categories/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/material_ledger/<int:mat_id>",
+   "endpoint": "ledgers.material_ledger_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/material_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/material_ledger/<int:mat_id>",
+   "endpoint": "material_ledger_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/material_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/material_returns",
+   "endpoint": "material_returns_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/material_returns"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/material_returns",
+   "endpoint": "sales.material_returns_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/material_returns"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/materials",
+   "endpoint": "masters.materials",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/materials"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/materials",
+   "endpoint": "materials",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/materials"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/notifications",
+   "endpoint": "notifications_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/notifications"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/notifications",
+   "endpoint": "system.notifications_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/notifications"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/notifications/bill/<int:bill_id>",
+   "endpoint": "notifications_bill_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/notifications/bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/bill/<int:bill_id>",
+   "endpoint": "system.notifications_bill_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/notifications/bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/mark_paid/<int:bill_id>",
+   "endpoint": "notifications_mark_paid",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/notifications/mark_paid/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/mark_paid/<int:bill_id>",
+   "endpoint": "system.notifications_mark_paid",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/notifications/mark_paid/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/resolve_due/<int:id>",
+   "endpoint": "notifications_resolve_due",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/notifications/resolve_due/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/resolve_due/<int:id>",
+   "endpoint": "system.notifications_resolve_due",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/notifications/resolve_due/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/payments",
+   "endpoint": "payments_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/payments"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/payments",
+   "endpoint": "sales.payments_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/payments"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/pending_bills",
+   "endpoint": "pending_bills",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/pending_bills",
+    "/pending_bills/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/pending_bills",
+   "endpoint": "sales.pending_bills",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/pending_bills",
+    "/pending_bills/"
+   ],
+   "hits": 2,
+   "exact_hits": 2
+  },
+  {
+   "rule": "/pending_bills/<int:bill_id>/modals",
+   "endpoint": "pending_bill_modals",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/pending_bills/\u2026",
+    "/pending_bills\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/pending_bills/<int:bill_id>/modals",
+   "endpoint": "sales.pending_bill_modals",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/pending_bills/\u2026",
+    "/pending_bills\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/profit_reports",
+   "endpoint": "profit_reports",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/profit_reports",
+   "endpoint": "reports.profit_reports",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/profit_reports/export/excel",
+   "endpoint": "profit_report_excel",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports/export/excel"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/profit_reports/export/excel",
+   "endpoint": "reports.profit_report_excel",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports/export/excel"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/profit_reports/export/pdf",
+   "endpoint": "profit_report_pdf",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports/export/pdf"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/profit_reports/export/pdf",
+   "endpoint": "reports.profit_report_pdf",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports/export/pdf"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+   "endpoint": "profit_transaction_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports/transaction/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/profit_reports/transaction/<string:document_type>/<int:document_id>",
+   "endpoint": "reports.profit_transaction_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/profit_reports/transaction/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services",
+   "endpoint": "masters.services",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/services"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/services",
+   "endpoint": "services",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/services"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/services/add",
+   "endpoint": "add_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/services/add",
+   "endpoint": "masters.add_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/add"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/services/delete/<int:id>",
+   "endpoint": "delete_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/delete/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/delete/<int:id>",
+   "endpoint": "masters.delete_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/delete/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/edit/<int:id>",
+   "endpoint": "edit_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/edit/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/edit/<int:id>",
+   "endpoint": "masters.edit_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/edit/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/migrate",
+   "endpoint": "masters.migrate_rent_to_services",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/migrate"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/services/migrate",
+   "endpoint": "migrate_rent_to_services",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/migrate"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/services/toggle/<int:id>",
+   "endpoint": "masters.toggle_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/toggle/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/toggle/<int:id>",
+   "endpoint": "toggle_service",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/services/toggle/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/settings",
+   "endpoint": "settings",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/settings"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings",
+   "endpoint": "system.settings",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/settings"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/activity",
+   "endpoint": "activity_log_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/settings/activity"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/activity",
+   "endpoint": "system.activity_log_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/settings/activity"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/sidebar",
+   "endpoint": "sidebar_settings_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/settings/sidebar"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/sidebar",
+   "endpoint": "system.sidebar_settings_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/settings/sidebar"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/sidebar/reset",
+   "endpoint": "sidebar_settings_reset",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/settings/sidebar/reset"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/sidebar/reset",
+   "endpoint": "system.sidebar_settings_reset",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/settings/sidebar/reset"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/sidebar/save",
+   "endpoint": "sidebar_settings_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/settings/sidebar/save"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/settings/sidebar/save",
+   "endpoint": "system.sidebar_settings_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/settings/sidebar/save"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/shift_supplier_ledger/<int:id>",
+   "endpoint": "masters.shift_supplier_ledger",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/shift_supplier_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/shift_supplier_ledger/<int:id>",
+   "endpoint": "shift_supplier_ledger",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/shift_supplier_ledger/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/shift_supplier_payment/<int:id>",
+   "endpoint": "masters.shift_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/shift_supplier_payment/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/shift_supplier_payment/<int:id>",
+   "endpoint": "shift_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/shift_supplier_payment/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/static/<path:filename>",
+   "endpoint": "static",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/static\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/supplier_ledger/<int:id>",
+   "endpoint": "misc.supplier_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/supplier_ledger/1",
+    "/supplier_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/supplier_ledger/<int:id>",
+   "endpoint": "supplier_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/supplier_ledger/1",
+    "/supplier_ledger/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/supplier_ledger_shift/<int:id>",
+   "endpoint": "masters.supplier_ledger_shift_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/supplier_ledger_shift/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/supplier_ledger_shift/<int:id>",
+   "endpoint": "supplier_ledger_shift_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/supplier_ledger_shift/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/suppliers",
+   "endpoint": "masters.suppliers",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/suppliers"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/suppliers",
+   "endpoint": "suppliers",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/suppliers"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/system_report",
+   "endpoint": "misc.system_report",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/system_report"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/system_report",
+   "endpoint": "system_report",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/system_report"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/toggle_bill_paid/<int:id>",
+   "endpoint": "misc.toggle_bill_paid",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/toggle_bill_paid/1",
+    "/toggle_bill_paid/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/toggle_bill_paid/<int:id>",
+   "endpoint": "toggle_bill_paid",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [
+    "/toggle_bill_paid/1",
+    "/toggle_bill_paid/\u2026"
+   ],
+   "hits": 2,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/tracking",
+   "endpoint": "ops.tracking",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/tracking"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/tracking",
+   "endpoint": "tracking",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/tracking"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/view_bill/<path:bill_no>",
+   "endpoint": "sales.view_bill",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/view_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/view_bill/<path:bill_no>",
+   "endpoint": "view_bill",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/view_bill/\u2026"
+   ],
+   "hits": 1,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/void_audit",
+   "endpoint": "system.void_audit_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/void_audit"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  },
+  {
+   "rule": "/void_audit",
+   "endpoint": "void_audit_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [
+    "/void_audit"
+   ],
+   "hits": 1,
+   "exact_hits": 1
+  }
+ ],
+ "gap_rows": [
+  {
+   "rule": "/accounts/api/grn_obligations/<int:grn_id>",
+   "endpoint": "accounts.grn_obligations_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/api/kpi/client_payments",
+   "endpoint": "accounts.api_client_payments_today",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/api/kpi/company_money",
+   "endpoint": "accounts.api_company_money",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/api/kpi/expenditures",
+   "endpoint": "accounts.api_expenditures_today",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/api/kpi/receipts",
+   "endpoint": "accounts.api_receipts_today",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/api/kpi/supplier_payments",
+   "endpoint": "accounts.api_supplier_payments_today",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/audit",
+   "endpoint": "accounts.audit_trail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/categories/add",
+   "endpoint": "accounts.add_account_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/expenditures",
+   "endpoint": "accounts.expenditures",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/bank_accounts",
+   "endpoint": "accounts.kpi_bank_accounts",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/cash_accounts",
+   "endpoint": "accounts.kpi_cash_accounts",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/cash_money",
+   "endpoint": "accounts.kpi_cash_money",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/client_payments",
+   "endpoint": "accounts.kpi_client_payments",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/company_money",
+   "endpoint": "accounts.kpi_company_money",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/expenditures",
+   "endpoint": "accounts.kpi_expenditures",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/receipts",
+   "endpoint": "accounts.kpi_receipts",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/kpi/supplier_payments",
+   "endpoint": "accounts.kpi_supplier_payments",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/ledger/<int:account_id>",
+   "endpoint": "accounts.account_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/payments/clients/restore/<int:id>",
+   "endpoint": "accounts.client_payment_restore",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/payments/clients/void/<int:id>",
+   "endpoint": "accounts.client_payment_void",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/reconciliations",
+   "endpoint": "accounts.reconciliations",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/transactions/<int:tx_id>/delete",
+   "endpoint": "accounts.delete_account_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/transactions/<int:tx_id>/edit",
+   "endpoint": "accounts.edit_account_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/transactions/<int:tx_id>/void",
+   "endpoint": "accounts.void_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/transfers",
+   "endpoint": "accounts.transfers",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/accounts/transfers/add",
+   "endpoint": "accounts.add_transfer",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/add_sale",
+   "endpoint": "add_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/add_sale",
+   "endpoint": "sales.add_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/add_supplier_payment",
+   "endpoint": "add_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/add_supplier_payment",
+   "endpoint": "misc.add_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/add_user",
+   "endpoint": "add_user",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/add_user",
+   "endpoint": "misc.add_user",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/accounts_domain_wipe",
+   "endpoint": "admin_accounts_domain_wipe",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/accounts_domain_wipe",
+   "endpoint": "misc.admin_accounts_domain_wipe",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/api/health",
+   "endpoint": "admin.api_health_check",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/api/modules",
+   "endpoint": "admin.api_get_modules",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/modules",
+   "endpoint": "admin.modules_list",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/rebuild_erp_consistency",
+   "endpoint": "admin_rebuild_erp_consistency",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/admin/rebuild_erp_consistency",
+   "endpoint": "misc.admin_rebuild_erp_consistency",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/audit/financial-integrity",
+   "endpoint": "api.api_financial_integrity_audit",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/audit/financial-integrity",
+   "endpoint": "api_financial_integrity_audit",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/client_financial_summary/<client_code>",
+   "endpoint": "api.api_client_financial_summary",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/client_financial_summary/<client_code>",
+   "endpoint": "api_client_financial_summary",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/client_next_code",
+   "endpoint": "api.api_client_next_code",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/client_next_code",
+   "endpoint": "api_client_next_code",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/clients/search",
+   "endpoint": "api.api_clients_search",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/clients/search",
+   "endpoint": "api_clients_search",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/delivery_person_ledger/<int:id>",
+   "endpoint": "delivery_person_ledger_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/delivery_person_ledger/<int:id>",
+   "endpoint": "ledgers.delivery_person_ledger_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/delivery_persons/search",
+   "endpoint": "delivery_person_search_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/delivery_persons/search",
+   "endpoint": "ledgers.delivery_person_search_api",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/last_sold_price",
+   "endpoint": "api.api_last_sold_price",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/last_sold_price",
+   "endpoint": "api_last_sold_price",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/material_next_code",
+   "endpoint": "api.api_material_next_code",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/material_next_code",
+   "endpoint": "api_material_next_code",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/notifications/contact_history/<int:bill_id>",
+   "endpoint": "api.api_notifications_contact_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/notifications/contact_history/<int:bill_id>",
+   "endpoint": "api_notifications_contact_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/supplier_balance/<int:id>",
+   "endpoint": "api.api_supplier_balance",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/supplier_balance/<int:id>",
+   "endpoint": "api_supplier_balance",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/suppliers/search",
+   "endpoint": "api.api_suppliers_search",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/suppliers/search",
+   "endpoint": "api_suppliers_search",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/ui/theme",
+   "endpoint": "api.ui_theme_preference_api",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/api/ui/theme",
+   "endpoint": "ui_theme_preference_api",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/bulk_update_material_unit",
+   "endpoint": "bulk_update_material_unit",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/bulk_update_material_unit",
+   "endpoint": "misc.bulk_update_material_unit",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/entry/<int:entry_id>.json",
+   "endpoint": "cash_flow_entry_json",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/entry/<int:entry_id>.json",
+   "endpoint": "reports.cash_flow_entry_json",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/meta/categories",
+   "endpoint": "cash_flow_categories_meta",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/meta/categories",
+   "endpoint": "reports.cash_flow_categories_meta",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/meta/parties",
+   "endpoint": "cash_flow_parties_meta",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/meta/parties",
+   "endpoint": "reports.cash_flow_parties_meta",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/meta/subcategories",
+   "endpoint": "cash_flow_subcategories_meta",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow/meta/subcategories",
+   "endpoint": "reports.cash_flow_subcategories_meta",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow_differences",
+   "endpoint": "cash_flow_differences",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow_differences",
+   "endpoint": "reports.cash_flow_differences",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow_differences/<int:rec_id>",
+   "endpoint": "cash_flow_reconciliation_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/cash_flow_differences/<int:rec_id>",
+   "endpoint": "reports.cash_flow_reconciliation_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/change_password",
+   "endpoint": "change_password",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/change_password",
+   "endpoint": "misc.change_password",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_booking_cancel/<int:client_id>",
+   "endpoint": "client_booking_cancel",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_booking_cancel/<int:client_id>",
+   "endpoint": "ledgers.client_booking_cancel",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_booking_cancel_revert/<int:client_id>/<int:entry_id>",
+   "endpoint": "client_booking_cancel_revert",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_booking_cancel_revert/<int:client_id>/<int:entry_id>",
+   "endpoint": "ledgers.client_booking_cancel_revert",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_opening_balance/<int:id>",
+   "endpoint": "client_opening_balance",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_opening_balance/<int:id>",
+   "endpoint": "masters.client_opening_balance",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_toggle_active/<int:client_id>",
+   "endpoint": "client_toggle_active",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/client_toggle_active/<int:client_id>",
+   "endpoint": "ledgers.client_toggle_active",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/clients/activate_all",
+   "endpoint": "activate_all_clients",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/clients/activate_all",
+   "endpoint": "masters.activate_all_clients",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/daily_transactions",
+   "endpoint": "daily_transactions_redirect",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/daily_transactions",
+   "endpoint": "reports.daily_transactions_redirect",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/data_lab/",
+   "endpoint": "data_lab.upload",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/data_lab/basket",
+   "endpoint": "data_lab.view_basket",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/data_lab/correct_bill",
+   "endpoint": "data_lab.correct_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/data_lab/legacy_import",
+   "endpoint": "data_lab.legacy_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/data_wipe_preview",
+   "endpoint": "data_wipe_preview",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/data_wipe_preview",
+   "endpoint": "misc.data_wipe_preview",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/debug/db",
+   "endpoint": "debug_db",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/debug/db",
+   "endpoint": "system.debug_db",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_all_data",
+   "endpoint": "delete_all_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_all_data",
+   "endpoint": "misc.delete_all_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_bill/<string:type>/<int:id>",
+   "endpoint": "delete_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_bill/<string:type>/<int:id>",
+   "endpoint": "sales.delete_bill",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_entry/<int:id>",
+   "endpoint": "delete_entry",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_entry/<int:id>",
+   "endpoint": "ops.delete_entry",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_supplier_payment/<int:id>",
+   "endpoint": "delete_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_supplier_payment/<int:id>",
+   "endpoint": "misc.delete_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_user/<int:id>",
+   "endpoint": "delete_user",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delete_user/<int:id>",
+   "endpoint": "misc.delete_user",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_ledger/<int:id>",
+   "endpoint": "delivery_person_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_ledger/<int:id>",
+   "endpoint": "ledgers.delivery_person_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_opening_balance/<int:id>",
+   "endpoint": "delivery_person_opening_balance",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_opening_balance/<int:id>",
+   "endpoint": "ledgers.delivery_person_opening_balance",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_payments/<int:id>/edit",
+   "endpoint": "edit_delivery_person_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_payments/<int:id>/edit",
+   "endpoint": "ledgers.edit_delivery_person_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_payments/<int:id>/restore",
+   "endpoint": "ledgers.restore_delivery_person_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_payments/<int:id>/restore",
+   "endpoint": "restore_delivery_person_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_payments/<int:id>/void",
+   "endpoint": "ledgers.void_delivery_person_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/delivery_person_payments/<int:id>/void",
+   "endpoint": "void_delivery_person_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/hold",
+   "endpoint": "hold_direct_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/hold",
+   "endpoint": "sales.hold_direct_sale",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/hold/<int:draft_id>/delete",
+   "endpoint": "delete_direct_sale_draft",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/hold/<int:draft_id>/delete",
+   "endpoint": "sales.delete_direct_sale_draft",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/hold/<int:draft_id>/resume",
+   "endpoint": "resume_direct_sale_draft",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/direct_sales/hold/<int:draft_id>/resume",
+   "endpoint": "sales.resume_direct_sale_draft",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/download_delivery_person_ledger/<int:id>",
+   "endpoint": "download_delivery_person_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/download_delivery_person_ledger/<int:id>",
+   "endpoint": "ledgers.download_delivery_person_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/download_supplier_payment/<int:payment_id>",
+   "endpoint": "download_supplier_payment",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/download_supplier_payment/<int:payment_id>",
+   "endpoint": "misc.download_supplier_payment",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_bill/Payment/<int:id>",
+   "endpoint": "edit_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_bill/Payment/<int:id>",
+   "endpoint": "sales.edit_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_entry/<int:id>",
+   "endpoint": "edit_entry",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_entry/<int:id>",
+   "endpoint": "ops.edit_entry",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_ledger_transaction/<string:trans_type>/<int:trans_id>",
+   "endpoint": "edit_ledger_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_ledger_transaction/<string:trans_type>/<int:trans_id>",
+   "endpoint": "sales.edit_ledger_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_material_return/<int:id>",
+   "endpoint": "edit_material_return",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_material_return/<int:id>",
+   "endpoint": "sales.edit_material_return",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_supplier_payment/<int:id>",
+   "endpoint": "edit_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_supplier_payment/<int:id>",
+   "endpoint": "misc.edit_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_user_permissions/<int:id>",
+   "endpoint": "edit_user_permissions",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/edit_user_permissions/<int:id>",
+   "endpoint": "misc.edit_user_permissions",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/export_clients",
+   "endpoint": "export_clients",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/export_clients",
+   "endpoint": "misc.export_clients",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/export_pending_bills",
+   "endpoint": "export_pending_bills",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/export_pending_bills",
+   "endpoint": "misc.export_pending_bills",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/fix_system_issues",
+   "endpoint": "fix_system_issues",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/fix_system_issues",
+   "endpoint": "misc.fix_system_issues",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/generate_dummy_data",
+   "endpoint": "generate_dummy_data",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/generate_dummy_data",
+   "endpoint": "misc.generate_dummy_data",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_dispatch_data",
+   "endpoint": "import_dispatch_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_dispatch_data",
+   "endpoint": "ops.import_dispatch_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/app_upgrade",
+   "endpoint": "import_export.app_upgrade",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/app_upgrade/migrate",
+   "endpoint": "import_export.app_upgrade_migrate",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/app_upgrade/rollback",
+   "endpoint": "import_export.app_upgrade_rollback",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/app_upgrade/start",
+   "endpoint": "import_export.app_upgrade_start",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/app_upgrade/status/<job_id>",
+   "endpoint": "import_export.app_upgrade_status",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/email_file",
+   "endpoint": "import_export.email_file",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/execute_import",
+   "endpoint": "import_export.execute_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/export_excel_all",
+   "endpoint": "import_export.export_excel_all",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/full_raw_export",
+   "endpoint": "import_export.full_raw_export",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/full_raw_import_history",
+   "endpoint": "import_export.full_raw_import_history",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/full_raw_import_history_export",
+   "endpoint": "import_export.full_raw_import_history_export",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/history",
+   "endpoint": "import_browse_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/jobs/<int:job_id>/cancel",
+   "endpoint": "import_cancel_job",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/jobs/<int:job_id>/history",
+   "endpoint": "import_job_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/jobs/<int:job_id>/progress",
+   "endpoint": "import_job_progress",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/master/export",
+   "endpoint": "import_export.export_master",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/master/import",
+   "endpoint": "import_export.import_master",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/master/import/start",
+   "endpoint": "import_export.master_import_start",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/master/import/status/<job_id>",
+   "endpoint": "import_export.master_import_status",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/preview",
+   "endpoint": "import_export.preview_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/template/<dataset>",
+   "endpoint": "import_export.get_template",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/tenant_db_export",
+   "endpoint": "import_export.tenant_db_export",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/tenant_db_restore",
+   "endpoint": "import_export.tenant_db_restore",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/upload",
+   "endpoint": "import_upload_file",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/uploads",
+   "endpoint": "import_list_uploads",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/uploads/<upload_id>",
+   "endpoint": "import_delete_upload",
+   "methods": [
+    "DELETE"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/uploads/<upload_id>",
+   "endpoint": "import_get_upload",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_export/uploads/<upload_id>/start",
+   "endpoint": "import_start_job",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_pending_bills",
+   "endpoint": "import_pending_bills",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/import_pending_bills",
+   "endpoint": "misc.import_pending_bills",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/inventory/inventory_log",
+   "endpoint": "inventory.inventory_log",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>",
+   "endpoint": "legacy_migration.preview",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>",
+   "endpoint": "preview",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/dry-run",
+   "endpoint": "dry_run",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/dry-run",
+   "endpoint": "legacy_migration.dry_run",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/errors.xlsx",
+   "endpoint": "errors",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/errors.xlsx",
+   "endpoint": "legacy_migration.errors",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/import",
+   "endpoint": "do_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/run/<int:run_id>/import",
+   "endpoint": "legacy_migration.do_import",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/template/<kind>",
+   "endpoint": "download",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/template/<kind>",
+   "endpoint": "legacy_migration.download",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/upload",
+   "endpoint": "legacy_migration.upload",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/legacy-migration/upload",
+   "endpoint": "upload",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/material_categories/<int:id>/rename",
+   "endpoint": "misc.rename_material_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/material_categories/<int:id>/rename",
+   "endpoint": "rename_material_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/material_categories/<int:id>/toggle",
+   "endpoint": "misc.toggle_material_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/material_categories/<int:id>/toggle",
+   "endpoint": "toggle_material_category",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/materials/activate_all",
+   "endpoint": "activate_all_materials",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/materials/activate_all",
+   "endpoint": "masters.activate_all_materials",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/materials/rename_label",
+   "endpoint": "masters.rename_material_label",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/materials/rename_label",
+   "endpoint": "rename_material_label",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/merge_materials",
+   "endpoint": "merge_materials",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/merge_materials",
+   "endpoint": "misc.merge_materials",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/mixed_transactions",
+   "endpoint": "mixed_transactions",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/mixed_transactions",
+   "endpoint": "sales.mixed_transactions",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/ack_reminder/<int:id>",
+   "endpoint": "notifications_ack_reminder",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/ack_reminder/<int:id>",
+   "endpoint": "system.notifications_ack_reminder",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/add_email",
+   "endpoint": "notifications_add_email",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/add_email",
+   "endpoint": "system.notifications_add_email",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/close_reminder/<int:id>",
+   "endpoint": "notifications_close_reminder",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/close_reminder/<int:id>",
+   "endpoint": "system.notifications_close_reminder",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/delete_email/<int:id>",
+   "endpoint": "notifications_delete_email",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/delete_email/<int:id>",
+   "endpoint": "system.notifications_delete_email",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/log_contact/<int:bill_id>",
+   "endpoint": "notifications_log_contact",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/log_contact/<int:bill_id>",
+   "endpoint": "system.notifications_log_contact",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/set_reminder/<int:bill_id>",
+   "endpoint": "notifications_set_reminder",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/set_reminder/<int:bill_id>",
+   "endpoint": "system.notifications_set_reminder",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/set_severity/<int:bill_id>",
+   "endpoint": "notifications_set_severity",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/set_severity/<int:bill_id>",
+   "endpoint": "system.notifications_set_severity",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/toggle_email/<int:id>",
+   "endpoint": "notifications_toggle_email",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/toggle_email/<int:id>",
+   "endpoint": "system.notifications_toggle_email",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/upcoming",
+   "endpoint": "notifications_upcoming",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/notifications/upcoming",
+   "endpoint": "system.notifications_upcoming",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/party_ledger/<int:id>",
+   "endpoint": "misc.party_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/party_ledger/<int:id>",
+   "endpoint": "party_ledger",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/pay_supplier",
+   "endpoint": "misc.pay_supplier_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/pay_supplier",
+   "endpoint": "pay_supplier_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/reclaim_client/<int:id>",
+   "endpoint": "masters.reclaim_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/reclaim_client/<int:id>",
+   "endpoint": "reclaim_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/reclaim_supplier_ledger/<int:id>",
+   "endpoint": "masters.reclaim_supplier_ledger",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/reclaim_supplier_ledger/<int:id>",
+   "endpoint": "reclaim_supplier_ledger",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/reconcile_data",
+   "endpoint": "misc.reconcile_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/reconcile_data",
+   "endpoint": "reconcile_data",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/restore_supplier_payment/<int:id>",
+   "endpoint": "misc.restore_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/restore_supplier_payment/<int:id>",
+   "endpoint": "restore_supplier_payment",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings",
+   "endpoint": "auth.root_backup_settings",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings",
+   "endpoint": "root_backup_settings",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/history/clear",
+   "endpoint": "auth.root_backup_settings_history_clear",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/history/clear",
+   "endpoint": "root_backup_settings_history_clear",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/history/download/<int:history_id>",
+   "endpoint": "auth.root_backup_settings_history_download",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/history/download/<int:history_id>",
+   "endpoint": "root_backup_settings_history_download",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/save",
+   "endpoint": "auth.root_backup_settings_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/save",
+   "endpoint": "root_backup_settings_save",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/send-now",
+   "endpoint": "auth.root_backup_settings_send_now",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/backup-settings/send-now",
+   "endpoint": "root_backup_settings_send_now",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/recovery",
+   "endpoint": "auth.root_recovery",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/recovery",
+   "endpoint": "root_recovery",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/recovery_codes",
+   "endpoint": "auth.root_recovery_codes",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/root/recovery_codes",
+   "endpoint": "root_recovery_codes",
+   "methods": [
+    "GET",
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/merge",
+   "endpoint": "masters.merge_services",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/services/merge",
+   "endpoint": "merge_services",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/settings/sessions",
+   "endpoint": "login_sessions_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/settings/sessions",
+   "endpoint": "system.login_sessions_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/shift_grn_supplier/<int:id>",
+   "endpoint": "masters.shift_grn_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/shift_grn_supplier/<int:id>",
+   "endpoint": "shift_grn_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/stock_summary",
+   "endpoint": "reports.stock_summary_redirect",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/stock_summary",
+   "endpoint": "stock_summary_redirect",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/supplier_opening_balance/<int:id>",
+   "endpoint": "masters.supplier_opening_balance",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/supplier_opening_balance/<int:id>",
+   "endpoint": "supplier_opening_balance",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants",
+   "endpoint": "system.tenants_dashboard",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants",
+   "endpoint": "tenants_dashboard",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/backup_history",
+   "endpoint": "system.tenants_backup_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/backup_history",
+   "endpoint": "tenants_backup_history",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/delete",
+   "endpoint": "system.tenants_delete",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/delete",
+   "endpoint": "tenants_delete",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/reset_admin",
+   "endpoint": "system.tenants_reset_admin",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/reset_admin",
+   "endpoint": "tenants_reset_admin",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/reset_missing_passwords",
+   "endpoint": "system.tenants_reset_missing_passwords",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/reset_missing_passwords",
+   "endpoint": "tenants_reset_missing_passwords",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/status",
+   "endpoint": "system.tenants_update_status",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/status",
+   "endpoint": "tenants_update_status",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/update",
+   "endpoint": "system.tenants_update",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/<tenant_id>/update",
+   "endpoint": "tenants_update",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/backup_history/download/<int:history_id>",
+   "endpoint": "system.tenants_backup_history_download",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/backup_history/download/<int:history_id>",
+   "endpoint": "tenants_backup_history_download",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/backup_history/restore/<int:history_id>",
+   "endpoint": "system.tenants_backup_history_restore",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/backup_history/restore/<int:history_id>",
+   "endpoint": "tenants_backup_history_restore",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/create",
+   "endpoint": "system.tenants_create",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/tenants/create",
+   "endpoint": "tenants_create",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/toggle_user_status/<int:id>",
+   "endpoint": "misc.toggle_user_status",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/toggle_user_status/<int:id>",
+   "endpoint": "toggle_user_status",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/transfer_client/<int:id>",
+   "endpoint": "masters.transfer_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/transfer_client/<int:id>",
+   "endpoint": "transfer_client",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/transfer_supplier/<int:id>",
+   "endpoint": "masters.transfer_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/transfer_supplier/<int:id>",
+   "endpoint": "transfer_supplier",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/unpaid_transactions",
+   "endpoint": "reports.unpaid_transactions_page",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/unvoid_transaction/<string:type>/<int:id>",
+   "endpoint": "sales.unvoid_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/unvoid_transaction/<string:type>/<int:id>",
+   "endpoint": "unvoid_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/update_settings",
+   "endpoint": "misc.update_settings",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/update_settings",
+   "endpoint": "update_settings",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/uploads/<path:filename>",
+   "endpoint": "misc.uploaded_file",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/uploads/<path:filename>",
+   "endpoint": "uploaded_file",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/view_bill_detail/<string:type>/<int:id>",
+   "endpoint": "sales.view_bill_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/view_bill_detail/<string:type>/<int:id>",
+   "endpoint": "view_bill_detail",
+   "methods": [
+    "GET"
+   ],
+   "read_only": true,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/void_audit/restore/<string:entity>/<int:record_id>",
+   "endpoint": "restore_audit_record",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/void_audit/restore/<string:entity>/<int:record_id>",
+   "endpoint": "system.restore_audit_record",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/void_transaction/<string:type>/<int:id>",
+   "endpoint": "sales.void_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  },
+  {
+   "rule": "/void_transaction/<string:type>/<int:id>",
+   "endpoint": "void_transaction",
+   "methods": [
+    "POST"
+   ],
+   "read_only": false,
+   "examples": [],
+   "hits": 0,
+   "exact_hits": 0
+  }
+ ]
+}

@@ -19,6 +19,7 @@ D_FIN_DETAILS_TYPE = "KF-004"
 D_CFFORM_MARKUP = "KF-005"
 D_STOCK_KPI = "KF-006"
 D_MARKUP_HIDDEN = "KF-007"
+D_MUTATE_GAP = "KF-008"      # mechanism gap: seed.mutate() is never called
 
 
 class Results:
@@ -261,13 +262,17 @@ def check_cash_flow(session, db, R: Results) -> None:
             number_near(text, "Closing Balance", EXPECT["cf_closing"]), "see text",
             EXPECT["cf_closing"], known=D_CASHFLOW_SCOPE)
 
+    # The row this reads is written by seed.mutate(), which seed.seed() never
+    # calls (see KF-008).  While that is true the observed value is None, so the
+    # failure belongs to the mechanism, not to KF-001 — keep the attributions
+    # separate or the register slowly loses meaning (SKL-006).
     try:
         row = db.one("select * from cash_flow_difference_adjustment order by id desc limit 1")
     except Exception:
         row = None
     R.near("W-06", "reconciliation difference 17,000",
            (row or {}).get("difference"), EXPECT["cf_recon_difference"],
-           known=D_CASHFLOW_SCOPE)
+           known=D_MUTATE_GAP)
 
     status, html = session.html("/cash_flow")
     has_form = 'id="cfRecordForm"' in html
@@ -344,6 +349,27 @@ def check_receipts_mismatch(session, db, R: Results) -> None:
             known=D_RECEIPTS_MISMATCH)
 
 
+def check_mechanism(session, db, R: Results) -> None:
+    """Assertions about the harness itself, not the app.
+
+    A suite that silently skips a third of its write flows is a suite that
+    reports 96% while measuring 86% of what it claims (KF-008).  This check
+    flips green the moment ``seed.seed()`` starts calling ``seed.mutate()``;
+    delete the ``known=`` flag on that day.
+    """
+    print("\n== mechanism ==")
+    import inspect
+
+    import seed as _seed
+    body = inspect.getsource(_seed.seed)
+    wired = "mutate(" in body
+    phase2 = len([s for s in _seed.STAGES if s["stage"] in (
+        "material return", "pending bill", "reconciliation",
+        "idempotent replay rejected", "toggle bill paid")])
+    R.truth("M-01", "phase-2 write flows reachable from seed.seed()",
+            wired, f"phase-2 stages run: {phase2}", "5", known=D_MUTATE_GAP)
+
+
 # ----------------------------------------------------------------------
 def run_all(session, db, R: Results) -> Results:
     check_readonly_pages(session, db, R)
@@ -359,4 +385,5 @@ def run_all(session, db, R: Results) -> Results:
     check_receipts_mismatch(session, db, R)
     check_system_report(session, db, R)
     check_dead_links(session, db, R)
+    check_mechanism(session, db, R)
     return R
