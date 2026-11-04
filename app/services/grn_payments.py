@@ -1,8 +1,14 @@
 """GRN payment posting — the ONLY place purchase money moves (owner rule A1).
 
 A payment targets exactly one obligation of one GRN:
-  * SUPPLIER  -> material (Σ qty × rate) plus individually selected expenses
+  * MATERIAL  -> stock value only (Σ qty × rate)
+  * EXPENSES  -> only the GRN costs ticked "Add to supplier ledger"
+  * SUPPLIER  -> the legacy lumped supplier bill (both of the above at once);
+                 still accepted so old links/forms keep working
   * CHARGE    -> one GRNCharge (vehicle / loading / unloading / other recipient)
+
+Material and expenses are separate payables (owner rule A3): paying stock never
+settles an expense and paying an expense never settles stock.
 
 One ``SupplierPayment`` row (the existing payment table, extended), exactly one
 ``AccountTransaction`` (money out of a cash/bank account) and one structured
@@ -13,7 +19,7 @@ the row and its history.
 from __future__ import annotations
 
 from flask import has_request_context
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from models import (
     db, GRN, GRNCharge, SupplierPayment, Account, AccountTransaction,
@@ -22,7 +28,11 @@ from models import (
 from utils.money import to_minor, from_minor
 from utils.accounting_audit import record_accounting_audit
 from utils.audit import audit_log
-from app.services.grn_costing import grn_breakdown
+from app.services.grn_costing import (
+    grn_breakdown, parse_obligation_key, supplier_obligation_paid_minor,
+    OBLIGATION_MATERIAL, OBLIGATION_EXPENSES, OBLIGATION_SUPPLIER,
+    OBLIGATION_CHARGE, PAYMENT_KIND_BY_OBLIGATION,
+)
 from app.services.time_money import pk_now, resolve_posted_datetime
 from app.services.payments_crud import (
     _validate_account_for_method, _account_minor, _assert_period_open,
@@ -47,9 +57,21 @@ def grn_payment_obligations(grn):
 
 
 def _find_obligation(grn, obligation_key):
-    for row in grn_payment_obligations(grn):
+    """Resolve the posted key (or a legacy spelling) to an open obligation."""
+    rows = grn_payment_obligations(grn)
+    for row in rows:
         if row['key'] == obligation_key:
             return row
+    # Backwards compatibility: "SUPPLIER:<id>" used to be the single lumped bill
+    # and is still linked from older screens, bookmarks and API clients.
+    kind, _ = parse_obligation_key(obligation_key)
+    if kind == OBLIGATION_SUPPLIER:
+        material = next((r for r in rows if r['kind'] == OBLIGATION_MATERIAL), None)
+        if material is not None and material['remaining_minor'] > 0:
+            return material
+        expenses = next((r for r in rows if r['kind'] == OBLIGATION_EXPENSES), None)
+        if expenses is not None and expenses['remaining_minor'] > 0:
+            return expenses
     return None
 
 
@@ -78,6 +100,16 @@ def _payment_minor(payment):
                else to_minor(getattr(payment, 'amount', 0)))
 
 
+def _payment_obligation_kind(payment):
+    """Which supplier payable an existing voucher belongs to (A3)."""
+    kind = (getattr(payment, 'payment_kind', None) or '').strip().upper()
+    if getattr(payment, 'grn_charge_id', None) or kind == 'GRN_CHARGE':
+        return OBLIGATION_CHARGE
+    if kind == 'GRN_EXPENSES':
+        return OBLIGATION_EXPENSES
+    return OBLIGATION_MATERIAL
+
+
 def save_grn_payment(
     *, grn_id, obligation_key, amount, method='Cash', payment_account_id=None,
     date_posted=None, reference='', note='', actor=None, idempotency_key=None,
@@ -104,7 +136,8 @@ def save_grn_payment(
     obligation = _find_obligation(grn, (obligation_key or '').strip())
     if obligation is None:
         raise ValueError('Select a valid GRN recipient / charge to pay.')
-    is_supplier = obligation['kind'] == 'SUPPLIER'
+    is_supplier = obligation['kind'] in (OBLIGATION_SUPPLIER, OBLIGATION_MATERIAL,
+                                         OBLIGATION_EXPENSES)
     charge = None
     if not is_supplier:
         charge = db.session.get(GRNCharge, int(obligation['charge_id']))
@@ -128,21 +161,29 @@ def save_grn_payment(
         created = True
 
     # ---- remaining balance guard ------------------------------------------
-    other_paid = 0
-    q = SupplierPayment.query.filter(
-        SupplierPayment.grn_id == grn.id,
-        SupplierPayment.is_void == False,  # noqa: E712
-        SupplierPayment.payment_kind.in_(['GRN_MATERIAL', 'GRN_CHARGE']),
-    )
-    if not created:
-        q = q.filter(SupplierPayment.id != payment.id)
-    for row in q.all():
-        if is_supplier:
-            if row.grn_charge_id is None and (row.recipient_type or 'SUPPLIER') == 'SUPPLIER':
-                other_paid += _payment_minor(row)
-        elif row.grn_charge_id == charge.id:
-            other_paid += _payment_minor(row)
-    remaining = int(obligation['original_minor']) - other_paid
+    # Material and supplier-billed expenses are paid separately (A3).  The
+    # remaining figure comes from the same allocation that renders the screen,
+    # so an amount the operator was allowed to enter can never bounce, and a
+    # material voucher can never consume an expense payable.
+    if is_supplier:
+        remaining = int(obligation['remaining_minor'])
+        if not created and (payment.payment_kind or '') in ('GRN_MATERIAL', 'GRN_EXPENSES',
+                                                            'ADVANCE', ''):
+            # Editing an existing supplier voucher: its own money is available
+            # again, but only inside the payable it belongs to.
+            if _payment_obligation_kind(payment) == obligation['kind']:
+                remaining += _payment_minor(payment)
+    else:
+        other_paid = 0
+        q = SupplierPayment.query.filter(
+            SupplierPayment.grn_id == grn.id,
+            SupplierPayment.grn_charge_id == charge.id,
+            SupplierPayment.is_void == False,  # noqa: E712
+        )
+        if not created:
+            q = q.filter(SupplierPayment.id != payment.id)
+        other_paid = sum(_payment_minor(row) for row in q.all())
+        remaining = int(obligation['original_minor']) - other_paid
     if amount_minor > remaining and not allow_advance:
         raise ValueError(
             f"Payment {_f(amount_minor):,.2f} exceeds the remaining payable "
@@ -183,8 +224,16 @@ def save_grn_payment(
         recipient_type = 'SUPPLIER'
         recipient_party_id = None
         recipient_name = grn.supplier or ''
-        payment_kind = 'GRN_MATERIAL'
         grn_charge_id = None
+        payment_kind = PAYMENT_KIND_BY_OBLIGATION.get(obligation['kind'], 'GRN_MATERIAL')
+        if obligation['kind'] == OBLIGATION_SUPPLIER:
+            # The legacy lumped voucher pays the supplier bill in one go.  Book
+            # it against whichever part is still open (material first) so that
+            # editing it later never re-opens an already settled expense.
+            material_left = (int(obligation['material_original_minor'])
+                             - supplier_obligation_paid_minor(grn, OBLIGATION_MATERIAL))
+            if material_left <= 0:
+                payment_kind = 'GRN_EXPENSES'
         party_id_for_audit = grn.supplier_id
     else:
         recipient_type = (charge.recipient_type or 'OTHER')
@@ -244,7 +293,7 @@ def save_grn_payment(
             (note or '').strip(),
             f"[SRC:GRN_PAYMENT:{payment.id}] GRN #{grn.manual_bill_no or grn.auto_bill_no or grn.id} — {obligation['label']}",
         ] if x).strip()
-    if allow_advance and amount_minor > remaining:
+    if allow_advance and amount_minor > remaining and created:
         payment.payment_kind = 'ADVANCE'
         payment.note = (payment.note or '') + ' [Advance over remaining payable]'
 
@@ -352,7 +401,280 @@ def grn_payment_integrity():
     return issues
 
 
+# =========================================================================
+#  One shared entry point for EVERY "pay a supplier" screen
+# =========================================================================
+#  Accounts -> Pay Supplier and the supplier ledger used to post a free-floating
+#  SupplierPayment that no GRN knew about: the supplier ledger dropped, but
+#  every GRN stayed "Unpaid" and PAY EXISTING GRN still demanded the money again.
+#  These helpers resolve the *same* GRN obligations so one payment settles one
+#  payable exactly once, whichever screen the operator used.
+
+OPEN_OBLIGATION_STATUSES = ('Unpaid', 'Partially Paid')
+
+
+def open_supplier_obligations(supplier_id=None, *, grn_id=None, include_advance=False):
+    """Every open supplier payable (material / GRN expenses / advance first).
+
+    One row per open obligation, oldest first, carrying the exact remaining
+    amount from :func:`grn_costing.grn_breakdown` — the same figure the GRN
+    page and the supplier ledger show.
+    """
+    query = GRN.query.filter(
+        GRN.is_void == False,  # noqa: E712
+        GRN.is_cancelled == False,  # noqa: E712
+    )
+    if grn_id:
+        query = query.filter(GRN.id == int(grn_id))
+    if supplier_id:
+        supplier = db.session.get(Supplier, int(supplier_id))
+        if supplier is None:
+            return []
+        query = query.filter(or_(GRN.supplier_id == supplier.id,
+                                 func.lower(func.trim(GRN.supplier)) == (supplier.name or '').strip().lower()))
+    rows = []
+    for grn in query.order_by(GRN.date_posted.asc(), GRN.id.asc()).all():
+        breakdown = grn_breakdown(grn)
+        for obligation in breakdown['obligations']:
+            if obligation['kind'] not in (OBLIGATION_MATERIAL, OBLIGATION_EXPENSES):
+                continue
+            if include_advance and obligation['kind'] == OBLIGATION_EXPENSES:
+                # Stock comes first; an expense voucher may only be created once
+                # the material payable is closed (or there is no material at all).
+                material_open = any(
+                    o['kind'] == OBLIGATION_MATERIAL and o['remaining_minor'] > 0
+                    for o in breakdown['obligations']
+                )
+                if material_open:
+                    continue
+            if obligation['remaining_minor'] <= 0:
+                continue
+            rows.append({
+                'grn': grn,
+                'breakdown': breakdown,
+                'obligation': obligation,
+                'key': obligation['key'],
+                'label': obligation['label'],
+                'detail': obligation['hint'],
+                'original': obligation['original'],
+                'paid': obligation['paid'],
+                'remaining': obligation['remaining'],
+                'remaining_minor': obligation['remaining_minor'],
+                'supplier_name': breakdown['supplier'],
+                'supplier_id': breakdown['supplier_id'],
+                'bill_ref': breakdown['bill_ref'],
+                'date_posted': getattr(grn, 'date_posted', None),
+                'kind': obligation['kind'],
+            })
+    return rows
+
+
+def supplier_open_obligation_options(supplier_id):
+    """Ready-to-render rows for a supplier (Pay Supplier page / ledger)."""
+    return [
+        {
+            'key': row['key'],
+            'grn_id': row['grn'].id,
+            'bill_ref': row['bill_ref'],
+            'label': row['label'],
+            'detail': row['detail'],
+            'remaining': row['remaining'],
+            'paid': row['paid'],
+            'original': row['original'],
+            'kind': row['kind'],
+            'date_posted': row['date_posted'],
+            'date_label': row['date_posted'].strftime('%d/%b/%Y') if row['date_posted'] else '',
+        }
+        for row in open_supplier_obligations(supplier_id)
+    ]
+
+
+def supplier_open_obligation_total(supplier_id):
+    return sum(row['remaining_minor'] for row in open_supplier_obligations(supplier_id)) / 100.0
+
+
+def post_supplier_payment(
+    *, supplier_id, amount, method='Cash', payment_account_id=None,
+    date_posted=None, reference='', note='', manual_bill_no='', actor=None,
+    idempotency_key=None, expected_revision=None, payment_id=None, grn_id=None,
+    obligation_key=None, allow_advance=False,
+):
+    """Route a supplier payment through the ONE GRN payment engine.
+
+    * a chosen ``obligation_key`` (or ``grn_id``) is paid as that exact
+      obligation;
+    * otherwise the amount is applied oldest-first across the supplier's open
+      obligations, one voucher per obligation, so nothing is overpaid and no
+      GRN is left looking unpaid.
+
+    Returns ``(payments, created_any)``.  The caller owns the commit.
+    """
+    from decimal import Decimal as _D
+    from app.services.payments_crud import _normalise_method, _normalise_key
+
+    amount_minor = to_minor(amount, field='Payment amount')
+    if amount_minor <= 0:
+        raise ValueError('Payment amount must be greater than zero.')
+    normal_method = _normalise_method(method)
+    supplier = db.session.get(Supplier, int(supplier_id)) if supplier_id else None
+    if supplier is None:
+        raise ValueError('Supplier not found. Select a valid supplier.')
+    # Validate the account/method pair once, before touching any GRN.
+    account = db.session.get(Account, int(payment_account_id)) if payment_account_id else None
+    _validate_account_for_method(account, normal_method)
+
+    if obligation_key:
+        parsed_kind, parsed_id = parse_obligation_key(obligation_key)
+        if parsed_kind == OBLIGATION_CHARGE and parsed_id:
+            payment, created = save_grn_payment(
+                grn_id=grn_id, obligation_key=obligation_key, amount=from_minor(amount_minor),
+                method=normal_method, payment_account_id=account.id,
+                date_posted=date_posted, reference=reference, note=note, actor=actor,
+                idempotency_key=_normalise_key(idempotency_key),
+                payment_id=payment_id, expected_revision=expected_revision,
+                allow_advance=allow_advance,
+            )
+            return [payment], created
+        target = None
+        for row in open_supplier_obligations(supplier.id, grn_id=grn_id):
+            if row['key'] == obligation_key:
+                target = row
+                break
+        if target is None:
+            raise ValueError('That GRN payable is already settled or belongs to another supplier. '
+                             'Reload the page and choose an open obligation.')
+        payment, created = save_grn_payment(
+            grn_id=target['grn'].id, obligation_key=target['key'],
+            amount=from_minor(amount_minor), method=normal_method,
+            payment_account_id=account.id, date_posted=date_posted,
+            reference=reference, note=note or (f'Pay Supplier · {target["bill_ref"]} · {target["label"]}'),
+            actor=actor, idempotency_key=_normalise_key(idempotency_key),
+            payment_id=payment_id, expected_revision=expected_revision,
+            allow_advance=allow_advance,
+        )
+        return [payment], created
+
+    rows = open_supplier_obligations(supplier.id, grn_id=grn_id)
+    if not rows:
+        raise ValueError(
+            'This supplier has no open GRN payable. A "Pay Supplier" voucher must settle a '
+            'real GRN obligation — receive the stock on a GRN first, then pay it here.'
+        )
+    total_open = sum(r['remaining_minor'] for r in rows)
+    if amount_minor > total_open and not allow_advance:
+        raise ValueError(
+            f'Payment {from_minor(amount_minor):,.2f} is more than the open GRN payable '
+            f'{from_minor(total_open):,.2f}. Use a smaller amount or tick "Record extra as advance".'
+        )
+    left = amount_minor
+    payments = []
+    created_any = False
+    for row in rows:
+        if left <= 0:
+            break
+        slice_minor = min(left, row['remaining_minor'])
+        if slice_minor <= 0:
+            continue
+        payment, created = save_grn_payment(
+            grn_id=row['grn'].id, obligation_key=row['key'],
+            amount=from_minor(slice_minor), method=normal_method,
+            payment_account_id=account.id, date_posted=date_posted,
+            reference=reference,
+            note=note or f'Pay Supplier · {row["bill_ref"]} · {row["label"]}',
+            actor=actor, idempotency_key=idempotency_key if len(rows) == 1 else None,
+            allow_advance=False,
+        )
+        created_any = created_any or created
+        payments.append(payment)
+        left -= slice_minor
+    if left > 0:
+        if not allow_advance:
+            raise ValueError('The payment could not be applied to an open obligation.')
+        # Money above the open payables is a supplier ADVANCE, not a GRN
+        # payment (A1): it is posted as its own voucher so the GRN keeps
+        # showing exactly what was paid against it.
+        from app.services.payments_crud import save_supplier_payment
+        advance, created = save_supplier_payment(
+            supplier_id=supplier.id, amount=from_minor(left), method=normal_method,
+            payment_account_id=account.id, manual_bill_no=manual_bill_no,
+            date_posted=date_posted,
+            note=' '.join(x for x in [(note or '').strip(),
+                                      f'Advance paid to {supplier.name} (above the open GRN payable)'] if x),
+            actor=actor,
+        )
+        advance.payment_kind = 'ADVANCE'
+        advance.recipient_type = 'SUPPLIER'
+        advance.recipient_name = supplier.name
+        created_any = created_any or created
+        payments.append(advance)
+    return payments, created_any
+
+
+def save_grn_payment_expanded(**kwargs):
+    """Post one operator amount against a GRN, honouring the legacy lumped key.
+
+    ``save_grn_payment`` writes exactly one payment for exactly one obligation.
+    Older screens/links send ``SUPPLIER:<id>`` meaning "the whole supplier
+    bill", so that amount is split here: stock first, then the supplier-billed
+    expenses, each as its own voucher (A3).  Every other key is passed through
+    unchanged.
+    """
+    grn = db.session.get(GRN, int(kwargs.get('grn_id'))) if kwargs.get('grn_id') else None
+    kind, _ = parse_obligation_key(kwargs.get('obligation_key'))
+    if grn is None or kind != OBLIGATION_SUPPLIER:
+        return [save_grn_payment(**kwargs)]
+    amount_minor = to_minor(kwargs.get('amount', 0), field='Payment amount')
+    breakdown = grn_breakdown(grn)
+    targets = [o for o in breakdown['obligations']
+               if o['kind'] in (OBLIGATION_MATERIAL, OBLIGATION_EXPENSES) and o['remaining_minor'] > 0]
+    if not targets:
+        raise ValueError('This GRN has no open supplier payable left to pay.')
+    payments = []
+    left = amount_minor
+    for obligation in targets:
+        if left <= 0:
+            break
+        share = min(left, obligation['remaining_minor'])
+        base = dict(kwargs)
+        base['obligation_key'] = obligation['key']
+        base['amount'] = from_minor(share)
+        if payments:
+            base['idempotency_key'] = None
+        payments.append(save_grn_payment(**base))
+        left -= share
+    if left > 0 and not kwargs.get('allow_advance'):
+        raise ValueError(
+            f'Payment {from_minor(amount_minor):,.2f} exceeds the open supplier payable '
+            f'for this GRN. Use a smaller amount or allow an advance.'
+        )
+    if left > 0:
+        base = dict(kwargs)
+        base['obligation_key'] = targets[-1]['key']
+        base['amount'] = from_minor(left)
+        base['idempotency_key'] = None
+        base['allow_advance'] = True
+        payments.append(save_grn_payment(**base))
+    return payments
+
+
+def pay_grn_payable_for_supplier(
+    *, supplier_id, grn_id, obligation_key, amount, method='Cash',
+    payment_account_id=None, date_posted=None, reference='', note='', actor=None,
+    idempotency_key=None,
+):
+    """Convenience wrapper used by the ledger / GRN screens."""
+    return post_supplier_payment(
+        supplier_id=supplier_id, grn_id=grn_id, obligation_key=obligation_key,
+        amount=amount, method=method, payment_account_id=payment_account_id,
+        date_posted=date_posted, reference=reference, note=note, actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
 __all__ = [
     'grn_payment_obligations', 'save_grn_payment', 'void_grn_payment',
     'restore_grn_payment', 'grn_payment_integrity',
+    'open_supplier_obligations', 'supplier_open_obligation_options',
+    'supplier_open_obligation_total', 'post_supplier_payment',
+    'pay_grn_payable_for_supplier', 'save_grn_payment_expanded',
 ]

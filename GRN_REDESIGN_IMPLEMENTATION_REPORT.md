@@ -199,3 +199,59 @@ rendered page via `GRN_PAGE_HTML=…`). Full suite: 484 passed, 6 skipped.
 5. Pay supplier 50,000, then 100,000 on a later voucher; pay loading 1,000. Verify payment history, remaining 500, and Cash Flow's four separate rows.
 6. Sell/deliver some stock and open Profit Reports → COGS uses 1,565/bag (or the exact per-lot landed rate for multi-material GRNs), with no separate freight expense.
 7. Try to change a paid charge on the GRN → refused with "already has payments"; try to cancel a GRN with payments → refused; void a payment → cash and balances reverse, history preserved.
+
+---
+
+## 8. Amendment A3 — stock and GRN expenses are separate payables (2026-11-04)
+
+**Answer to the owner's question** — *"in accounts how to pay supplier ledger and
+how to pay expenses of GRN separate; in GRN you know stock price only for the
+supplier and expenses with check box too, otherwise paid separately"*.
+
+Yes. That is now exactly how the system behaves, in three places.
+
+| Screen | Route | What it does |
+|---|---|---|
+| **Accounts → PAY GRN (STOCK / EXPENSES)** (new) | `/accounts/pay_grn` (`?supplier_id=`, `?grn_id=`, `&obligation=EXPENSES`) | Pick supplier → pick GRN. Two boxes: **Stock / material** (qty × rate) and **GRN expenses billed to supplier**. Each shows its own due and has its own **Pay full**. Fill one, the other, or both, and post. Recipient charges (unticked expenses) are listed underneath with their own paid/remaining. |
+| **Accounts → PAY EXISTING GRN** | `/accounts/grn_payments?grn_id=…` | Every obligation of the GRN as its own payable row — `Stock / material`, `GRN expenses (billed to supplier)` and one row per unticked expense for its own recipient — each with its own paid / remaining and Pay button. |
+| **Supplier Ledger / GRN screen** | `/supplier_ledger/<id>`, `/grn` | The supplier ledger shows **two credit rows** per GRN: `GRN <bill>` (material only) and `GRN Expenses` (`GRN-EXP-<id>`). The GRN screen shows `Stock due:` and `GRN expenses due to supplier:` side by side with **Pay stock / expenses**. |
+
+### Checkbox semantics (unchanged, now visible as money)
+
+`charge_include_in_supplier[]` on each charge row of the GRN Expenses tab:
+
+* **Ticked** → the expense joins the supplier's balance as the `EXPENSES`
+  obligation ("billed to supplier"). It can be paid with the stock or later,
+  but always and only from its own box.
+* **Unticked** → never touches the supplier balance. It is a `CHARGE:<id>`
+  payable to `recipient_name` / `recipient_party_id` and is paid from **PAY
+  EXISTING GRN** to that recipient.
+* Neither setting changes the landed cost — `cost_treatment` alone governs
+  costing (A2 stays intact: the *supplier ledger material* row is still
+  `Σ qty × rate`; the expense row is a separate, clearly labelled credit).
+
+### Mechanics
+
+* Obligation keys: `MATERIAL:<grn_id>`, `EXPENSES:<grn_id>`, `CHARGE:<charge_id>`,
+  plus legacy `SUPPLIER:<grn_id>` = the whole supplier bill (split stock-first,
+  then expenses, as separate vouchers by `save_grn_payment_expanded`).
+* `SupplierPayment.payment_kind` ∈ `GRN_MATERIAL`, `GRN_EXPENSES`,
+  `GRN_CHARGE`, `ADVANCE`; each payment writes **one** `AccountTransaction`, so
+  voiding one payable never reverses the other.
+* Guards are per obligation: a stock voucher can never consume the expense
+  balance and vice versa. Money above the bill needs the explicit **"Record
+  extra as advance"** tick and is posted as its own `ADVANCE` voucher, never
+  attached to a GRN.
+* `/accounts/payments/suppliers` (SALARY/other supplier vouchers) now routes
+  new payments through `post_supplier_payment()`: it demands a real open GRN
+  payable, offers a **Pay against** select of the open obligations, and refuses
+  to orphan cash with *"no open GRN payable"*.
+
+### Verification
+
+* `tests/test_grn_stock_expense_split_payments.py` — 11 tests.
+* `tests/test_pay_grn_screen.py` — 10 tests (screen boxes, one-box-only posting,
+  unticked expense paid to its own recipient, ledger rows, links).
+* `tests/frontend/test_pay_grn_dom.js` — 20 DOM checks (Pay full per box, total,
+  over-remaining guard, empty submit).
+* Full suite: **562 passed, 6 skipped**.
