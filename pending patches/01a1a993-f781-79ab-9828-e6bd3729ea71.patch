@@ -1,0 +1,1176 @@
+diff --git a/app/blueprints/ops/grn.py b/app/blueprints/ops/grn.py
+index 4220168..f2a87de 100644
+--- a/app/blueprints/ops/grn.py
++++ b/app/blueprints/ops/grn.py
+@@ -87,7 +87,7 @@ def grn():
+                 return redirect(url_for('grn'))
+             # Owner rule A1: a GRN NEVER pays.  No payment amount, method,
+             # account or bank detail is accepted on a receive document.  All
+-            # payments are posted from Accounts -> PAY EXISTING GRN.
++            # payments are posted from Accounts -> Pay GRN Expenses.
+             paid_amount = 0.0
+             payment_type = 'Credit'
+             payment_account_id = None
+diff --git a/app/services/grn_costing.py b/app/services/grn_costing.py
+index 9c9bb1f..c3366ca 100644
+--- a/app/services/grn_costing.py
++++ b/app/services/grn_costing.py
+@@ -4,7 +4,7 @@ Owner rules (approved 2026-11-02):
+ 
+ A1  A GRN NEVER pays.  It records material received, purchase costs, charge
+     details and payment obligations only.  No payment/settlement/cash row is
+-    created here.  All money is paid from Accounts -> PAY EXISTING GRN.
++    created here.  All money is paid from Accounts -> Pay GRN Expenses.
+ 
+ A2  Supplier Ledger credit for a GRN is material
+     ``sum(GRNItem.qty * GRNItem.price_at_time)`` plus only the individual
+diff --git a/app/services/grn_costs.py b/app/services/grn_costs.py
+index 08f7589..379fc35 100644
+--- a/app/services/grn_costs.py
++++ b/app/services/grn_costs.py
+@@ -6,7 +6,7 @@ authority itself):
+ * A1 — a GRN never pays.  This report is a *cost* report: it shows what the
+   business owes/spent on stock and on the incidental costs of receiving it.
+   It never shows a paid/unpaid declaration, because every payment lives in
+-  Accounts (``Accounts -> PAY EXISTING GRN``).
++  Accounts (``Accounts -> Pay GRN Expenses``).
+ * The supplier material amount is exactly ``sum(qty * rate)``.  Vehicle
+   fare, transport, loading, unloading and other charges are listed as their
+   own cost kinds.  Each expense's own billing checkbox decides whether it is
+diff --git a/app/services/grn_payments.py b/app/services/grn_payments.py
+index 9cdfb8f..18a317f 100644
+--- a/app/services/grn_payments.py
++++ b/app/services/grn_payments.py
+@@ -406,7 +406,7 @@ def grn_payment_integrity():
+ # =========================================================================
+ #  Accounts -> Pay Supplier and the supplier ledger used to post a free-floating
+ #  SupplierPayment that no GRN knew about: the supplier ledger dropped, but
+-#  every GRN stayed "Unpaid" and PAY EXISTING GRN still demanded the money again.
++#  every GRN stayed "Unpaid" and Pay GRN Expenses still demanded the money again.
+ #  These helpers resolve the *same* GRN obligations so one payment settles one
+ #  payable exactly once, whichever screen the operator used.
+ 
+diff --git a/app/services/sidebar_nav.py b/app/services/sidebar_nav.py
+index c1ab7d4..db36d54 100644
+--- a/app/services/sidebar_nav.py
++++ b/app/services/sidebar_nav.py
+@@ -289,7 +289,7 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
+     ),
+     NavLink(
+         key="grn_payments",
+-        label="PAY EXISTING GRN",
++        label="Pay GRN Expenses",
+         icon="bi-cash-coin",
+         endpoint="accounts.grn_payments",
+         fallback_url="/accounts/grn_payments",
+diff --git a/blueprints/accounts/dashboard.py b/blueprints/accounts/dashboard.py
+index 6819e8b..59f0def 100644
+--- a/blueprints/accounts/dashboard.py
++++ b/blueprints/accounts/dashboard.py
+@@ -110,11 +110,30 @@ def dashboard():
+             driver_outstanding_map[person.id] = driver_outstanding(person.id)
+         except Exception:
+             driver_outstanding_map[person.id] = 0.0
+-    grn_payment_options = [
+-        {'id': g.id, 'label': (g.manual_bill_no or g.auto_bill_no or f"GRN-{g.id}") + ' · ' + (g.supplier or '')}
+-        for g in GRN.query.filter(GRN.is_void == False, GRN.is_cancelled == False)
+-                          .order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(200).all()
+-    ]
++    # The modal's "Pay GRN Expenses" picker must expose the date and the REAL
++    # amount still payable.  Expenses that were not ticked "Add to supplier
++    # ledger" are included here as recipient dues, so they are never shown as
++    # an empty / zero amount just because they are outside the supplier ledger.
++    from app.services.grn_costing import supplier_bill_breakdown
++    grn_payment_options = []
++    for g in (GRN.query.filter(GRN.is_void == False, GRN.is_cancelled == False)
++                        .order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(200).all()):
++        try:
++            bill = supplier_bill_breakdown(g)
++        except Exception:
++            continue
++        date_label = g.date_posted.strftime('%d/%b/%Y') if g.date_posted else 'Date not recorded'
++        grn_payment_options.append({
++            'id': g.id,
++            'label': f"{bill['bill_ref']} · {bill['supplier'] or 'Supplier not recorded'} · {date_label}",
++            'bill_ref': bill['bill_ref'],
++            'supplier': bill['supplier'] or '',
++            'date_label': date_label,
++            'date_iso': g.date_posted.strftime('%Y-%m-%d') if g.date_posted else '',
++            'total_due': bill['total_remaining'],
++            'supplier_ledger_due': bill['material_remaining'] + bill['expenses_remaining'],
++            'recipient_expenses_due': bill['recipient_remaining'],
++        })
+     return render_template('accounts/dashboard.html',
+                           grn_payment_options=grn_payment_options,
+                           client_payments_today=client_payments_today,
+diff --git a/blueprints/accounts/grn_payments.py b/blueprints/accounts/grn_payments.py
+index c7c9288..54e8695 100644
+--- a/blueprints/accounts/grn_payments.py
++++ b/blueprints/accounts/grn_payments.py
+@@ -1,4 +1,4 @@
+-"""PAY EXISTING GRN / PAY GRN / GRN PAYMENT — the ONLY place purchase money is paid.
++"""Pay GRN Expenses — the ONLY place purchase money is paid.
+ 
+ Owner rule A1: GRN entry never pays.  These screens (and the "Make New
+ Transaction" modal's `grn_payment` target) are where full, partial and repeated
+@@ -37,6 +37,30 @@ def _grn_payment_accounts():
+     ).order_by(Account.category.asc(), Account.name.asc(), Account.id.asc()).all()
+ 
+ 
++def _grn_payment_summary(grn, breakdown=None):
++    """Display facts for one GRN: date, supplier dues and off-ledger expenses.
++
++    The off-ledger figure is the amount of expenses whose "Add to supplier
++    ledger" box was NOT ticked.  They are still payable, just to their own
++    recipient, so the GRN picker must never show them as zero.
++    """
++    bd = breakdown or grn_breakdown(grn)
++    posted = getattr(grn, 'date_posted', None)
++    return {
++        'bill_ref': bd.get('bill_ref') or f"GRN-{grn.id}",
++        'supplier': bd.get('supplier') or '',
++        'date_posted': posted,
++        'date_label': posted.strftime('%d/%b/%Y') if posted else 'Date not recorded',
++        'date_iso': posted.strftime('%Y-%m-%d') if posted else '',
++        'material_remaining': bd.get('material_remaining', 0.0),
++        'expenses_remaining': bd.get('expenses_remaining', 0.0),
++        'recipient_expenses_remaining': bd.get('additional_remaining', 0.0),
++        'supplier_ledger_remaining': (bd.get('material_remaining', 0.0)
++                                      + bd.get('expenses_remaining', 0.0)),
++        'total_remaining': bd.get('total_remaining', 0.0),
++    }
++
++
+ @accounts_bp.route('/grn_payments', methods=['GET'])
+ @login_required
+ def grn_payments():
+@@ -49,26 +73,40 @@ def grn_payments():
+     ).order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(500).all()
+     selected = db.session.get(GRN, selected_id) if selected_id else None
+     breakdown = grn_breakdown(selected) if selected else None
++    selected_summary = _grn_payment_summary(selected, breakdown) if selected and breakdown else None
+     selected_obligation = None
+     if breakdown and selected_charge:
+-        for row in breakdown['obligations']:
+-            if row['charge_id'] == selected_charge:
+-                selected_obligation = row
+-                break
+-    if breakdown and selected_obligation is None and selected_charge is None:
+-        # default: the stock / material payable (A3 keeps expenses separate)
+         selected_obligation = next(
+-            (r for r in breakdown['obligations'] if r['kind'] == OBLIGATION_MATERIAL), None)
++            (row for row in breakdown['obligations']
++             if row['charge_id'] == selected_charge),
++            None,
++        )
++    if breakdown and selected_obligation is None:
++        # Prefer an OPEN obligation.  When stock is already paid, the next
++        # supplier expense or own-recipient expense must show its amount
++        # instead of leaving the form on a settled Rs. 0.00 stock row.
++        open_rows = [row for row in breakdown['obligations']
++                     if row['remaining_minor'] > 0]
++        selected_obligation = (
++            next((row for row in open_rows if row['kind'] == OBLIGATION_MATERIAL), None)
++            or next((row for row in open_rows if row['kind'] == OBLIGATION_EXPENSES), None)
++            or (open_rows[0] if open_rows else None)
++            or next((row for row in breakdown['obligations']
++                     if row['kind'] == OBLIGATION_MATERIAL), None)
++        )
+ 
+     page_rows = []
+     for g in grns:
+         try:
+             bd = grn_breakdown(g)
++            summary = _grn_payment_summary(g, bd)
+         except Exception:
+             bd = None
++            summary = None
+         page_rows.append({
+             'grn': g,
+             'breakdown': bd,
++            'summary': summary,
+         })
+ 
+     return render_template(
+@@ -76,6 +114,7 @@ def grn_payments():
+         page_rows=page_rows,
+         selected=selected,
+         breakdown=breakdown,
++        selected_summary=selected_summary,
+         selected_obligation=selected_obligation,
+         accounts=_grn_payment_accounts(),
+         parties=CashFlowParty.query.order_by(CashFlowParty.name.asc()).all(),
+@@ -331,10 +370,16 @@ def pay_grn_save():
+         flash('Unable to save the GRN payment. Please check the details and try again.', 'danger')
+         return redirect(url_for('accounts.pay_grn', grn_id=grn_id))
+     total = sum(float(getattr(p, 'amount', 0) or 0) for p in posted)
+-    labels = ', '.join(sorted({
+-        'stock' if (p.payment_kind or '') != 'GRN_EXPENSES' else 'GRN expenses'
+-        for p in posted
+-    }))
++
++    def _paid_for_label(payment):
++        kind = (getattr(payment, 'payment_kind', '') or '').upper()
++        if kind == 'GRN_EXPENSES':
++            return 'GRN expenses billed to supplier'
++        if kind == 'GRN_CHARGE':
++            return 'GRN expenses to their own recipients'
++        return 'stock'
++
++    labels = ', '.join(sorted({_paid_for_label(p) for p in posted}))
+     flash(f'Rs. {total:,.2f} paid for {labels} on this GRN. Cash Flow and the ledgers are updated.', 'success')
+     return redirect(url_for('accounts.pay_grn', grn_id=grn_id))
+ 
+diff --git a/blueprints/accounts/transactions.py b/blueprints/accounts/transactions.py
+index 9feba93..edb19e0 100644
+--- a/blueprints/accounts/transactions.py
++++ b/blueprints/accounts/transactions.py
+@@ -307,7 +307,7 @@ def add_transaction():
+             # can never create a second, inconsistent payment system.
+             if (request.form.get('pay_target') or '').strip().lower() == 'grn_payment':
+                 grn_id = request.form.get('grn_payment_grn_id', type=int)
+-                flash('Choose the GRN recipient/charge and record the payment on the GRN Payments page.', 'info')
++                flash('Choose the GRN expense/recipient and record the payment on Pay GRN Expenses.', 'info')
+                 db.session.rollback()
+                 return redirect(url_for('accounts.grn_payments', **({'grn_id': grn_id} if grn_id else {})))
+             from_account_id = request.form.get('pay_from_account_id', type=int)
+diff --git a/full cycle test mechanism/1.all files/run-001-20261104T0518/scripts/extract_pages.py b/full cycle test mechanism/1.all files/run-001-20261104T0518/scripts/extract_pages.py
+index 94bb7ab..035aaf7 100644
+--- a/full cycle test mechanism/1.all files/run-001-20261104T0518/scripts/extract_pages.py	
++++ b/full cycle test mechanism/1.all files/run-001-20261104T0518/scripts/extract_pages.py	
+@@ -40,7 +40,7 @@ PAGES = [
+     ('/accounts/purchase_payables', 'Purchase payables'),
+     ('/accounts/payments/clients', 'Client payments'),
+     ('/accounts/payments/suppliers', 'Supplier payments'),
+-    ('/accounts/grn_payments', 'Pay existing GRN'),
++    ('/accounts/grn_payments', 'Pay GRN Expenses'),
+     ('/cash_flow', 'Cash Flow'),
+     ('/cash_flow_differences', 'Cash Flow differences'),
+     ('/daily_reconciliation', 'Daily reconciliation'),
+diff --git a/static/grn_charges.js b/static/grn_charges.js
+index e2a25d5..a26c1a6 100644
+--- a/static/grn_charges.js
++++ b/static/grn_charges.js
+@@ -16,7 +16,7 @@
+ 
+    A charge line carries cost facts only: type, label, amount, recipient,
+    cost treatment, allocation basis and its own supplier-billing choice.
+-   It deliberately has no paid/unpaid field — payment state belongs to Accounts (PAY EXISTING GRN), never to a
++   It deliberately has no paid/unpaid field — payment state belongs to Accounts (Pay GRN Expenses), never to a
+    receiving document.
+ 
+    This module owns the rows only.  All money arithmetic still comes from
+diff --git a/static/pay_grn.js b/static/pay_grn.js
+index 82b139e..c0fe73f 100644
+--- a/static/pay_grn.js
++++ b/static/pay_grn.js
+@@ -120,10 +120,11 @@
+             readonly: false
+         };
+         var submit = form.querySelector("#payGrnSubmit");
+-        if (submit && submit.disabled) {
+-            // Server disabled it because the role may not post payments.
+-            state.readonly = form.getAttribute("data-can-edit") === "0";
+-        }
++        var canEdit = (submit && submit.getAttribute("data-can-edit"))
++            || form.getAttribute("data-can-edit") || "1";
++        // Server-side permission is authoritative; the calculator must never
++        // re-enable a submit button that the server disabled.
++        state.readonly = canEdit === "0";
+ 
+         form.addEventListener("input", refresh);
+         form.addEventListener("change", refresh);
+diff --git a/templates/accounts/dashboard.html b/templates/accounts/dashboard.html
+index a04d452..73b917f 100644
+--- a/templates/accounts/dashboard.html
++++ b/templates/accounts/dashboard.html
+@@ -403,11 +403,11 @@
+                         <label class="form-label">Posted Date</label>
+                         <input type="datetime-local" class="form-control" name="date_posted" value="{{ default_tx_datetime }}">
+                     </div>
+-                    <div class="col-md-6">
++                    <div class="col-md-6" id="txAmountWrap">
+                         <label class="form-label">Amount</label>
+                         <input type="number" step="0.01" min="0" class="form-control" name="amount" id="tx_amount" required>
+                     </div>
+-                    <div class="col-md-6">
++                    <div class="col-md-6" id="txMethodWrap">
+                         <label class="form-label">Method</label>
+                         <select class="form-select" name="method">
+                             <option value="Cash">Cash</option>
+@@ -502,7 +502,7 @@
+                         </div>
+                         <div class="card-body">
+                             <div class="row g-3">
+-                                <div class="col-md-6">
++                                <div class="col-md-6" id="payFromAccountWrap">
+                                     <label class="form-label">Pay From Account</label>
+                                     <select class="form-select acc-searchable-select" data-search-placeholder="Search accounts…" name="pay_from_account_id" id="pay_from_account_id">
+                                         <option value="">Select source account</option>
+@@ -516,20 +516,36 @@
+                                     <select class="form-select" name="pay_target" id="pay_target">
+                                         <option value="company_transfer">Company Account Transfer</option>
+                                         <option value="supplier">Supplier Payment</option>
+-                                        <option value="grn_payment">PAY EXISTING GRN / GRN PAYMENT</option>
++                                        <option value="grn_payment">Pay GRN Expenses</option>
+                                         <option value="driver">Driver Service Payment</option>
+                                         <option value="client_refund">Client Refund</option>
+                                         <option value="loan">Loan Payment</option>
+                                         <option value="personal_expense">Personal Expense</option>
+                                         <option value="other_expense">Other Expense</option>
+                                     </select>
+-                                    <div class="col-md-12 mt-2" id="grnPaymentWrap">
+-                                        <label class="form-label">GRN to pay</label>
+-                                        <select class="form-select" name="grn_payment_grn_id">
+-                                            <option value="">— Open the GRN Payments page —</option>
+-                                            {% for g in grn_payment_options or [] %}<option value="{{ g.id }}">{{ g.label }}</option>{% endfor %}
++                                    <div class="col-md-12 mt-2 d-none" id="grnPaymentWrap">
++                                        <label class="form-label" for="grnPaymentGrnSelect">Select GRN</label>
++                                        <select class="form-select" name="grn_payment_grn_id" id="grnPaymentGrnSelect" disabled>
++                                            <option value="">— Open Pay GRN Expenses —</option>
++                                            {% for g in grn_payment_options or [] %}
++                                            <option value="{{ g.id }}"
++                                                    data-bill-ref="{{ g.bill_ref }}"
++                                                    data-supplier="{{ g.supplier }}"
++                                                    data-date-label="{{ g.date_label }}"
++                                                    data-date-iso="{{ g.date_iso }}"
++                                                    data-total-due="{{ '%.2f'|format(g.total_due) }}"
++                                                    data-supplier-ledger-due="{{ '%.2f'|format(g.supplier_ledger_due) }}"
++                                                    data-recipient-expenses-due="{{ '%.2f'|format(g.recipient_expenses_due) }}">{{ g.label }}</option>
++                                            {% endfor %}
+                                         </select>
+-                                        <div class="form-text">This opens the dedicated GRN payment wizard; no money is posted from this modal for GRNs.</div>
++                                        <div id="grnPaymentSelectionInfo" class="small mt-2 p-2 border rounded d-none" aria-live="polite">
++                                            <div id="grnPaymentSelectedInfo" class="fw-bold text-info"></div>
++                                            <div id="grnPaymentDateInfo" class="text-muted"></div>
++                                            <div id="grnPaymentDueInfo" class="fw-bold text-warning"></div>
++                                            <div id="grnPaymentExpenseInfo" class="text-muted"></div>
++                                        </div>
++                                        <div id="grnPaymentEmptyInfo" class="small text-muted mt-2">Select a GRN to see its date and the amount still to be paid.</div>
++                                        <div class="form-text">This opens <strong>Pay GRN Expenses</strong>, where the amount and recipient are chosen. No money is posted from this modal.</div>
+                                     </div>
+                                 </div>
+ 
+@@ -616,7 +632,7 @@
+                 </div>
+             </div>
+             <div class="modal-footer">
+-                <button type="submit" class="btn btn-primary">Submit Transaction</button>
++                <button type="submit" class="btn btn-primary" id="newTransactionSubmit">Submit Transaction</button>
+             </div>
+         </form>
+     </div>
+@@ -735,6 +751,43 @@ function clearSupplierDisplay() {
+     if (payableDisplay) payableDisplay.textContent = '';
+ }
+ 
++function formatDashboardMoney(value) {
++    return `Rs. ${Number(value || 0).toLocaleString(undefined, {
++        minimumFractionDigits: 2,
++        maximumFractionDigits: 2
++    })}`;
++}
++
++function updateGrnPaymentInfo() {
++    const select = document.getElementById('grnPaymentGrnSelect');
++    const info = document.getElementById('grnPaymentSelectionInfo');
++    const empty = document.getElementById('grnPaymentEmptyInfo');
++    const selected = document.getElementById('grnPaymentSelectedInfo');
++    const date = document.getElementById('grnPaymentDateInfo');
++    const due = document.getElementById('grnPaymentDueInfo');
++    const expenses = document.getElementById('grnPaymentExpenseInfo');
++    if (!select || !info || !empty) return;
++    const option = select.value ? select.options[select.selectedIndex] : null;
++    if (!option) {
++        info.classList.add('d-none');
++        empty.classList.remove('d-none');
++        return;
++    }
++    const data = option.dataset || {};
++    const totalDue = Number(data.totalDue || 0);
++    const supplierDue = Number(data.supplierLedgerDue || 0);
++    const recipientDue = Number(data.recipientExpensesDue || 0);
++    if (selected) selected.textContent = `${data.billRef || option.textContent} · ${data.supplier || ''}`.trim();
++    if (date) date.textContent = `GRN date: ${data.dateLabel || 'Date not recorded'}`;
++    if (due) due.textContent = `Amount still to be paid: ${formatDashboardMoney(totalDue)}`;
++    if (expenses) {
++        expenses.textContent = `Supplier ledger due: ${formatDashboardMoney(supplierDue)} · ` +
++            `Expenses not added to supplier ledger: ${formatDashboardMoney(recipientDue)}`;
++    }
++    info.classList.remove('d-none');
++    empty.classList.add('d-none');
++}
++
+ function selectPayClient(code, name, hiddenFieldId, inputId) {
+     const hidden = document.getElementById(hiddenFieldId);
+     const input = document.getElementById(inputId);
+@@ -872,11 +925,15 @@ function setPayTargetMode() {
+     const supplierWrap = document.getElementById('supplierWrap');
+     const targetLabelWrap = document.getElementById('targetLabelWrap');
+     const payTo = document.getElementById('pay_to_account_id');
++    const payFrom = document.getElementById('pay_from_account_id');
+     const supplierHidden = document.getElementById('supplier_id');
+     const supplierInput = document.getElementById('paySupplierInput');
+     const clientRefundWrap = document.getElementById('clientRefundWrap');
+     const payClientInput = document.getElementById('payClientInput');
+     const targetLabel = document.getElementById('target_label');
++    const grnWrap = document.getElementById('grnPaymentWrap');
++    const grnSelect = document.getElementById('grnPaymentGrnSelect');
++    const amountInput = document.getElementById('tx_amount');
+     if (!payTarget || !payToWrap || !supplierWrap || !targetLabelWrap || !payTo || !supplierHidden || !targetLabel) {
+         return;
+     }
+@@ -884,6 +941,7 @@ function setPayTargetMode() {
+     const txMode = document.querySelector('input[name="tx_mode"]:checked');
+     const isPayMode = txMode && (txMode.value || '').toLowerCase() === 'pay';
+     const target = (payTarget.value || '').toLowerCase();
++    const isGrnExpenses = isPayMode && target === 'grn_payment';
+ 
+     payToWrap.classList.toggle('d-none', target !== 'company_transfer');
+     supplierWrap.classList.toggle('d-none', target !== 'supplier');
+@@ -896,11 +954,36 @@ function setPayTargetMode() {
+     if (driverInput) driverInput.required = isPayMode && target === 'driver';
+     targetLabelWrap.classList.toggle('d-none', !['loan', 'personal_expense', 'other_expense'].includes(target));
+ 
++    // The GRN picker belongs to Pay GRN Expenses ONLY.  For a supplier payment
++    // (or any other target) it is hidden and disabled, so it can never look
++    // like a required field or change that transaction.
++    if (grnWrap) grnWrap.classList.toggle('d-none', !isGrnExpenses);
++    if (grnSelect) {
++        grnSelect.disabled = !isGrnExpenses;
++        if (!isGrnExpenses) grnSelect.value = '';
++    }
++    // No money is posted from this modal for GRN expenses; the amount/account
++    // are entered on the dedicated page.  Do not demand them here.
++    ['txAmountWrap', 'txMethodWrap', 'payFromAccountWrap'].forEach(id => {
++        const wrap = document.getElementById(id);
++        if (wrap) wrap.classList.toggle('d-none', isGrnExpenses);
++    });
++    if (amountInput) {
++        amountInput.required = !isGrnExpenses;
++        if (isGrnExpenses) amountInput.value = '';
++    }
++
+     payTo.required = isPayMode && target === 'company_transfer';
++    if (payFrom) payFrom.required = isPayMode && !isGrnExpenses;
+     supplierHidden.required = false;
+     if (supplierInput) supplierInput.required = isPayMode && target === 'supplier';
+     if (payClientInput) payClientInput.required = isPayMode && target === 'client_refund';
+     targetLabel.required = isPayMode && ['loan', 'personal_expense', 'other_expense'].includes(target);
++    const submitButton = document.getElementById('newTransactionSubmit');
++    if (submitButton) {
++        submitButton.textContent = isGrnExpenses ? 'Open Pay GRN Expenses' : 'Submit Transaction';
++    }
++    updateGrnPaymentInfo();
+ }
+ 
+ function syncDriverSelection() {
+@@ -1102,6 +1185,8 @@ document.addEventListener('DOMContentLoaded', function() {
+         });
+     }
+     if (targetSelect) targetSelect.addEventListener('change', setPayTargetMode);
++    const grnPaymentSelect = document.getElementById('grnPaymentGrnSelect');
++    if (grnPaymentSelect) grnPaymentSelect.addEventListener('change', updateGrnPaymentInfo);
+     if (receiveSourceType) receiveSourceType.addEventListener('change', setReceiveSourceMode);
+     if (receiveAccountSelect) receiveAccountSelect.addEventListener('change', setReceiveSourceMode);
+     if (amountInput) amountInput.addEventListener('input', updateReceiveSettlementState);
+diff --git a/templates/accounts/grn_payments.html b/templates/accounts/grn_payments.html
+index 6f9b118..9cce8e9 100644
+--- a/templates/accounts/grn_payments.html
++++ b/templates/accounts/grn_payments.html
+@@ -1,5 +1,5 @@
+ {% extends "layout.html" %}
+-{% block title %}PAY EXISTING GRN{% endblock %}
++{% block title %}Pay GRN Expenses{% endblock %}
+ {% block content %}
+ <style>
+   .grn-payment-live-summary {
+@@ -22,11 +22,12 @@
+ <div class="container-fluid py-3">
+   <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+     <div>
+-      <h3 class="mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>PAY EXISTING GRN / GRN PAYMENT</h3>
++      <h3 class="mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>Pay GRN Expenses</h3>
+       <div class="text-muted small">
+-        Every obligation of this GRN with its own paid / remaining balance: stock, the GRN expenses ticked for the
+-        supplier, and each expense recipient. A GRN only records what was received and what is owed.
+-        Prefer the split screen? <a href="{{ url_for('accounts.pay_grn', grn_id=selected.id) if selected else url_for('accounts.pay_grn') }}">Pay GRN (stock / expenses)</a>.
++        Every obligation of this GRN has its own amount to be paid: stock, the GRN expenses ticked for the
++        supplier, and each expense that was not ticked and stays payable to its own recipient. A GRN only records
++        what was received and what is owed. Prefer the split screen?
++        <a href="{{ url_for('accounts.pay_grn', grn_id=selected.id) if selected else url_for('accounts.pay_grn') }}">Pay GRN (stock / expenses)</a>.
+       </div>
+     </div>
+     <div class="d-flex gap-2">
+@@ -39,19 +40,32 @@
+     <div class="card-body">
+       <form method="get" class="row g-2 align-items-end">
+         <div class="col-md-8">
+-          <label class="form-label small fw-semibold">1. Select GRN</label>
+-          <select name="grn_id" class="form-select" onchange="this.form.submit()">
++          <label class="form-label small fw-semibold" for="grnSelect">1. Select GRN</label>
++          <select name="grn_id" id="grnSelect" class="form-select" onchange="this.form.submit()">
+             <option value="">— Select a GRN —</option>
+             {% for row in page_rows %}
+               {% set g = row.grn %}
+               {% set bd = row.breakdown %}
+-              <option value="{{ g.id }}" {{ 'selected' if selected and selected.id == g.id }}>
++              {% set summary = row.summary %}
++              <option value="{{ g.id }}" {{ 'selected' if selected and selected.id == g.id }}
++                      {% if summary %}data-date-label="{{ summary.date_label }}"
++                      data-total-due="{{ '%.2f'|format(summary.total_remaining) }}"
++                      data-recipient-expenses-due="{{ '%.2f'|format(summary.recipient_expenses_remaining) }}"{% endif %}>
+                 {{ g.manual_bill_no or g.auto_bill_no or ('GRN-' ~ g.id) }} · {{ g.supplier }} ·
+                 {{ g.date_posted.strftime('%d/%b/%Y') if g.date_posted else '' }}
+                 {% if bd %}· cost {{ '{:,.2f}'.format(bd.landed_cost_total) }} · due {{ '{:,.2f}'.format(bd.total_remaining) }}{% endif %}
+               </option>
+             {% endfor %}
+           </select>
++          <div id="grnSelectedDateNote" class="small mt-2 text-muted" aria-live="polite">
++            {% if selected_summary %}
++              <i class="bi bi-calendar3 me-1"></i>Selected GRN date: <strong class="text-info">{{ selected_summary.date_label }}</strong>
++              · Amount still to be paid: <strong class="text-warning">Rs. {{ '{:,.2f}'.format(selected_summary.total_remaining) }}</strong>
++              · Expenses not added to supplier ledger: <strong>Rs. {{ '{:,.2f}'.format(selected_summary.recipient_expenses_remaining) }}</strong>
++            {% else %}
++              Select a GRN to see its date and the amount still to be paid.
++            {% endif %}
++          </div>
+         </div>
+         <div class="col-md-4"><button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> Open GRN</button></div>
+       </form>
+@@ -59,14 +73,20 @@
+   </div>
+ 
+   {% if breakdown %}
++  {% set payable_now = selected_obligation.remaining if selected_obligation else none %}
++  {% set already_paid = selected_obligation.paid if selected_obligation else none %}
++  {% set payable_now_text = ('Rs. ' ~ '{:,.2f}'.format(payable_now)) if payable_now is not none else '—' %}
++  {% set already_paid_text = ('Rs. ' ~ '{:,.2f}'.format(already_paid)) if already_paid is not none else '—' %}
++  {% set total_balance_text = 'Rs. ' ~ '{:,.2f}'.format(breakdown.total_remaining) %}
+   <div class="row g-2 mb-3 small">
+     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Material</div><b>Rs. {{ '{:,.2f}'.format(breakdown.supplier_material_amount) }}</b></div></div></div>
+     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Ledger Bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b><div class="small text-muted">Stock {{ '{:,.2f}'.format(breakdown.material_original) }} + expenses {{ '{:,.2f}'.format(breakdown.expenses_original) }}</div></div></div></div>
+     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Additional Charges</div><b>Rs. {{ '{:,.2f}'.format(breakdown.capitalised_charge_total + breakdown.expense_charge_total) }}</b></div></div></div>
++    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Expenses outside supplier ledger</div><b class="text-info">Rs. {{ '{:,.2f}'.format(breakdown.additional_remaining) }}</b><div class="small text-muted">Still payable to their own recipients</div></div></div></div>
+     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Total Actual Cost</div><b class="text-success">Rs. {{ '{:,.2f}'.format(breakdown.landed_cost_total) }}</b></div></div></div>
+     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Avg Actual Rate</div><b>Rs. {{ '{:,.2f}'.format(breakdown.average_actual_rate) }}</b></div></div></div>
+     <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Cash Actually Paid</div><b class="text-info">Rs. {{ '{:,.2f}'.format(breakdown.total_cash_paid) }}</b></div></div></div>
+-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Total Remaining</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.total_remaining) }}</b></div></div></div>
++    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Amount to be paid</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.total_remaining) }}</b></div></div></div>
+   </div>
+ 
+   <div class="row g-3">
+@@ -75,14 +95,18 @@
+         <div class="card-header fw-semibold"><i class="bi bi-list-ul me-1"></i>2. Select payment recipient / obligation</div>
+         <div class="table-responsive">
+           <table class="table table-sm table-hover mb-0">
+-            <thead class="small text-muted"><tr><th>Recipient / Obligation</th><th class="text-end">Original</th><th class="text-end">Already Paid</th><th class="text-end">Remaining</th><th>Status</th><th></th></tr></thead>
++            <thead class="small text-muted"><tr><th>Recipient / Obligation</th><th class="text-end">Original</th><th class="text-end">Already Paid</th><th class="text-end">Amount to be paid</th><th>Status</th><th></th></tr></thead>
+             <tbody>
+             {% for ob in breakdown.obligations %}
+               <tr class="{{ 'table-info' if selected_obligation and selected_obligation.key == ob.key else '' }}"
+                   data-grn-obligation-row="{{ ob.key }}" data-remaining="{{ '%.2f'|format(ob.remaining) }}">
+                 <td>
+                   <b>{{ ob.label }}</b>
+-                  {% if ob.kind in ['MATERIAL', 'EXPENSES'] %}<span class="badge bg-dark border border-secondary ms-1">supplier</span>{% endif %}
++                  {% if ob.kind in ['MATERIAL', 'EXPENSES'] %}
++                  <span class="badge bg-dark border border-secondary ms-1">supplier</span>
++                  {% else %}
++                  <span class="badge bg-secondary ms-1">own recipient</span>
++                  {% endif %}
+                   <span class="d-block small text-muted">{{ ob.recipient_label }}{% if ob.recipient_name %} — {{ ob.recipient_name }}{% endif %}</span>
+                   {% if ob.hint %}<span class="d-block small text-muted fst-italic">{{ ob.hint }}</span>{% endif %}
+                 </td>
+@@ -158,8 +182,8 @@
+                 {% endfor %}
+               </select>
+               <div class="form-text">
+-                Stock and the GRN expenses billed to the supplier are separate payables: paying one never
+-                settles the other.
++                Stock, GRN expenses billed to the supplier, and expenses not added to the supplier ledger are
++                separate payables. Each line shows the amount still to be paid to its supplier or own recipient.
+               </div>
+             </div>
+ 
+@@ -170,20 +194,20 @@
+               </div>
+               <div class="row g-2 small">
+                 <div class="col-6">
+-                  <div class="text-muted">Amount payable now</div>
+-                  <strong class="live-figure text-warning" id="grnPaymentPayable">—</strong>
++                  <div class="text-muted">Amount to be paid now</div>
++                  <strong class="live-figure text-warning" id="grnPaymentPayable">{{ payable_now_text }}</strong>
+                 </div>
+                 <div class="col-6">
+                   <div class="text-muted">Already paid</div>
+-                  <strong class="live-figure text-info" id="grnPaymentAlreadyPaid">—</strong>
++                  <strong class="live-figure text-info" id="grnPaymentAlreadyPaid">{{ already_paid_text }}</strong>
+                 </div>
+                 <div class="col-6">
+-                  <div class="text-muted">Total GRN balance</div>
+-                  <strong class="live-figure text-warning" id="grnTotalPayable">—</strong>
++                  <div class="text-muted">Total amount to be paid</div>
++                  <strong class="live-figure text-warning" id="grnTotalPayable">{{ total_balance_text }}</strong>
+                 </div>
+                 <div class="col-6">
+                   <div class="text-muted">Total after this payment</div>
+-                  <strong class="live-figure" id="grnTotalRemaining">—</strong>
++                  <strong class="live-figure" id="grnTotalRemaining">{{ total_balance_text }}</strong>
+                 </div>
+                 <div class="col-6">
+                   <div class="text-muted">Amount entered</div>
+@@ -191,7 +215,7 @@
+                 </div>
+                 <div class="col-6 live-remaining p-2">
+                   <div class="text-muted">Remaining balance after payment</div>
+-                  <strong class="live-figure" id="grnPaymentRemaining">—</strong>
++                  <strong class="live-figure" id="grnPaymentRemaining">{{ payable_now_text }}</strong>
+                 </div>
+                 <div class="col-12 d-none" id="grnPaymentOverpaymentRow">
+                   <div class="d-flex justify-content-between text-danger">
+@@ -229,7 +253,7 @@
+           </form>
+           <div class="small text-muted mt-2">
+             <i class="bi bi-shield-check me-1"></i>
+-            Only expenses checked on the GRN are included in the supplier bill. Unchecked expenses remain payable to their own recipients. Each save creates exactly one cash-out row in Cash Flow.
++            Only expenses checked on the GRN are included in the supplier bill. Unchecked expenses remain payable to their own recipients and are listed above with their amount to be paid. Each save creates exactly one cash-out row in Cash Flow.
+           </div>
+         </div>
+       </div>
+diff --git a/templates/accounts/pay_grn.html b/templates/accounts/pay_grn.html
+index bb05da0..6f5c1bd 100644
+--- a/templates/accounts/pay_grn.html
++++ b/templates/accounts/pay_grn.html
+@@ -37,7 +37,7 @@
+     </div>
+     <div class="d-flex flex-wrap gap-2">
+       <a href="{{ url_for('accounts.purchase_payables') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-list-check"></i> Outstanding Payables</a>
+-      <a href="{{ url_for('accounts.grn_payments') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-list-ul"></i> Full GRN Payment Screen</a>
++      <a href="{{ url_for('accounts.grn_payments') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-list-ul"></i> Pay GRN Expenses — Full Breakdown</a>
+       <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Accounts</a>
+     </div>
+   </div>
+@@ -69,6 +69,16 @@
+         </div>
+         <div class="col-md-2"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-search"></i> Open</button></div>
+       </form>
++      <div class="small text-muted mt-2" aria-live="polite">
++        {% if bill %}
++          <i class="bi bi-calendar3 me-1"></i>Selected GRN date:
++          <strong class="text-info">{{ bill.date_posted.strftime('%d/%b/%Y') if bill.date_posted else 'Date not recorded' }}</strong>
++          · Amount still to be paid: <strong class="text-warning">Rs. {{ '{:,.2f}'.format(bill.total_remaining) }}</strong>
++          · Expenses outside supplier ledger: <strong>Rs. {{ '{:,.2f}'.format(bill.recipient_remaining) }}</strong>
++        {% else %}
++          Select a GRN to see its date and the amount still to be paid.
++        {% endif %}
++      </div>
+       {% if supplier_id and not grn_rows %}
+       <div class="alert alert-info small mt-3 mb-0">
+         <i class="bi bi-info-circle me-1"></i>No open GRN payable for this supplier — everything is settled.
+@@ -119,7 +129,7 @@
+         <div class="table-responsive">
+           <table class="table table-sm align-middle mb-0">
+             <thead class="small text-muted">
+-              <tr><th>Payable</th><th class="text-end">Original</th><th class="text-end">Paid</th><th class="text-end">Remaining</th><th>Route</th></tr>
++              <tr><th>Payable</th><th class="text-end">Original</th><th class="text-end">Paid</th><th class="text-end">Amount to be paid</th><th>Route</th></tr>
+             </thead>
+             <tbody>
+               <tr>
+@@ -196,7 +206,7 @@
+         <div class="card-header fw-semibold"><i class="bi bi-wallet2 me-1"></i>3. Record the payment</div>
+         <div class="card-body">
+           {% if not can_edit %}<div class="alert alert-warning small">You do not have permission to post payments.</div>{% endif %}
+-          <form method="post" action="{{ url_for('accounts.pay_grn_save') }}" autocomplete="off" id="payGrnForm" data-bill-total="{{ '%.2f'|format(bill.total_remaining) }}">
++          <form method="post" action="{{ url_for('accounts.pay_grn_save') }}" autocomplete="off" id="payGrnForm" data-bill-total="{{ '%.2f'|format(bill.total_remaining) }}" data-can-edit="{{ '1' if can_edit else '0' }}">
+             <input type="hidden" name="_csrf_token" value="{{ csrf_token or '' }}">
+             <input type="hidden" name="grn_id" value="{{ bill.grn_id }}">
+             <input type="hidden" name="idempotency_key" value="paygrn-{{ submission_token }}">
+@@ -237,13 +247,39 @@
+               <div class="form-text">Only the {{ bill.supplier_billed_charge_count }} expense{{ '' if bill.supplier_billed_charge_count == 1 else 's' }} ticked “Add to supplier ledger”.</div>
+               {% else %}
+               <div class="small text-muted">
+-                No expense is billed to this supplier. Vehicle fare / loading and similar costs stay payable to their own
+-                recipient in the table on the left — pay them from
+-                <a href="{{ url_for('accounts.grn_payments', grn_id=bill.grn_id) }}">PAY EXISTING GRN</a>.
++                No expense is billed to this supplier. Vehicle fare / loading and similar costs stay payable to their
++                own recipients in the separate boxes below.
++                <a href="{{ url_for('accounts.grn_payments', grn_id=bill.grn_id) }}">Pay GRN Expenses</a> shows the full breakdown.
+               </div>
+               {% endif %}
+             </div>
+ 
++            {% if bill.recipient_charges %}
++            <div class="small fw-bold text-uppercase text-muted mt-3 mb-1">GRN expenses not added to supplier ledger</div>
++            {% for ob in bill.recipient_charges %}
++            <div class="paygrn-pay-block mb-2 {{ 'is-paid' if ob.remaining <= 0.004 }}"
++                 data-pay-block="CHARGE:{{ ob.charge_id }}" data-remaining="{{ '%.2f'|format(ob.remaining) }}">
++              <div class="d-flex justify-content-between align-items-center mb-1">
++                <label class="form-label fw-semibold mb-0">{{ ob.label }}</label>
++                <span class="badge bg-secondary">Amount to be paid {{ '{:,.2f}'.format(ob.remaining) }}</span>
++              </div>
++              <div class="small text-muted mb-1">
++                {{ ob.recipient_label }}{% if ob.recipient_name %} — {{ ob.recipient_name }}{% endif %}
++                · not part of the supplier ledger
++              </div>
++              <input type="hidden" name="pay_obligation_key[]" value="{{ ob.key }}">
++              <div class="input-group input-group-sm">
++                <span class="input-group-text">Rs.</span>
++                <input type="number" step="0.01" min="0" class="form-control paygrn-input" name="pay_amount[]"
++                       id="payGrnCharge{{ ob.charge_id }}" placeholder="0.00" inputmode="decimal"
++                       {{ 'disabled' if ob.remaining <= 0.004 }}>
++                <button type="button" class="btn btn-outline-warning" data-pay-full="payGrnCharge{{ ob.charge_id }}"
++                        {{ 'disabled' if ob.remaining <= 0.004 }}>Pay full</button>
++              </div>
++            </div>
++            {% endfor %}
++            {% endif %}
++
+             <div class="paygrn-total d-flex justify-content-between mb-2">
+               <span class="small text-uppercase text-muted fw-bold">Entered now</span>
+               <b class="paygrn-figure" id="payGrnEntered">Rs. 0.00</b>
+@@ -280,8 +316,8 @@
+           </form>
+           <div class="small text-muted mt-2">
+             <i class="bi bi-shield-check me-1"></i>
+-            Each box creates its own cash-out row in Cash Flow. Paying stock never marks an expense paid, and
+-            paying an expense never marks stock paid.
++            Each box creates its own cash-out row in Cash Flow, including expenses not added to the supplier ledger.
++            Paying stock never marks an expense paid, and paying an expense never marks stock paid.
+           </div>
+         </div>
+       </div>
+@@ -294,5 +330,5 @@
+   </div>
+   {% endif %}
+ </div>
+-<script src="{{ url_for('static', filename='pay_grn.js') }}?v=1"></script>
++<script src="{{ url_for('static', filename='pay_grn.js') }}?v=2"></script>
+ {% endblock %}
+diff --git a/templates/accounts/purchase_payables.html b/templates/accounts/purchase_payables.html
+index d5496e4..b715986 100644
+--- a/templates/accounts/purchase_payables.html
++++ b/templates/accounts/purchase_payables.html
+@@ -7,7 +7,7 @@
+       <h3 class="mb-0"><i class="bi bi-list-check me-2 text-warning"></i>Outstanding Purchase Payables</h3>
+       <div class="text-muted small">Supplier payables follow each GRN checkbox: material only, or material + GRN costs. Unchecked costs are payable to their own recipients.</div>
+     </div>
+-    <a href="{{ url_for('accounts.grn_payments') }}" class="btn btn-sm btn-success"><i class="bi bi-cash-coin"></i> PAY EXISTING GRN</a>
++    <a href="{{ url_for('accounts.grn_payments') }}" class="btn btn-sm btn-success"><i class="bi bi-cash-coin"></i> Pay GRN Expenses</a>
+   </div>
+   <div class="row g-2 mb-3">
+     <div class="col-md-4"><div class="card"><div class="card-body"><div class="text-muted small">Total outstanding</div><h4 class="mb-0 text-warning">Rs. {{ '{:,.2f}'.format(report.total) }}</h4></div></div></div>
+diff --git a/templates/grn_costs_tab.html b/templates/grn_costs_tab.html
+index 336d5ec..a8e7f8c 100644
+--- a/templates/grn_costs_tab.html
++++ b/templates/grn_costs_tab.html
+@@ -6,7 +6,7 @@
+      * vehicle fare / transport, loading, unloading and other are separate
+        cost lines with their own recipients;
+      * there is NO paid/unpaid declaration anywhere on this screen.  Money is
+-       paid only from Accounts -> PAY EXISTING GRN.
++       paid only from Accounts -> Pay GRN Expenses.
+ 
+    Numbers come from app/services/grn_costs.py, which reads grn_costing.
+    ========================================================================= #}
+@@ -99,7 +99,7 @@
+             to <b>{{ costs.end.strftime('%d/%b/%Y') if costs.end else 'today' }}</b>
+         {% endif %}
+         &middot; filtered total <b>Rs {{ '{:,.2f}'.format(costs.filtered_total) }}</b>
+-        <span class="text-muted">(payments are recorded only in Accounts &rarr; PAY EXISTING GRN)</span>
++        <span class="text-muted">(payments are recorded only in Accounts &rarr; Pay GRN Expenses)</span>
+     </div>
+ 
+     <div class="table-responsive">
+diff --git a/templates/grn_wizard.html b/templates/grn_wizard.html
+index b654fdb..fb883c1 100644
+--- a/templates/grn_wizard.html
++++ b/templates/grn_wizard.html
+@@ -619,7 +619,7 @@
+                             <i class="bi bi-shield-check me-1"></i>
+                             <strong>GRN never pays.</strong> This document records material received, its complete
+                             actual (landed) cost and who must be paid. All payments — full, partial or repeated —
+-                            are made later from <strong>Accounts &rarr; PAY EXISTING GRN</strong>. The Supplier Ledger
++                            are made later from <strong>Accounts &rarr; Pay GRN Expenses</strong>. The Supplier Ledger
+                             receives <strong>only</strong> material quantity &times; rate.
+                         </div>
+ 
+@@ -841,7 +841,7 @@
+                                     <i class="bi bi-info-circle me-1"></i>
+                                     This grid records costs only — there is no paid/unpaid option on a GRN.
+                                     Paid, remaining and status come exclusively from Accounts payments
+-                                    (<strong>Accounts &rarr; PAY EXISTING GRN</strong>).
++                                    (<strong>Accounts &rarr; Pay GRN Expenses</strong>).
+                                     "Separate expense" charges are excluded from inventory valuation and never double counted.
+                                     Every line here appears in the <strong>GRN Costs</strong> tab at the top of this page.
+                                 </div>
+diff --git a/tests/frontend/test_accounts_dashboard_grn_picker_dom.js b/tests/frontend/test_accounts_dashboard_grn_picker_dom.js
+new file mode 100644
+index 0000000..afcce20
+--- /dev/null
++++ b/tests/frontend/test_accounts_dashboard_grn_picker_dom.js
+@@ -0,0 +1,139 @@
++/* Offline DOM test for the Accounts → Make New Transaction GRN picker.
++
++   The picker must be invisible/disabled for Supplier Payment, and visible only
++   for Pay GRN Expenses.  When a GRN is selected, the note below the picker
++   shows the server-authoritative GRN date and amount still to be paid,
++   including expenses that were not added to the supplier ledger.
++
++   Run: npm i jsdom && node tests/frontend/test_accounts_dashboard_grn_picker_dom.js
++*/
++const fs = require("fs");
++const path = require("path");
++let JSDOM;
++try { JSDOM = require("jsdom").JSDOM; }
++catch (_) { JSDOM = require("/tmp/node_modules/jsdom").JSDOM; }
++
++const template = fs.readFileSync(
++    path.join(__dirname, "..", "..", "templates", "accounts", "dashboard.html"),
++    "utf8"
++);
++
++function slice(startMarker, endMarker) {
++    const start = template.indexOf(startMarker);
++    const end = template.indexOf(endMarker, start + startMarker.length);
++    if (start < 0 || end < 0) {
++        throw new Error("Could not extract " + startMarker + " from dashboard.html");
++    }
++    return template.slice(start, end);
++}
++
++/* Both blocks are plain JavaScript (Jinja expressions live elsewhere). */
++const code = [
++    slice("function formatDashboardMoney", "function selectPayClient"),
++    slice("function setPayTargetMode", "function syncDriverSelection")
++].join("\n");
++
++const PAGE = `<!doctype html><html><body>
++<input type="radio" name="tx_mode" value="pay" checked>
++<div id="txAmountWrap"><input id="tx_amount" value="123.00" required></div>
++<div id="txMethodWrap"><select name="method"><option>Cash</option></select></div>
++<div id="paySection">
++  <div id="payFromAccountWrap"><select id="pay_from_account_id" required></select></div>
++  <select id="pay_target">
++    <option value="supplier">Supplier Payment</option>
++    <option value="grn_payment">Pay GRN Expenses</option>
++  </select>
++  <div id="grnPaymentWrap" class="d-none">
++    <select id="grnPaymentGrnSelect" disabled>
++      <option value="">— Open Pay GRN Expenses —</option>
++      <option value="7"
++              data-bill-ref="GRN-7"
++              data-supplier="Cement Works"
++              data-date-label="20/Oct/2026"
++              data-total-due="6500.00"
++              data-supplier-ledger-due="6000.00"
++              data-recipient-expenses-due="500.00">GRN-7 · Cement Works · 20/Oct/2026</option>
++    </select>
++    <div id="grnPaymentSelectionInfo" class="d-none">
++      <div id="grnPaymentSelectedInfo"></div>
++      <div id="grnPaymentDateInfo"></div>
++      <div id="grnPaymentDueInfo"></div>
++      <div id="grnPaymentExpenseInfo"></div>
++    </div>
++    <div id="grnPaymentEmptyInfo"></div>
++  </div>
++  <div id="payToAccountWrap"><select id="pay_to_account_id"></select></div>
++  <div id="supplierWrap">
++    <input id="supplier_id"><input id="paySupplierInput">
++  </div>
++  <div id="targetLabelWrap"><input id="target_label"></div>
++  <div id="clientRefundWrap"><input id="payClientInput"></div>
++  <button id="newTransactionSubmit">Submit Transaction</button>
++</div>
++</body></html>`;
++
++const dom = new JSDOM(PAGE, {
++    url: "http://localhost/accounts/",
++    runScripts: "outside-only",
++    pretendToBeVisual: true
++});
++const w = dom.window;
++const d = w.document;
++w.eval(code);
++
++let pass = 0;
++let fail = 0;
++function check(name, condition, extra) {
++    if (condition) { pass += 1; console.log("  ok  -", name); }
++    else { fail += 1; console.log("  FAIL-", name, extra === undefined ? "" : "-> " + extra); }
++}
++
++const target = d.getElementById("pay_target");
++const grnWrap = d.getElementById("grnPaymentWrap");
++const grnSelect = d.getElementById("grnPaymentGrnSelect");
++const amount = d.getElementById("tx_amount");
++const payFrom = d.getElementById("pay_from_account_id");
++const submit = d.getElementById("newTransactionSubmit");
++
++/* 1. A supplier payment must not show or submit the GRN field. */
++target.value = "supplier";
++grnSelect.value = "7";
++w.setPayTargetMode();
++check("supplier target hides the GRN picker", grnWrap.classList.contains("d-none"));
++check("supplier target disables the GRN picker", grnSelect.disabled === true);
++check("supplier target clears a stale GRN selection", grnSelect.value === "");
++check("supplier target keeps the amount required", amount.required === true);
++check("supplier target keeps the source account required", payFrom.required === true);
++check("supplier target uses the normal submit label", submit.textContent === "Submit Transaction");
++
++/* 2. Pay GRN Expenses shows the date and all payable amounts. */
++target.value = "grn_payment";
++grnSelect.value = "7";
++w.setPayTargetMode();
++check("GRN expenses target shows the picker", !grnWrap.classList.contains("d-none"));
++check("GRN expenses target enables the picker", grnSelect.disabled === false);
++check("GRN expenses target hides the generic amount", d.getElementById("txAmountWrap").classList.contains("d-none"));
++check("GRN expenses target does not require a modal amount", amount.required === false && amount.value === "");
++check("GRN expenses target does not require a source account", payFrom.required === false);
++check("GRN expenses target changes the submit label", submit.textContent === "Open Pay GRN Expenses");
++check("GRN selection note is visible", !d.getElementById("grnPaymentSelectionInfo").classList.contains("d-none"));
++check("GRN selection note shows the GRN date",
++    d.getElementById("grnPaymentDateInfo").textContent.includes("20/Oct/2026"));
++check("GRN selection note shows the total to be paid",
++    d.getElementById("grnPaymentDueInfo").textContent.includes("Rs. 6,500.00"));
++check("GRN selection note shows off-ledger expenses",
++    d.getElementById("grnPaymentExpenseInfo").textContent.includes("Rs. 500.00"));
++
++/* 3. Clearing the selection restores the prompt. */
++grnSelect.value = "";
++w.updateGrnPaymentInfo();
++check("empty GRN hides the amount note",
++    d.getElementById("grnPaymentSelectionInfo").classList.contains("d-none"));
++check("empty GRN shows the selection prompt",
++    !d.getElementById("grnPaymentEmptyInfo").classList.contains("d-none"));
++
++if (fail) {
++    console.log("\n" + fail + " check(s) failed; " + pass + " passed.");
++    process.exit(1);
++}
++console.log("\n" + pass + " checks passed.");
+diff --git a/tests/frontend/test_pay_grn_dom.js b/tests/frontend/test_pay_grn_dom.js
+index bb6a526..c77a6b6 100644
+--- a/tests/frontend/test_pay_grn_dom.js
++++ b/tests/frontend/test_pay_grn_dom.js
+@@ -4,8 +4,9 @@
+    `data-remaining` produced by app/services/grn_costing.py.  This test pins
+    the browser-only contract:
+ 
+-     1. "Pay full" fills exactly what that ONE payable is due;
+-     2. the entered total adds both boxes and never merges the payables;
++     1. "Pay full" fills exactly what that ONE payable is due, including an
++        expense that was not added to the supplier ledger;
++     2. the entered total adds every box and never merges the payables;
+      3. an amount above a payable is flagged and blocked before submit;
+      4. an empty submit is refused;
+      5. the calculator never disables a permitted submit.
+@@ -35,6 +36,11 @@ const PAGE = `<!doctype html><html><body>
+     <input type="number" name="pay_amount[]" id="payGrnExpenses">
+     <button type="button" data-pay-full="payGrnExpenses">Pay full</button>
+   </div>
++  <div data-pay-block="CHARGE:31" data-remaining="500.00">
++    <input type="hidden" name="pay_obligation_key[]" value="CHARGE:31">
++    <input type="number" name="pay_amount[]" id="payGrnCharge31">
++    <button type="button" data-pay-full="payGrnCharge31">Pay full</button>
++  </div>
+   <b id="payGrnEntered">Rs. 0.00</b>
+   <div id="payGrnStatus" class="d-none"></div>
+   <button id="payGrnSubmit" data-can-edit="1">Save payment</button>
+@@ -120,6 +126,18 @@ d.getElementById("payGrnExpenses").disabled = true;
+ expensesFull.click();
+ check("Pay full does nothing on a settled payable", d.getElementById("payGrnExpenses").value === "");
+ 
++/* 7. An expense not added to the supplier ledger has its own payable box. */
++const chargeFull = d.querySelector('[data-pay-full="payGrnCharge31"]');
++chargeFull.click();
++check("own-recipient expense Pay full uses its own due",
++    d.getElementById("payGrnCharge31").value === "500.00");
++check("entered total includes off-ledger expenses",
++    d.getElementById("payGrnEntered").textContent === "Rs. 150,500.00");
++input("payGrnCharge31", "600");
++check("own-recipient expense overpayment is flagged",
++    d.getElementById("payGrnCharge31").classList.contains("is-invalid"));
++check("own-recipient expense overpayment is blocked", submit().defaultPrevented);
++
+ if (fail) {
+     console.log("\n" + fail + " check(s) failed; " + pass + " passed.");
+     process.exit(1);
+diff --git a/tests/test_full_cycle_smoke.py b/tests/test_full_cycle_smoke.py
+index fe00c57..404d28e 100644
+--- a/tests/test_full_cycle_smoke.py
++++ b/tests/test_full_cycle_smoke.py
+@@ -118,7 +118,7 @@ def cycle(app, client):
+     assert "GRN added successfully" in resp.get_data(as_text=True)
+ 
+     # A1: the GRN never pays.  Record the supplier's part payment from
+-    # Accounts -> PAY EXISTING GRN instead (the legacy paid_amount fields in
++    # Accounts -> Pay GRN Expenses instead (the legacy paid_amount fields in
+     # the GRN payload above are intentionally ignored).
+     with app.app_context():
+         cycle_grn_id = GRN.query.filter(GRN.manual_bill_no.like("%CYCLE-GRN-1%")).one().id
+diff --git a/tests/test_grn_costs_tab.py b/tests/test_grn_costs_tab.py
+index ec44f06..e70f803 100644
+--- a/tests/test_grn_costs_tab.py
++++ b/tests/test_grn_costs_tab.py
+@@ -114,7 +114,7 @@ def test_charge_grid_has_no_paid_or_unpaid_control(costs_app):
+     # The tab strip and its explanation are present instead.
+     assert "grn-main-tabs" in html and "<ul class=\"nav nav-tabs" in html, "the Records | Costs tab strip must exist"
+     assert ">Costs\n" in html or ">Costs<" in html
+-    assert "PAY EXISTING GRN" in html
++    assert "Pay GRN Expenses" in html
+ 
+ 
+ def test_removing_the_paid_field_does_not_change_received_costs(costs_app):
+diff --git a/tests/test_grn_edit_form_null_fields.py b/tests/test_grn_edit_form_null_fields.py
+index d31d4b5..cf976b1 100644
+--- a/tests/test_grn_edit_form_null_fields.py
++++ b/tests/test_grn_edit_form_null_fields.py
+@@ -25,7 +25,7 @@ LOGIN = {"username": "Admin", "password": "Admin@fbm12345"}
+ # Owner rule A1 (approved 2026-11-02): a GRN NEVER pays, so the old
+ # payment/bank fields (payment_type, paid_amount, payment_account_id,
+ # bank_name, account_name, account_no) are no longer on the GRN form.
+-# Payments are recorded only from Accounts -> PAY EXISTING GRN.
++# Payments are recorded only from Accounts -> Pay GRN Expenses.
+ GUARDED_FIELDS = (
+     "supplier",
+     "supplier_invoice_no",
+diff --git a/tests/test_grn_landed_cost_payments.py b/tests/test_grn_landed_cost_payments.py
+index ae9acf0..77be79d 100644
+--- a/tests/test_grn_landed_cost_payments.py
++++ b/tests/test_grn_landed_cost_payments.py
+@@ -229,7 +229,7 @@ def test_pay_vehicle_then_supplier_then_loading(client, app):
+     # 4. The GRN Payments page renders obligations + history.
+     resp = client.get(f'/accounts/grn_payments?grn_id={grn_id}')
+     assert resp.status_code == 200
+-    assert b'PAY EXISTING GRN' in resp.data
++    assert b'Pay GRN Expenses' in resp.data
+     assert b'Rana Transport' in resp.data
+ 
+ 
+diff --git a/tests/test_pay_grn_screen.py b/tests/test_pay_grn_screen.py
+index 848df9d..0776123 100644
+--- a/tests/test_pay_grn_screen.py
++++ b/tests/test_pay_grn_screen.py
+@@ -4,10 +4,10 @@ Owner contract (A3): the stock value of a GRN (qty × rate) and the GRN
+ expenses that were ticked "add to supplier ledger" are TWO separate payables.
+ This suite pins the operator-visible halves:
+ 
+-  * the screen offers a stock box and an expenses box, each with its own
+-    "Pay full" and its own remaining amount;
++  * the screen offers a stock box, a supplier-billed expenses box and one box
++    per expense with its own recipient, each with its own amount and "Pay full";
+   * expenses that were NOT ticked never appear in the supplier box — they stay
+-    payable to their own recipient on PAY EXISTING GRN;
++    payable to their own recipient on Pay GRN Expenses;
+   * posting the stock box settles stock only and leaves the expenses due;
+   * posting the expenses box settles expenses only and leaves stock due;
+   * posting only one line in a two-line run is honoured (no silent waterfall);
+@@ -106,9 +106,12 @@ def test_screen_shows_stock_and_expenses_as_two_boxes(client, app):
+     assert html.count('data-pay-block="EXPENSES"') == 1
+     assert "Stock / material" in html
+     assert "GRN expenses billed to supplier" in html
+-    assert html.count("Pay full") >= 2
+-    assert html.count('name="pay_obligation_key[]"') == 2
+-    assert html.count('name="pay_amount[]"') == 2
++    assert html.count("Pay full") >= 3
++    assert html.count('name="pay_obligation_key[]"') == 3
++    assert html.count('name="pay_amount[]"') == 3
++    assert 'data-pay-block="CHARGE:' in html
++    assert "GRN expenses not added to supplier ledger" in html
++    assert "Amount to be paid" in html
+ 
+     # Stock 150,000 and the ticked 5,000 are distinct figures on the page.
+     assert "150,000.00" in html
+@@ -234,7 +237,8 @@ def test_unticked_expense_is_paid_to_its_own_recipient(client, app):
+         key = f"CHARGE:{tea.id}"
+         assert grn_breakdown(db.session.get(GRN, grn_id))["supplier_bill_amount"] == pytest.approx(155000)
+ 
+-    pay(client, app, grn_id, cash_id, [(key, "500")])
++    response = pay(client, app, grn_id, cash_id, [(key, "500")])
++    assert b"GRN expenses to their own recipients" in response.data
+     with app.app_context():
+         bill = grn_breakdown(db.session.get(GRN, grn_id))
+         assert bill["additional_remaining"] == 0
+@@ -244,6 +248,10 @@ def test_unticked_expense_is_paid_to_its_own_recipient(client, app):
+         assert build_supplier_financial_ledger(
+             db.session.get(Supplier, supplier_id))["closing_balance"] == pytest.approx(155000)
+ 
++    # The own-recipient box is now explicitly shown as settled.
++    html = client.get(f"/accounts/pay_grn?grn_id={grn_id}").get_data(as_text=True)
++    assert re.search(r'data-pay-block="CHARGE:%d"\s+data-remaining="0.00"' % tea.id, html)
++
+ 
+ def test_pay_existing_grn_page_lists_every_obligation(client, app):
+     login(client)
+@@ -268,3 +276,58 @@ def test_screen_links_are_reachable_from_accounts(client, app):
+     assert "Stock due:" in grn_page
+     assert "GRN expenses due to supplier:" in grn_page
+     assert f"/accounts/pay_grn?grn_id={grn_id}" in grn_page
++
++
++def test_dashboard_grn_picker_is_hidden_for_supplier_payment_but_exposes_due_facts(client, app):
++    """The stray GRN field is only for the Pay GRN Expenses route."""
++    login(client)
++    supplier_id, _cash_id = seed(app)
++    grn_id = receive_grn(client, app, supplier_id, bill="PG-DASH-1")
++
++    html = client.get("/accounts/").get_data(as_text=True)
++    assert '<option value="grn_payment">Pay GRN Expenses</option>' in html
++    assert re.search(r'<div class="[^"]*\bd-none\b[^"]*"\s+id="grnPaymentWrap"', html)
++    assert re.search(r'id="grnPaymentGrnSelect"[^>]*\bdisabled\b', html)
++    assert "Amount still to be paid" in html
++    assert "Expenses not added to supplier ledger" in html
++    # The picker's server-authoritative values include the unticked 500.
++    assert 'data-date-label="20/Oct/2026"' in html
++    assert 'data-total-due="155500.00"' in html
++    assert 'data-recipient-expenses-due="500.00"' in html
++    assert f'value="{grn_id}"' in html
++
++
++def test_pay_grn_expenses_shows_selected_date_and_amount_without_js(client, app):
++    """An off-ledger expense opens with its real payable amount and GRN date."""
++    login(client)
++    supplier_id, _cash_id = seed(app)
++    grn_id = receive_grn(client, app, supplier_id, bill="PG-FULL-1")
++    with app.app_context():
++        tea = GRNCharge.query.filter_by(grn_id=grn_id, recipient_name="Tea shop").one()
++        tea_id = tea.id
++
++    html = client.get(
++        f"/accounts/grn_payments?grn_id={grn_id}&charge_id={tea_id}"
++    ).get_data(as_text=True)
++    assert "Pay GRN Expenses" in html
++    assert "Selected GRN date" in html
++    assert "20/Oct/2026" in html
++    assert "Amount to be paid now" in html
++    assert "Expenses not added to supplier ledger" in html
++    assert re.search(r'id="grnPaymentPayable">\s*Rs\. 500\.00', html)
++    assert re.search(
++        r'<option value="CHARGE:%d"[^>]*\bselected\b' % tea_id, html, re.S)
++    assert 'data-recipient-expenses-due="500.00"' in html
++
++
++def test_pay_grn_expenses_defaults_to_an_open_payable_after_stock_is_settled(client, app):
++    """A settled stock row must not hide the next GRN expense amount."""
++    login(client)
++    supplier_id, cash_id = seed(app)
++    grn_id = receive_grn(client, app, supplier_id, bill="PG-OPEN-1")
++    pay(client, app, grn_id, cash_id, [(f"MATERIAL:{grn_id}", "150000")])
++
++    html = client.get(f"/accounts/grn_payments?grn_id={grn_id}").get_data(as_text=True)
++    assert re.search(r'id="grnPaymentPayable">\s*Rs\. 5,000\.00', html)
++    assert re.search(
++        r'<option value="EXPENSES:%d"[^>]*\bselected\b' % grn_id, html, re.S)
+diff --git a/tests/test_sidebar_navigation.py b/tests/test_sidebar_navigation.py
+index f96d216..5e8f3f8 100644
+--- a/tests/test_sidebar_navigation.py
++++ b/tests/test_sidebar_navigation.py
+@@ -162,7 +162,7 @@ def test_admin_sidebar_categories_and_item_grouping(client):
+         "Daily Reconciliation",
+         "PAY GRN (STOCK / EXPENSES)",
+         "Pay Supplier",
+-        "PAY EXISTING GRN",
++        "Pay GRN Expenses",
+         "Profit Reports",
+     ]
+     assert by_label["Ledger"] == [
