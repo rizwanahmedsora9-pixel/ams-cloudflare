@@ -1,0 +1,6 @@
+# Complete feature set for standard desktop/server installations.
+# On constrained ARM/Android environments, install requirements.txt first and
+# add the optional files individually only when compatible wheels are available.
+-r requirements.txt
+-r requirements-data.txt
+-r requirements-pdf.txt

@@ -1253,7 +1253,11 @@ class Installer:
 
     @property
     def requirements(self) -> Path:
-        return self.target / "requirements.txt"
+        # Production deployments should retain the full feature set when the
+        # repository provides a complete manifest. Minimal/mobile installs can
+        # still use requirements.txt directly outside this deployment helper.
+        full = self.target / "requirements-full.txt"
+        return full if full.is_file() else self.target / "requirements.txt"
 
     def may_write(self) -> bool:
         return not self.o.dry_run and not self.o.check_only
@@ -1439,7 +1443,7 @@ class Installer:
         if self.o.skip_deps:
             plan.append("Dependencies: skipped (--skip-deps)")
         else:
-            plan.append("Dependencies: pip install -r requirements.txt into the virtualenv (timeout %ss)" % self.o.pip_timeout)
+            plan.append("Dependencies: pip install -r %s into the virtualenv (timeout %ss)" % (self.requirements.name, self.o.pip_timeout))
         if detected.secret_present and detected.secret_valid:
             plan.append("Secret: keep the existing %s (%s)" % (self.secret_path, detected.secret_fingerprint))
         else:
@@ -2053,14 +2057,14 @@ class Installer:
         digest = sha256_file(self.requirements)
         previous = str(self.detected.state.get("requirements_sha256") or "")
         if previous == digest and self.detected.venv_present:
-            self.reporter.check("Dependencies", INFO, detail="requirements.txt unchanged since the last install; verifying instead",
+            self.reporter.check("Dependencies", INFO, detail="%s unchanged since the last install; verifying instead" % self.requirements.name,
                                 required=False)
         args = ["install", "--disable-pip-version-check", "--no-input", "--retries", "2",
                 "--timeout", "60", "-r", str(self.requirements)]
         self.reporter.info("  installing requirements into %s (timeout %ss per attempt)" % (self.venv_dir, self.o.pip_timeout))
         result = self._pip(args, timeout=self.o.pip_timeout)
         if result.ok:
-            self.reporter.check("Dependencies", PASS, detail="pip install -r requirements.txt succeeded")
+            self.reporter.check("Dependencies", PASS, detail="pip install -r %s succeeded" % self.requirements.name)
             self.record["requirements_sha256"] = digest
         else:
             self.reporter.check("Dependencies", FAIL, detail=tail(result.combined, 8),
@@ -2068,20 +2072,38 @@ class Installer:
                                     % (self.venv_python, self.requirements))
 
     def _validate_environment(self) -> None:
-        code = ("import importlib, sys\n"
-                "mods = ['flask', 'flask_login', 'flask_sqlalchemy', 'sqlalchemy', 'pandas', 'numpy', 'openpyxl', 'reportlab']\n"
-                "missing = []\n"
-                "for name in mods:\n"
-                "    try:\n"
-                "        importlib.import_module(name)\n"
-                "    except Exception as exc:\n"
-                "        missing.append('%s (%s)' % (name, exc))\n"
-                "print('MISSING:' + '; '.join(missing) if missing else 'IMPORTS-OK')\n")
+        code = ("import importlib\n"
+                "required = ['flask', 'flask_login', 'flask_sqlalchemy', 'sqlalchemy', 'openpyxl']\n"
+                "optional = ['pandas', 'reportlab']\n"
+                "def missing(modules):\n"
+                "    failures = []\n"
+                "    for name in modules:\n"
+                "        try:\n"
+                "            importlib.import_module(name)\n"
+                "        except Exception as exc:\n"
+                "            failures.append('%s (%s)' % (name, exc))\n"
+                "    return failures\n"
+                "required_missing = missing(required)\n"
+                "optional_missing = missing(optional)\n"
+                "print('MISSING:' + '; '.join(required_missing) if required_missing else 'IMPORTS-OK')\n"
+                "if optional_missing:\n"
+                "    print('OPTIONAL-MISSING:' + '; '.join(optional_missing))\n")
         result = self.runner.run([str(self.venv_python), "-c", code], timeout=max(120, self.o.timeout * 2))
         output = result.out.strip()
         if result.ok and "IMPORTS-OK" in output:
             self.reporter.check("Dependencies importable", PASS,
-                                detail="flask, sqlalchemy, pandas, numpy, openpyxl, reportlab import cleanly")
+                                detail="Flask, SQLAlchemy, and openpyxl import cleanly")
+            optional_missing = next((line.partition(":")[2] for line in output.splitlines()
+                                     if line.startswith("OPTIONAL-MISSING:")), "")
+            if optional_missing:
+                self.reporter.check(
+                    "Optional feature dependencies", WARN, required=False,
+                    detail="some features unavailable (pandas enables data-analysis/import features; ReportLab enables PDF fallback): %s" % optional_missing,
+                    fix="install requirements-data.txt and/or requirements-pdf.txt if this platform supports their wheels",
+                )
+            else:
+                self.reporter.check("Optional feature dependencies", PASS,
+                                    detail="pandas and ReportLab importable", required=False)
         else:
             self.reporter.check("Dependencies importable", FAIL,
                                 detail=tail(output or result.combined, 5),
@@ -2092,7 +2114,7 @@ class Installer:
             self.reporter.check("WeasyPrint", PASS, detail="native PDF engine importable", required=False)
         else:
             self.reporter.check("WeasyPrint", WARN, required=False,
-                                detail="not importable here (missing pango/cairo is normal on shared hosts); PDFs fall back to ReportLab",
+                                detail="not importable here (missing pango/cairo is normal on shared hosts); PDF exports use ReportLab when installed",
                                 fix="install the system libraries only if you need WeasyPrint output")
         self._deps_validated = True
 
