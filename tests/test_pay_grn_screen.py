@@ -106,9 +106,12 @@ def test_screen_shows_stock_and_expenses_as_two_boxes(client, app):
     assert html.count('data-pay-block="EXPENSES"') == 1
     assert "Stock / material" in html
     assert "GRN expenses billed to supplier" in html
-    assert html.count("Pay full") >= 3
-    assert html.count('name="pay_obligation_key[]"') == 3
-    assert html.count('name="pay_amount[]"') == 3
+    assert html.count("Pay full") >= 4
+    # One box per payable: stock, the ticked expenses, and EVERY GRN expense
+    # (the ticked fare too — it is its own box, and paying it to the recipient
+    # removes it from the supplier box above).
+    assert html.count('name="pay_obligation_key[]"') == 4
+    assert html.count('name="pay_amount[]"') == 4
     assert 'data-pay-block="CHARGE:' in html
     assert "GRN expenses not added to supplier ledger" in html
     assert "Amount to be paid" in html
@@ -254,12 +257,18 @@ def test_unticked_expense_is_paid_to_its_own_recipient(client, app):
 
 
 def test_pay_existing_grn_page_lists_every_obligation(client, app):
+    """Supplier payables on the supplier form, every expense in the expense form."""
     login(client)
     supplier_id, _cash_id = seed(app)
     grn_id = receive_grn(client, app, supplier_id)
     html = client.get(f"/accounts/grn_payments?grn_id={grn_id}").get_data(as_text=True)
-    for needle in ["Stock / material", "GRN expenses", "billed to supplier", "Tea shop"]:
+    for needle in ["Stock / material", "billed to supplier"]:
         assert needle in html, needle
+    # The expenses themselves live on their own per-expense system.
+    expenses_html = client.get(
+        f"/accounts/grn_payments?grn_id={grn_id}&mode=EXPENSES").get_data(as_text=True)
+    for needle in ["Rana Transport", "Tea shop", "one amount each"]:
+        assert needle in expenses_html, needle
 
 
 def test_screen_links_are_reachable_from_accounts(client, app):
@@ -289,11 +298,12 @@ def test_dashboard_grn_picker_is_hidden_for_supplier_payment_but_exposes_due_fac
     assert re.search(r'<div class="[^"]*\bd-none\b[^"]*"\s+id="grnPaymentWrap"', html)
     assert re.search(r'id="grnPaymentGrnSelect"[^>]*\bdisabled\b', html)
     assert "Amount still to be paid" in html
-    assert "Expenses not added to supplier ledger" in html
-    # The picker's server-authoritative values include the unticked 500.
+    assert "GRN expenses still to pay (one by one)" in html
+    # The picker's server-authoritative values include every open GRN expense:
+    # the ticked 5,000 (its own box too) and the unticked 500.
     assert 'data-date-label="20/Oct/2026"' in html
     assert 'data-total-due="155500.00"' in html
-    assert 'data-recipient-expenses-due="500.00"' in html
+    assert 'data-recipient-expenses-due="5500.00"' in html
     assert f'value="{grn_id}"' in html
 
 
@@ -309,15 +319,17 @@ def test_pay_grn_expenses_shows_selected_date_and_amount_without_js(client, app)
     html = client.get(
         f"/accounts/grn_payments?grn_id={grn_id}&charge_id={tea_id}"
     ).get_data(as_text=True)
+    # Opening one expense goes straight into the per-expense payment system.
     assert "Pay GRN Expenses" in html
     assert "Selected GRN date" in html
     assert "20/Oct/2026" in html
-    assert "Amount to be paid now" in html
-    assert "Expenses not added to supplier ledger" in html
-    assert re.search(r'id="grnPaymentPayable">\s*Rs\. 500\.00', html)
-    assert re.search(
-        r'<option value="CHARGE:%d"[^>]*\bselected\b' % tea_id, html, re.S)
-    assert 'data-recipient-expenses-due="500.00"' in html
+    assert "GRN expenses — one amount each" in html
+    # The tea shop box shows exactly its own 500, with its own money field...
+    assert re.search(r'data-expense-box="CHARGE:%d"\s+data-remaining="500\.00"' % tea_id, html)
+    assert re.search(r'id="expenseAmount%d"' % tea_id, html)
+    # ... and the supplier's single amount field is not on this screen at all.
+    assert 'id="grnPaymentAmount"' not in html
+    assert 'data-recipient-expenses-due="5500.00"' in html
 
 
 def test_pay_grn_expenses_defaults_to_an_open_payable_after_stock_is_settled(client, app):

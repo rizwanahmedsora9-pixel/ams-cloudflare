@@ -105,7 +105,16 @@ def test_grn_splits_stock_and_supplier_expenses(client, app):
         keys = [o["key"] for o in bd["obligations"]]
         assert keys[0] == f"MATERIAL:{grn_id}"
         assert keys[1] == f"EXPENSES:{grn_id}"
-        assert keys[2] == f"CHARGE:{charge.id}"
+        # One box per GRN expense (ticked or not).  The unticked 500 is the
+        # last one; the ticked ones are also on the supplier bill, so they are
+        # not double-counted in the GRN total.
+        charge_rows = bd["obligations"][2:]
+        assert len(charge_rows) == 3
+        assert keys[-1] == f"CHARGE:{charge.id}"
+        assert [r["billed_to_supplier"] for r in charge_rows] == [True, True, False]
+        # Only the unticked 500 is counted inside the expense boxes; the two
+        # ticked rows are counted once, through the supplier EXPENSES payable.
+        assert sum(r["counted_in_total_minor"] for r in charge_rows) == 50000
         split = supplier_bill_breakdown(grn)
         assert split["material_remaining"] == 150000
         assert split["expenses_remaining"] == 6000

@@ -122,11 +122,21 @@ def sell(client, *, qty=40, rate=1800, bill="E2E-SALE", date="2026-11-03", categ
 
 
 def pay_obligations(client, grn_id):
+    """Pay every open payable, re-reading the split after each voucher.
+
+    The supplier EXPENSES voucher settles the ticked expense boxes too (one
+    rupee, one place), so the open list must be recalculated each time.
+    """
     with client.application.app_context():
-        obligations = grn_breakdown(db.session.get(GRN, grn_id))["obligations"]
         account = Account.query.filter_by(name="E2E Cash").one()
         account_id = account.id
-    for obligation in obligations:
+    for _attempt in range(10):
+        with client.application.app_context():
+            open_rows = [o for o in grn_breakdown(db.session.get(GRN, grn_id))["obligations"]
+                         if o["remaining"] > 0]
+        if not open_rows:
+            return
+        obligation = open_rows[0]
         response = client.post("/accounts/grn_payments/save", data={
             "grn_id": str(grn_id), "obligation_key": obligation["key"],
             "amount": str(obligation["remaining"]), "method": "Cash",
@@ -394,11 +404,24 @@ def test_selecting_every_expense_moves_all_grn_costs_into_supplier_ledger_and_ac
         assert bd["supplier_bill_amount"] == 156500
         assert bd["average_actual_rate"] == 1565
         # A3: stock and the ticked GRN expenses are TWO supplier payables, so
-        # either can be paid without silently settling the other.
-        assert len(bd["obligations"]) == 2
-        assert [o["kind"] for o in bd["obligations"]] == ["MATERIAL", "EXPENSES"]
-        assert [o["original"] for o in bd["obligations"]] == [150000, 6500]
-        assert [o["key"] for o in bd["obligations"]] == [f"MATERIAL:{gid}", f"EXPENSES:{gid}"]
+        # either can be paid without silently settling the other.  Every GRN
+        # expense ALSO gets its own box (Pay GRN Expenses → one amount each),
+        # including the ticked ones — paying it there removes it from the
+        # supplier bill, so nothing is ever payable twice.
+        kinds = [o["kind"] for o in bd["obligations"]]
+        assert kinds[:2] == ["MATERIAL", "EXPENSES"]
+        assert kinds.count("CHARGE") == 3
+        supplier_rows = bd["obligations"][:2]
+        assert [o["original"] for o in supplier_rows] == [150000, 6500]
+        assert [o["key"] for o in supplier_rows] == [f"MATERIAL:{gid}", f"EXPENSES:{gid}"]
+        charge_rows = bd["obligations"][2:]
+        assert all(o["billed_to_supplier"] for o in charge_rows)
+        # Each is also its own box with its own amount (pay it here instead and
+        # the supplier payable drops by the same rupees) — but the GRN total
+        # counts the money once, through the supplier payable.
+        assert all(o["remaining"] == o["original"] for o in charge_rows)
+        assert all(o["counted_in_total_minor"] == 0 for o in charge_rows)
+        assert bd["total_remaining"] == 156500
         assert bd["material_remaining"] == 150000
         assert bd["expenses_remaining"] == 6500
         assert bd["total_remaining"] == 156500
@@ -464,11 +487,15 @@ def test_mixed_expense_selection_splits_supplier_and_recipient_payables_exactly(
         assert bd["capitalised_charge_total"] == 6500
         assert bd["expense_charge_total"] == 700
         assert bd["landed_cost_total"] == 156500
+        # total_obligations counts every payable once: material + ticked
+        # expenses through the supplier bill, plus each unticked expense owed to
+        # its own payee.
         assert bd["total_obligations"] == 157200
         # material + supplier-billed expenses + the two unreleased recipient
         # charges (loading 1,000 and the separate expense 700 both keep their
         # own payee once they are not ticked... only Loading is unticked here).
-        assert len(bd["obligations"]) == 4
+        # Two supplier payables + one box per GRN expense (all four rows).
+        assert len(bd["obligations"]) == 6
         assert {o["kind"] for o in bd["obligations"]} == {"MATERIAL", "EXPENSES", "CHARGE"}
         assert bd["material_remaining"] == 150000
         assert bd["expenses_remaining"] == 5500
@@ -530,7 +557,11 @@ def test_editing_one_checkbox_changes_only_that_expenses_payable_route(shop):
         after = grn_breakdown(grn)
         assert [c["included_in_supplier_bill"] for c in after["charges"]] == [False, True, False]
         assert after["supplier_bill_amount"] == 151000
+        # The row that just moved off the supplier bill (5,000 vehicle fare) is
+        # now owed to its own payee, next to the never-ticked 500 — and the GRN
+        # total still counts every rupee once.
         assert after["additional_remaining"] == 5500
+        assert after["total_remaining"] == 156500
         assert after["landed_cost_total"] == before["landed_cost_total"]
         assert after["capitalised_charge_total"] == before["capitalised_charge_total"]
         assert build_supplier_financial_ledger(Supplier.query.one())["closing_balance"] == 151000

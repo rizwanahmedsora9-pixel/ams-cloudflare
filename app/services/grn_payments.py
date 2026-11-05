@@ -174,16 +174,14 @@ def save_grn_payment(
             if _payment_obligation_kind(payment) == obligation['kind']:
                 remaining += _payment_minor(payment)
     else:
-        other_paid = 0
-        q = SupplierPayment.query.filter(
-            SupplierPayment.grn_id == grn.id,
-            SupplierPayment.grn_charge_id == charge.id,
-            SupplierPayment.is_void == False,  # noqa: E712
-        )
-        if not created:
-            q = q.filter(SupplierPayment.id != payment.id)
-        other_paid = sum(_payment_minor(row) for row in q.all())
-        remaining = int(obligation['original_minor']) - other_paid
+        # Every expense has its own payable.  The open amount is already net of
+        # any supplier-side payment that settled the same expense, so paying the
+        # recipient and paying the supplier can never pay one expense twice.
+        remaining = int(obligation['remaining_minor'])
+        if not created and _payment_obligation_kind(payment) == OBLIGATION_CHARGE \
+                and getattr(payment, 'grn_charge_id', None) == charge.id:
+            # Editing this very voucher: its own money is available again.
+            remaining += _payment_minor(payment)
     if amount_minor > remaining and not allow_advance:
         raise ValueError(
             f"Payment {_f(amount_minor):,.2f} exceeds the remaining payable "

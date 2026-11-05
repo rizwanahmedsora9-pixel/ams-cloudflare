@@ -254,6 +254,32 @@
               {% endif %}
             </div>
 
+            {% if bill.supplier_expense_charges %}
+            <div class="small fw-bold text-uppercase text-muted mt-3 mb-1">GRN expenses ticked to the supplier — pay one to its recipient instead (the supplier bill drops by that amount)</div>
+            {% for ob in bill.supplier_expense_charges %}
+            <div class="paygrn-pay-block mb-2 {{ 'is-paid' if ob.remaining <= 0.004 }}"
+                 data-pay-block="CHARGE:{{ ob.charge_id }}" data-remaining="{{ '%.2f'|format(ob.remaining) }}">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label fw-semibold mb-0">{{ ob.label }}</label>
+                <span class="badge bg-dark border border-secondary">To pay {{ '{:,.2f}'.format(ob.remaining) }}</span>
+              </div>
+              <div class="small text-muted mb-1">
+                {{ ob.recipient_label }}{% if ob.recipient_name %} — {{ ob.recipient_name }}{% endif %}
+                · ticked to the supplier, so paying here removes it from the supplier box above
+              </div>
+              <input type="hidden" name="pay_obligation_key[]" value="{{ ob.key }}">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Rs.</span>
+                <input type="number" step="0.01" min="0" class="form-control paygrn-input" name="pay_amount[]"
+                       id="payGrnCharge{{ ob.charge_id }}" placeholder="0.00" inputmode="decimal"
+                       {{ 'disabled' if ob.remaining <= 0.004 }}>
+                <button type="button" class="btn btn-outline-warning" data-pay-full="payGrnCharge{{ ob.charge_id }}"
+                        {{ 'disabled' if ob.remaining <= 0.004 }}>Pay full</button>
+              </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+
             {% if bill.recipient_charges %}
             <div class="small fw-bold text-uppercase text-muted mt-3 mb-1">GRN expenses not added to supplier ledger</div>
             {% for ob in bill.recipient_charges %}

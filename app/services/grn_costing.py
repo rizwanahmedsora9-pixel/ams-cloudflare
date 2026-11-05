@@ -317,12 +317,133 @@ def charges_billed_to_supplier(grn):
 
 
 def supplier_billed_charge_minor(grn):
-    """Sum of selected applicable expenses, in whole paisa.
+    """Sum of selected applicable expenses that are STILL owed to the supplier.
 
-    This is a billing/payable choice only.  It does not change whether a
-    charge is capitalised into inventory or recognised as an operating expense.
+    An expense ticked "Add to supplier ledger" can also be settled directly with
+    its own recipient (Pay GRN Expenses → one box per expense).  Whatever has
+    already been paid to the recipient is no longer a supplier payable, so the
+    supplier bill shrinks by exactly that amount.  Nothing is ever payable
+    twice: recipient payments and supplier payments never overlap.
     """
-    return sum(charge_supplier_billed_minor(c, grn) for c in active_charges(grn))
+    total = 0
+    for charge in active_charges(grn):
+        billed = charge_supplier_billed_minor(charge, grn)
+        if billed <= 0:
+            continue
+        total += max(0, billed - charge_recipient_paid_minor(charge))
+    return total
+
+
+def charge_recipient_paid_minor(charge):
+    """Money already paid straight to an expense's own recipient."""
+    if charge is None or getattr(charge, 'id', None) is None:
+        return 0
+    rows = SupplierPayment.query.filter(
+        SupplierPayment.grn_charge_id == charge.id,
+        SupplierPayment.is_void == False,  # noqa: E712
+    ).all()
+    total = 0
+    for row in rows:
+        current = getattr(row, 'amount_minor', None)
+        total += int(current) if current is not None else _minor(getattr(row, 'amount', 0))
+    return total
+
+
+def charge_recipient_open_minor(charge, grn=None):
+    """What is still payable to an expense's own recipient.
+
+    Every applicable expense has its own payable (owner rule: each expense gets
+    its own money field).  A ticked expense is owed to the supplier only up to
+    the part that has not been paid to the recipient directly.
+    """
+    if bool(getattr(charge, 'is_void', False)):
+        return 0
+    if (getattr(charge, 'cost_treatment', None) or 'INVENTORY').upper() in ('NON_MATERIAL', 'UNTRACKED_LEGACY'):
+        return 0
+    amount = charge_effective_minor(charge)
+    if amount <= 0:
+        return 0
+    return max(0, amount - charge_recipient_paid_minor(charge))
+
+
+def _supplier_expense_paid_minor(grn):
+    """Supplier-side expense money actually paid in Accounts (never capped).
+
+    Mirrors the expenses branch of :func:`supplier_obligation_paid_minor` but
+    without the clamp, so it can be used *inside* the supplier-bill calculation
+    without recursion.
+    """
+    if grn is None or not getattr(grn, 'id', None):
+        return 0
+    material_paid = 0
+    expense_paid = 0
+    lumped = 0
+    for payment in _payment_rows(grn):
+        if not _is_supplier_payment(payment):
+            continue
+        amount = int(getattr(payment, 'amount_minor', None)
+                     if getattr(payment, 'amount_minor', None) is not None
+                     else _minor(getattr(payment, 'amount', 0)))
+        if amount <= 0:
+            continue
+        kind = (getattr(payment, 'payment_kind', None) or '').strip().upper()
+        if kind == 'GRN_EXPENSES':
+            expense_paid += amount
+        elif kind == 'ADVANCE' and getattr(payment, 'grn_charge_id', None) is None:
+            material_paid += amount
+        elif getattr(payment, 'grn_charge_id', None) is None and kind in ('GRN_MATERIAL', '', 'LEGACY_GRN_AUTO'):
+            material_paid += amount
+        else:
+            lumped += amount
+    leftover = max(0, lumped - max(0, supplier_material_minor(grn) - material_paid))
+    return expense_paid + leftover
+
+
+def expense_route_allocation(grn):
+    """How each GRN expense has been settled, and what is still open.
+
+    Returns ``{charge_id: row}`` where ``row`` carries the expense amount, the
+    money already paid straight to its own recipient, the share of supplier
+    payments that has settled it (for expenses ticked "Add to supplier ledger"),
+    and the remaining payable.
+
+    Supplier expense payments are allocated to the ticked expenses oldest row
+    first.  That keeps one rupee in exactly one place: an expense is never both
+    a supplier payable and a recipient payable, whichever screen paid it.
+    """
+    rows = {}
+    charges = active_charges(grn)
+    ticked = []
+    for charge in charges:
+        amount = charge_effective_minor(charge)
+        treatment = (getattr(charge, 'cost_treatment', None) or 'INVENTORY').upper()
+        applicable = (amount > 0 and treatment not in ('NON_MATERIAL', 'UNTRACKED_LEGACY')
+                      and (getattr(charge, 'declared_status', None) or 'UNPAID').upper() != 'NOT_APPLICABLE')
+        recipient_paid = charge_recipient_paid_minor(charge)
+        billed = charge_supplier_billed_minor(charge, grn) > 0
+        rows[charge.id] = {
+            'charge_id': charge.id,
+            'amount_minor': amount,
+            'applicable': applicable,
+            'billed_to_supplier': billed,
+            'recipient_paid_minor': recipient_paid,
+            'supplier_paid_minor': 0,
+            'remaining_minor': max(0, amount - recipient_paid) if applicable else 0,
+        }
+        if applicable and billed:
+            ticked.append(charge.id)
+    remaining_supplier_money = _supplier_expense_paid_minor(grn)
+    for charge_id in ticked:
+        if remaining_supplier_money <= 0:
+            break
+        row = rows[charge_id]
+        applied = min(remaining_supplier_money, row['remaining_minor'])
+        row['supplier_paid_minor'] = applied
+        row['remaining_minor'] -= applied
+        remaining_supplier_money -= applied
+    for row in rows.values():
+        row['paid_minor'] = row['recipient_paid_minor'] + row['supplier_paid_minor']
+    return rows
 
 
 def supplier_ledger_credit_minor(grn):
@@ -387,9 +508,12 @@ def supplier_obligation_paid_minor(grn, obligation_kind):
     if obligation_kind == OBLIGATION_MATERIAL:
         return min(material_paid, supplier_minor)
     if obligation_kind == OBLIGATION_EXPENSES:
-        # Older lumped vouchers paid the material part first.
-        leftover = max(0, lumped - max(0, supplier_minor - material_paid))
-        return min(expense_paid + leftover, billed_minor)
+        # Older lumped vouchers paid the material part first.  The per-expense
+        # allocation then spreads that money over the ticked expenses, so an
+        # expense paid straight to its own recipient can never be paid twice.
+        allocation = expense_route_allocation(grn)
+        applied = sum(row['supplier_paid_minor'] for row in allocation.values())
+        return min(applied, billed_minor)
     # The legacy lumped obligation (and any "whole supplier bill" query).
     return min(material_paid + lumped + expense_paid, supplier_minor + billed_minor)
 
@@ -482,6 +606,7 @@ def grn_breakdown(grn):
     charge_rows = []
     capitalised_minor = 0
     expense_minor = 0
+    route_allocation = expense_route_allocation(grn) if grn_id else {}
     for c in charges:
         amount = charge_effective_minor(c)
         treatment = (getattr(c, 'cost_treatment', None) or 'INVENTORY').upper()
@@ -496,6 +621,10 @@ def grn_breakdown(grn):
             for p in payments if getattr(p, 'grn_charge_id', None) == c.id
         )
         applicable = amount > 0 and status != 'NOT_APPLICABLE' and treatment != 'NON_MATERIAL'
+        allocation = route_allocation.get(c.id) or {}
+        supplier_share_paid = int(allocation.get('supplier_paid_minor', 0) or 0)
+        settled = paid + supplier_share_paid
+        open_minor = max(0, amount - settled) if applicable else 0
         charge_rows.append({
             'id': c.id,
             'charge_type': c.charge_type,
@@ -514,18 +643,22 @@ def grn_breakdown(grn):
             'is_legacy_mirror': bool(getattr(c, 'is_legacy_mirror', False)),
             'paid': _f(paid),
             'paid_minor': paid,
-            'remaining': _f(max(0, amount - paid)),
-            'remaining_minor': max(0, amount - paid),
-            'status': ('Paid' if paid >= amount and amount > 0 else
-                       ('Partially Paid' if paid > 0 else 'Unpaid')),
+            # Every expense is its own payable: what is left after BOTH its own
+            # recipient payments and the supplier's expense payments.
+            'remaining': _f(open_minor),
+            'remaining_minor': open_minor,
+            'status': ('Paid' if amount > 0 and open_minor <= 0 and settled > 0 else
+                       ('Partially Paid' if settled > 0 else 'Unpaid')),
             'applicable': applicable,
             'include_in_supplier': charge_billed_to_supplier(c, grn),
             'included_in_supplier_bill': charge_supplier_billed_minor(c, grn) > 0,
+            # Where the money went / is owed, so no screen has to guess.
+            'recipient_paid': _f(paid),
+            'recipient_paid_minor': paid,
+            'supplier_paid': _f(supplier_share_paid),
+            'supplier_paid_minor': supplier_share_paid,
+            'supplier_open_minor': max(0, amount - settled) if charge_supplier_billed_minor(c, grn) > 0 else 0,
         })
-        if charge_rows[-1]['included_in_supplier_bill']:
-            charge_rows[-1]['remaining'] = 0.0
-            charge_rows[-1]['remaining_minor'] = 0
-            charge_rows[-1]['status'] = 'Included in supplier bill'
 
     supplier_paid = sum(
         int(getattr(p, 'amount_minor', None) if getattr(p, 'amount_minor', None) is not None
@@ -595,15 +728,25 @@ def grn_breakdown(grn):
             'GRN expenses billed to supplier',
             'Only the charges ticked "Add to supplier ledger" on this GRN.',
         ))
+    # Owner rule: EVERY GRN expense is its own payable with its own money field,
+    # including the ones ticked "Add to supplier ledger".  Such an expense is
+    # owed to the supplier only up to the part that has not been settled with
+    # its own recipient, so the same rupee is never payable twice.
     for row in charge_rows:
-        if not row['applicable'] or row['amount_minor'] <= 0 or row['included_in_supplier_bill']:
+        if not row['applicable'] or row['amount_minor'] <= 0:
             continue
+        also_on_supplier_bill = bool(row['included_in_supplier_bill'])
+        if also_on_supplier_bill:
+            hint = ('Ticked "Add to supplier ledger": owed to the supplier, and payable '
+                    'directly to this recipient too — whichever pays first removes it from the other.')
+        else:
+            hint = 'Not added to the supplier ledger: paid only to this recipient.'
         obligations.append({
             'key': make_obligation_key(OBLIGATION_CHARGE, row['id']),
             'kind': 'CHARGE',
             'charge_id': row['id'],
             'label': f"{row['charge_label']}{(' — ' + row['label']) if row['label'] else ''}",
-            'hint': 'Paid to its own recipient. It is NOT part of the supplier bill.',
+            'hint': hint,
             'recipient_type': row['recipient_type'],
             'recipient_label': row['recipient_label'],
             'recipient_name': row['recipient_name'],
@@ -616,6 +759,12 @@ def grn_breakdown(grn):
             'remaining_minor': row['remaining_minor'],
             'status': row['status'],
             'cost_treatment': row['cost_treatment'],
+            # Which ledger this expense is ALSO owed through (read-only facts).
+            'billed_to_supplier': also_on_supplier_bill,
+            'supplier_paid': row['supplier_paid'],
+            'supplier_paid_minor': row['supplier_paid_minor'],
+            'recipient_paid': row['recipient_paid'],
+            'recipient_paid_minor': row['recipient_paid_minor'],
         })
 
     per_line = []
@@ -634,9 +783,16 @@ def grn_breakdown(grn):
     total_obligations = supplier_bill_minor + sum(
         r['amount_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill']
     )
-    # Every obligation's remaining is derived from the same allocation, so the
-    # GRN total is simply the sum of what is still open.
-    total_remaining = sum(o['remaining_minor'] for o in obligations)
+    # One rupee, one place.  A ticked expense is counted inside the supplier
+    # EXPENSES payable until it is settled with its recipient; from then on the
+    # supplier payable shrinks and the expense box is what stays open.  So the
+    # GRN total never counts the same expense twice.
+    for ob in obligations:
+        if ob['kind'] == OBLIGATION_CHARGE and ob.get('billed_to_supplier'):
+            ob['counted_in_total_minor'] = 0
+        else:
+            ob['counted_in_total_minor'] = ob['remaining_minor']
+    total_remaining = sum(o['counted_in_total_minor'] for o in obligations)
 
     return {
         'grn_id': grn_id,
@@ -679,7 +835,11 @@ def grn_breakdown(grn):
         'expenses_paid': _f(expenses_paid_minor),
         'expenses_remaining': _f(max(0, billed_charge_minor - expenses_paid_minor)),
         'additional_paid': _f(charge_paid),
-        'additional_remaining': _f(sum(r['remaining_minor'] for r in charge_rows if r['applicable'] and not r['included_in_supplier_bill'])),
+        # Expenses the supplier ledger does not carry: unticked rows only.
+        'additional_remaining': _f(sum(r['remaining_minor'] for r in charge_rows
+                                       if r['applicable'] and not r['included_in_supplier_bill'])),
+        # Every expense still open, whoever it is owed to (pay-box display).
+        'recipient_expenses_remaining': _f(sum(r['remaining_minor'] for r in charge_rows if r['applicable'])),
         'total_obligations': _f(total_obligations),
         'total_remaining': _f(total_remaining),
         'total_cash_paid': _f(cash_paid_minor),
@@ -728,7 +888,10 @@ def supplier_bill_breakdown(grn):
     breakdown = grn_breakdown(grn)
     material = next((o for o in breakdown['obligations'] if o['kind'] == OBLIGATION_MATERIAL), None)
     expenses = next((o for o in breakdown['obligations'] if o['kind'] == OBLIGATION_EXPENSES), None)
-    recipient_charges = [o for o in breakdown['obligations'] if o['kind'] == OBLIGATION_CHARGE]
+    # Expenses the supplier ledger does NOT carry (unticked rows).  Every
+    # expense also has its own box — see ``grn_breakdown()['obligations']``.
+    recipient_charges = [o for o in breakdown['obligations']
+                         if o['kind'] == OBLIGATION_CHARGE and not o.get('billed_to_supplier')]
     return {
         'grn_id': breakdown.get('grn_id'),
         'bill_ref': breakdown.get('bill_ref'),
@@ -738,6 +901,12 @@ def supplier_bill_breakdown(grn):
         'material': material,
         'expenses': expenses,
         'recipient_charges': recipient_charges,
+        # Ticked expenses: owed to the supplier, but each also has its own box
+        # so the operator can pay the recipient directly (the supplier bill
+        # then drops by exactly that amount).
+        'supplier_expense_charges': [o for o in breakdown['obligations']
+                                     if o['kind'] == OBLIGATION_CHARGE
+                                     and o.get('billed_to_supplier')],
         'material_original': breakdown['material_original'],
         'material_paid': breakdown['material_paid'],
         'material_remaining': breakdown['material_remaining'],
@@ -1058,6 +1227,7 @@ __all__ = [
     'get_or_create_party', 'supplier_material_minor', 'charge_billed_to_supplier',
     'charge_supplier_billed_minor', 'charges_billed_to_supplier',
     'supplier_billed_charge_minor', 'supplier_ledger_credit_minor', 'grn_breakdown',
+    'charge_recipient_paid_minor', 'charge_recipient_open_minor', 'expense_route_allocation',
     'parse_obligation_key', 'make_obligation_key', 'supplier_obligation_paid_minor',
     'supplier_bill_breakdown',
     'payment_obligation_label', 'OBLIGATION_SUPPLIER', 'OBLIGATION_MATERIAL',
