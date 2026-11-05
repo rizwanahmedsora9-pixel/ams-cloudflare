@@ -38,3 +38,6 @@ deploy_secret.txt
 # Arena sandbox virtualenv
 .venv-arena/
 _audit/
+
+# Local JS test dependency (jsdom) installed by npm
+node_modules/

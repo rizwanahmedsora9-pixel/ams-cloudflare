@@ -115,7 +115,9 @@ check("GRN expenses target enables the picker", grnSelect.disabled === false);
 check("GRN expenses target hides the generic amount", d.getElementById("txAmountWrap").classList.contains("d-none"));
 check("GRN expenses target does not require a modal amount", amount.required === false && amount.value === "");
 check("GRN expenses target does not require a source account", payFrom.required === false);
-check("GRN expenses target changes the submit label", submit.textContent === "Open Pay GRN Expenses");
+/* The modal itself now posts the per-expense payments, so the button says
+   what it does instead of "open another screen". */
+check("GRN expenses target changes the submit label", submit.textContent === "Pay GRN expenses");
 check("GRN selection note is visible", !d.getElementById("grnPaymentSelectionInfo").classList.contains("d-none"));
 check("GRN selection note shows the GRN date",
     d.getElementById("grnPaymentDateInfo").textContent.includes("20/Oct/2026"));

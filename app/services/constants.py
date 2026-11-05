@@ -187,6 +187,8 @@ ENDPOINT_PERMISSION_MAP = {
     'accounts.grn_payment_void': 'can_manage_payments',
     'accounts.grn_payment_restore': 'can_manage_payments',
     'accounts.grn_obligations_api': 'can_view_cash_flow',
+    'accounts.grn_expense_payments_api': 'can_view_cash_flow',
+    'accounts.grn_expenses_pay_from_modal': 'can_manage_payments',
     'accounts.purchase_payables': 'can_view_cash_flow',
     'edit_grn': 'can_manage_grn',
     'export_grn': 'can_manage_grn',
