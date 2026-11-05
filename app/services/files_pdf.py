@@ -123,6 +123,15 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
     """
 
     safe_name = _safe_download_name(download_name, default='document.pdf')
+    # Dual-language mode: every saved PDF carries English + Urdu (Jameel Noori)
+    # in the same document.  The Urdu spans are shaped by Pango on the
+    # WeasyPrint path and by arabic_reshaper/python-bidi on the ReportLab
+    # fallback path, so both renderers produce the bilingual layout.
+    try:
+        from app.services.bilingual import apply_bilingual
+        rendered_html = apply_bilingual(rendered_html)
+    except Exception:
+        logging.getLogger(__name__).exception('Bilingual PDF injection failed; rendering English-only.')
     try:
         if state.WEASYPRINT_MODULE is None:
             # WeasyPrint prints dependency warnings to stderr on import; silence them here.

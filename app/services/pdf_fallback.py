@@ -79,6 +79,24 @@ def _is_chrome(attrs):
 _WS = re.compile(r'\s+')
 
 
+# Registered Jameel Noori TTF name for Urdu runs (set by render_html_to_pdf).
+_URDU_FONT = None
+
+
+def _shape_urdu_run(data):
+    """Shape an Urdu text run and wrap it in a Jameel Noori <font> tag."""
+    if not _URDU_FONT or not data.strip():
+        return data
+    try:
+        from xml.sax.saxutils import escape
+        from app.services.bilingual import shape_urdu
+        # Render the Urdu run slightly smaller than the body text so the added
+        # translation does not push English content onto a new line.
+        return f'<font face="{_URDU_FONT}" size="6">{escape(shape_urdu(data))}</font>'
+    except Exception:
+        return data
+
+
 def _clean(text):
     return _WS.sub(' ', unescape(text or '')).strip()
 
@@ -93,6 +111,9 @@ class _HtmlToFlowables(HTMLParser):
         self._skip_depth = 0      # nesting depth remaining inside that subtree
         self._buf = []            # current inline text buffer
         self._style = 'body'
+        self._class_stack = []    # class tokens of open inline elements (for .ur)
+        self._urdu_depth = 0      # >0 while inside a .ur span
+        self._urdu_buf = None     # raw Urdu text collected for a block-level span
         self._in_table = False
         self._rows = []
         self._row = None
@@ -122,6 +143,16 @@ class _HtmlToFlowables(HTMLParser):
             return
 
         ad = dict(attrs)
+        classes = set((ad.get('class') or '').split())
+        self._class_stack.append(classes)
+        if 'ur' in classes:
+            if self._urdu_depth == 0 and self._cell is None:
+                # Block-level Urdu run: close the English line first so the
+                # translation prints as its own right-aligned line beneath it
+                # (inline Nastaleeq metrics would distort the English line).
+                self._flush()
+                self._urdu_buf = []
+            self._urdu_depth += 1
         if tag in _HEADING_TAGS:
             self._flush()
             self._style = tag
@@ -160,6 +191,15 @@ class _HtmlToFlowables(HTMLParser):
                 self._skip_depth = 0
             return
 
+        popped = self._class_stack.pop() if self._class_stack else set()
+        if 'ur' in popped:
+            self._urdu_depth = max(0, self._urdu_depth - 1)
+            if self._urdu_depth == 0 and self._cell is None and self._urdu_buf is not None:
+                text = _clean(' '.join(self._urdu_buf))
+                self._urdu_buf = None
+                if text:
+                    from app.services.bilingual import shape_urdu
+                    self.blocks.append(('text', shape_urdu(text), 'urdu'))
         if tag in ('td', 'th') and self._row is not None:
             text = _clean(' '.join(self._cell or []))
             self._cell = None
@@ -182,6 +222,13 @@ class _HtmlToFlowables(HTMLParser):
     def handle_data(self, data):
         if self._skipping:
             return
+        if self._urdu_depth > 0:
+            if self._cell is not None:
+                # Inside a table cell keep the Urdu inline (small, Jameel font).
+                self._cell.append(_shape_urdu_run(data))
+            elif self._urdu_buf is not None:
+                self._urdu_buf.append(data)
+            return
         if self._cell is not None:
             self._cell.append(data)
         else:
@@ -189,6 +236,12 @@ class _HtmlToFlowables(HTMLParser):
 
     def close(self):
         self._flush()
+        if self._urdu_buf is not None:
+            text = _clean(' '.join(self._urdu_buf))
+            self._urdu_buf = None
+            if text:
+                from app.services.bilingual import shape_urdu
+                self.blocks.append(('text', shape_urdu(text), 'urdu'))
         super().close()
 
 
@@ -205,10 +258,18 @@ def _parse_html(html):
 def _build_story(blocks, body_font, bold_font, small_size):
     """Translate parsed blocks into ReportLab flowables."""
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_RIGHT
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
+    urdu_style = None
+    if _URDU_FONT:
+        urdu_style = ParagraphStyle(
+            'pdfUrdu', fontName=_URDU_FONT, fontSize=7.0, leading=9.6,
+            alignment=TA_RIGHT, textColor=colors.HexColor('#374151'),
+            spaceAfter=2,
+        )
     normal = ParagraphStyle(
         'pdfBody', fontName=body_font, fontSize=8.2, leading=10.4,
         spaceAfter=3, wordWrap='LTR',
@@ -235,6 +296,8 @@ def _build_story(blocks, body_font, bold_font, small_size):
             _kind, payload, style = block
             if style in heading_styles:
                 story.append(Paragraph(payload, heading_styles[style]))
+            elif style == 'urdu' and urdu_style is not None:
+                story.append(Paragraph(payload, urdu_style))
             elif style == 'small':
                 story.append(Paragraph(payload, small))
             else:
@@ -296,6 +359,15 @@ def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
         return None
 
     try:
+        # Register the bundled Jameel Noori font so Urdu runs (span.ur) render
+        # shaped and in the right typeface instead of as tofu boxes.
+        global _URDU_FONT
+        try:
+            from app.services.bilingual import register_urdu_font
+            _URDU_FONT = register_urdu_font()
+        except Exception:
+            _URDU_FONT = None
+
         blocks = _parse_html(html)
         # Prefer Helvetica (always present in ReportLab); DejaVu is optional.
         body_font, bold_font, small_size = 'Helvetica', 'Helvetica-Bold', 7.4
