@@ -782,7 +782,7 @@ function updateGrnPaymentInfo() {
     if (due) due.textContent = `Amount still to be paid: ${formatDashboardMoney(totalDue)}`;
     if (expenses) {
         expenses.textContent = `Supplier ledger due: ${formatDashboardMoney(supplierDue)} · ` +
-            `Expenses not added to supplier ledger: ${formatDashboardMoney(recipientDue)}`;
+            `GRN expenses still to pay (one by one): ${formatDashboardMoney(recipientDue)}`;
     }
     info.classList.remove('d-none');
     empty.classList.add('d-none');

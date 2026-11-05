@@ -15,6 +15,12 @@
     background: color-mix(in srgb, var(--accent, #fbbf24) 9%, transparent);
     border-radius: .55rem;
   }
+  .grn-mode-btn { border-radius: .8rem; padding: .7rem 1rem; text-align: left; line-height: 1.15; }
+  .grn-mode-btn .mode-hint { font-size: .72rem; opacity: .8; display: block; }
+  .grn-expense-box { border: 1px dashed var(--border-color, #334155); border-radius: .6rem; padding: .6rem .7rem; }
+  .grn-expense-box.is-paid { opacity: .6; }
+  .grn-expense-box .ex-figure, .grn-expense-total { font-variant-numeric: tabular-nums; }
+  .grn-expense-total { background: color-mix(in srgb, var(--accent, #fbbf24) 10%, transparent); border-radius: .55rem; padding: .5rem .7rem; }
   @media (max-width: 575.98px) {
     .grn-payment-live-summary .row > div { min-width: 50%; }
   }
@@ -24,14 +30,14 @@
     <div>
       <h3 class="mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>Pay GRN Expenses</h3>
       <div class="text-muted small">
-        Every obligation of this GRN has its own amount to be paid: stock, the GRN expenses ticked for the
-        supplier, and each expense that was not ticked and stays payable to its own recipient. A GRN only records
-        what was received and what is owed. Prefer the split screen?
-        <a href="{{ url_for('accounts.pay_grn', grn_id=selected.id) if selected else url_for('accounts.pay_grn') }}">Pay GRN (stock / expenses)</a>.
+        Two independent payment systems on this page: the <strong>supplier bill</strong> (stock + the expenses still
+        ticked to the supplier, one amount) and <strong>GRN expenses</strong>, where every vehicle fare, loading,
+        unloading or other expense gets its own amount field and is paid to its own recipient.
       </div>
     </div>
     <div class="d-flex gap-2">
       <a href="{{ url_for('accounts.purchase_payables') }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-list-check"></i> Outstanding Payables</a>
+      <a href="{{ url_for('accounts.pay_grn', grn_id=selected.id) if selected else url_for('accounts.pay_grn') }}" class="btn btn-sm btn-outline-info"><i class="bi bi-receipt"></i> Pay GRN (stock / expenses)</a>
       <a href="{{ url_for('accounts.dashboard') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Accounts</a>
     </div>
   </div>
@@ -39,6 +45,7 @@
   <div class="card mb-3">
     <div class="card-body">
       <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="mode" value="{{ mode }}">
         <div class="col-md-8">
           <label class="form-label small fw-semibold" for="grnSelect">1. Select GRN</label>
           <select name="grn_id" id="grnSelect" class="form-select" onchange="this.form.submit()">
@@ -53,7 +60,7 @@
                       data-recipient-expenses-due="{{ '%.2f'|format(summary.recipient_expenses_remaining) }}"{% endif %}>
                 {{ g.manual_bill_no or g.auto_bill_no or ('GRN-' ~ g.id) }} · {{ g.supplier }} ·
                 {{ g.date_posted.strftime('%d/%b/%Y') if g.date_posted else '' }}
-                {% if bd %}· cost {{ '{:,.2f}'.format(bd.landed_cost_total) }} · due {{ '{:,.2f}'.format(bd.total_remaining) }}{% endif %}
+                {% if bd %}· due {{ '{:,.2f}'.format(bd.total_remaining) }}{% endif %}
               </option>
             {% endfor %}
           </select>
@@ -61,7 +68,8 @@
             {% if selected_summary %}
               <i class="bi bi-calendar3 me-1"></i>Selected GRN date: <strong class="text-info">{{ selected_summary.date_label }}</strong>
               · Amount still to be paid: <strong class="text-warning">Rs. {{ '{:,.2f}'.format(selected_summary.total_remaining) }}</strong>
-              · Expenses not added to supplier ledger: <strong>Rs. {{ '{:,.2f}'.format(selected_summary.recipient_expenses_remaining) }}</strong>
+              · Supplier ledger still due: <strong>Rs. {{ '{:,.2f}'.format(selected_summary.supplier_ledger_remaining) }}</strong>
+              · GRN expenses still due: <strong>Rs. {{ '{:,.2f}'.format(selected_summary.recipient_expenses_remaining) }}</strong>
             {% else %}
               Select a GRN to see its date and the amount still to be paid.
             {% endif %}
@@ -78,44 +86,73 @@
   {% set payable_now_text = ('Rs. ' ~ '{:,.2f}'.format(payable_now)) if payable_now is not none else '—' %}
   {% set already_paid_text = ('Rs. ' ~ '{:,.2f}'.format(already_paid)) if already_paid is not none else '—' %}
   {% set total_balance_text = 'Rs. ' ~ '{:,.2f}'.format(breakdown.total_remaining) %}
+
+  {# ---- 2. Payment system: supplier bill OR one-by-one GRN expenses ---- #}
+  <div class="row g-2 mb-3" id="grnPaymentModeSwitch">
+    {% for pm in payment_modes %}
+    <div class="col-md-6">
+      <a class="btn w-100 grn-mode-btn {{ 'btn-warning text-dark' if mode == pm.key else 'btn-outline-secondary' }}"
+         href="{{ url_for('accounts.grn_payments', grn_id=selected.id, mode=pm.key) }}"
+         data-mode="{{ pm.key }}">
+        <span class="fw-bold"><i class="bi {{ pm.icon }} me-1"></i>{{ loop.index }}. {{ pm.label }}</span>
+        <span class="mode-hint">{{ pm.hint }}</span>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if mode == 'EXPENSES' %}
+  {# =====================  PER-EXPENSE PAYMENT SYSTEM  ===================== #}
   <div class="row g-2 mb-3 small">
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Material</div><b>Rs. {{ '{:,.2f}'.format(breakdown.supplier_material_amount) }}</b></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Ledger Bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b><div class="small text-muted">Stock {{ '{:,.2f}'.format(breakdown.material_original) }} + expenses {{ '{:,.2f}'.format(breakdown.expenses_original) }}</div></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Additional Charges</div><b>Rs. {{ '{:,.2f}'.format(breakdown.capitalised_charge_total + breakdown.expense_charge_total) }}</b></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Expenses outside supplier ledger</div><b class="text-info">Rs. {{ '{:,.2f}'.format(breakdown.additional_remaining) }}</b><div class="small text-muted">Still payable to their own recipients</div></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Total Actual Cost</div><b class="text-success">Rs. {{ '{:,.2f}'.format(breakdown.landed_cost_total) }}</b></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Avg Actual Rate</div><b>Rs. {{ '{:,.2f}'.format(breakdown.average_actual_rate) }}</b></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Cash Actually Paid</div><b class="text-info">Rs. {{ '{:,.2f}'.format(breakdown.total_cash_paid) }}</b></div></div></div>
-    <div class="col-md-2"><div class="card"><div class="card-body py-2"><div class="text-muted">Amount to be paid</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.total_remaining) }}</b></div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body py-2">
+      <div class="text-muted">GRN expenses on this GRN</div><b>{{ expense_rows|length }}</b>
+    </div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body py-2">
+      <div class="text-muted">Expenses still to be paid</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(expenses_open_total) }}</b>
+    </div></div></div>
+    <div class="col-md-4"><div class="card"><div class="card-body py-2">
+      <div class="text-muted">Supplier ledger bill (stock + ticked expenses)</div><b>Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b>
+    </div></div></div>
   </div>
 
   <div class="row g-3">
     <div class="col-lg-7">
       <div class="card mb-3">
-        <div class="card-header fw-semibold"><i class="bi bi-list-ul me-1"></i>2. Select payment recipient / obligation</div>
+        <div class="card-header fw-semibold"><i class="bi bi-truck me-1"></i>2. GRN expenses — one amount each</div>
         <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0">
-            <thead class="small text-muted"><tr><th>Recipient / Obligation</th><th class="text-end">Original</th><th class="text-end">Already Paid</th><th class="text-end">Amount to be paid</th><th>Status</th><th></th></tr></thead>
+          <table class="table table-sm table-hover mb-0" id="grnExpenseTable">
+            <thead class="small text-muted"><tr>
+              <th>Expense</th><th>Paid to</th><th class="text-end">Amount</th>
+              <th class="text-end">Paid</th><th class="text-end">To pay</th><th>Status</th><th></th>
+            </tr></thead>
             <tbody>
-            {% for ob in breakdown.obligations %}
-              <tr class="{{ 'table-info' if selected_obligation and selected_obligation.key == ob.key else '' }}"
-                  data-grn-obligation-row="{{ ob.key }}" data-remaining="{{ '%.2f'|format(ob.remaining) }}">
+            {% for ex in expense_rows %}
+              <tr data-expense-row="{{ ex.key }}" data-remaining="{{ '%.2f'|format(ex.remaining) }}"
+                  class="{{ 'table-warning' if selected_obligation and selected_obligation.key == ex.key else '' }}">
                 <td>
-                  <b>{{ ob.label }}</b>
-                  {% if ob.kind in ['MATERIAL', 'EXPENSES'] %}
-                  <span class="badge bg-dark border border-secondary ms-1">supplier</span>
+                  <b>{{ ex.label }}</b>
+                  {% if ex.billed_to_supplier %}
+                    <span class="badge bg-dark border border-secondary ms-1" title="Also on the supplier bill until it is paid here">supplier ticked</span>
                   {% else %}
-                  <span class="badge bg-secondary ms-1">own recipient</span>
+                    <span class="badge bg-secondary ms-1">own recipient</span>
                   {% endif %}
-                  <span class="d-block small text-muted">{{ ob.recipient_label }}{% if ob.recipient_name %} — {{ ob.recipient_name }}{% endif %}</span>
-                  {% if ob.hint %}<span class="d-block small text-muted fst-italic">{{ ob.hint }}</span>{% endif %}
                 </td>
-                <td class="text-end">{{ '{:,.2f}'.format(ob.original) }}</td>
-                <td class="text-end">{{ '{:,.2f}'.format(ob.paid) }}</td>
-                <td class="text-end fw-bold">{{ '{:,.2f}'.format(ob.remaining) }}</td>
-                <td><span class="badge {{ 'bg-success' if ob.status == 'Paid' else ('bg-warning text-dark' if ob.status == 'Partially Paid' else 'bg-secondary') }}">{{ ob.status }}</span></td>
-                <td><a class="btn btn-sm btn-outline-primary py-0" href="{{ url_for('accounts.grn_payments', grn_id=selected.id, charge_id=(ob.charge_id or '')) }}">Pay</a></td>
+                <td class="small">{{ ex.recipient_label }}{% if ex.recipient_name %} — {{ ex.recipient_name }}{% endif %}</td>
+                <td class="text-end ex-figure">{{ '{:,.2f}'.format(ex.original) }}</td>
+                <td class="text-end ex-figure">
+                  {{ '{:,.2f}'.format(ex.paid) }}
+                  {% if ex.supplier_paid > 0 %}<div class="small text-muted">via supplier</div>{% endif %}
+                </td>
+                <td class="text-end fw-bold ex-figure">{{ '{:,.2f}'.format(ex.remaining) }}</td>
+                <td><span class="badge {{ 'bg-success' if ex.status == 'Paid' else ('bg-warning text-dark' if ex.status == 'Partially Paid' else 'bg-secondary') }}">{{ ex.status }}</span></td>
+                <td class="text-end">
+                  {% if ex.remaining > 0.004 and can_edit %}
+                  <a class="btn btn-sm btn-outline-primary py-0" href="#expense-box-{{ ex.charge_id }}">Pay</a>
+                  {% endif %}
+                </td>
               </tr>
+            {% else %}
+              <tr><td colspan="7" class="text-center text-muted py-3">This GRN has no expenses. Vehicle fare, loading, unloading and other costs are added on the GRN itself.</td></tr>
             {% endfor %}
             </tbody>
           </table>
@@ -156,7 +193,173 @@
 
     <div class="col-lg-5">
       <div class="card">
-        <div class="card-header fw-semibold"><i class="bi bi-wallet2 me-1"></i>3. Record payment</div>
+        <div class="card-header fw-semibold"><i class="bi bi-wallet2 me-1"></i>3. Pay GRN expenses</div>
+        <div class="card-body">
+          {% if not can_edit %}
+            <div class="alert alert-warning small">You do not have permission to post payments.</div>
+          {% endif %}
+          <form method="post" action="{{ url_for('accounts.grn_payment_save') }}" autocomplete="off" id="grnExpenseForm"
+                data-can-edit="{{ '1' if can_edit else '0' }}" data-expenses-open="{{ '%.2f'|format(expenses_open_total) }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token or '' }}">
+            <input type="hidden" name="grn_id" value="{{ selected.id }}">
+            <input type="hidden" name="mode" value="EXPENSES">
+            <input type="hidden" name="idempotency_key" value="grnexp-{{ submission_token }}">
+
+            {% for ex in expense_rows %}
+            <div class="grn-expense-box mb-2 {{ 'is-paid' if ex.remaining <= 0.004 }}" id="expense-box-{{ ex.charge_id }}"
+                 data-expense-box="{{ ex.key }}" data-remaining="{{ '%.2f'|format(ex.remaining) }}">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="fw-semibold">{{ ex.label }}</div>
+                  <div class="small text-muted">
+                    {{ ex.recipient_label }}{% if ex.recipient_name %} — {{ ex.recipient_name }}{% endif %}
+                    {% if ex.billed_to_supplier %}
+                      · also ticked to the supplier: paying it here removes it from the supplier bill
+                    {% endif %}
+                  </div>
+                </div>
+                <span class="badge {{ 'bg-success' if ex.remaining <= 0.004 else 'bg-warning text-dark' }} text-nowrap">
+                  To pay {{ '{:,.2f}'.format(ex.remaining) }}
+                </span>
+              </div>
+              <input type="hidden" name="expense_key[]" value="{{ ex.key }}">
+              <div class="input-group input-group-sm mt-2">
+                <span class="input-group-text">Rs.</span>
+                <input type="number" step="0.01" min="0" class="form-control ex-figure" name="expense_amount[]"
+                       id="expenseAmount{{ ex.charge_id }}" placeholder="0.00" inputmode="decimal"
+                       aria-label="Amount to pay for {{ ex.label }}"
+                       {{ 'disabled' if ex.remaining <= 0.004 }}>
+                <button type="button" class="btn btn-outline-warning" data-pay-full="expenseAmount{{ ex.charge_id }}"
+                        {{ 'disabled' if ex.remaining <= 0.004 }}>Pay full</button>
+              </div>
+            </div>
+            {% else %}
+              <div class="alert alert-info small mb-2">No GRN expense on this GRN yet — add vehicle fare / loading / unloading on the GRN itself.</div>
+            {% endfor %}
+
+            <div class="grn-expense-total d-flex justify-content-between mt-3">
+              <span class="small text-uppercase text-muted fw-bold">Paying to recipients now</span>
+              <b class="ex-figure" id="grnExpenseEntered">Rs. 0.00</b>
+            </div>
+            <div class="small text-danger d-none mt-1" id="grnExpenseStatus"></div>
+
+            <div class="row g-2 mt-2">
+              <div class="col-7"><label class="form-label small">Cash / Bank</label>
+                <select name="method" class="form-select form-select-sm" required>
+                  <option value="Cash">Cash</option><option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Check">Check</option><option value="Online">Online</option>
+                </select>
+              </div>
+              <div class="col-5"><label class="form-label small">Payment date</label>
+                <input type="datetime-local" name="date_posted" class="form-control form-control-sm" value="{{ today_date }}T09:00">
+              </div>
+              <div class="col-12"><label class="form-label small">Pay from account</label>
+                <select name="payment_account_id" class="form-select form-select-sm" required>
+                  <option value="">— Select cash / bank account —</option>
+                  {% for a in accounts %}<option value="{{ a.id }}">[{{ (a.category or '')|upper }}] {{ a.name }} (Rs. {{ '{:,.2f}'.format(a.balance or 0) }})</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-12"><label class="form-label small">Reference</label>
+                <input type="text" name="reference" class="form-control form-control-sm" placeholder="Voucher / ref">
+              </div>
+              <div class="col-12"><label class="form-label small">Note</label>
+                <textarea name="note" rows="2" class="form-control form-control-sm" placeholder="Optional"></textarea>
+              </div>
+            </div>
+            <button class="btn btn-success w-100 mt-3" {{ 'disabled' if not can_edit }} id="grnExpenseSubmit" data-can-edit="{{ '1' if can_edit else '0' }}">
+              <i class="bi bi-save"></i> Save expense payment(s)
+            </button>
+          </form>
+          <div class="small text-muted mt-2">
+            <i class="bi bi-shield-check me-1"></i>
+            Each filled box is its own cash-out row in Cash Flow. Fill one or several — the empty ones are ignored.
+            An expense ticked to the supplier is never paid twice: the moment it is paid here, the supplier bill drops by the same amount.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  {# =====================  SUPPLIER BILL (single amount)  ===================== #}
+  <div class="row g-2 mb-3 small">
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier Material</div><b>Rs. {{ '{:,.2f}'.format(breakdown.supplier_material_amount) }}</b></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted">GRN expenses still on the supplier bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.expenses_original) }}</b><div class="small text-muted">Ticked rows, less anything already paid to their recipient</div></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted">Supplier ledger bill</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.supplier_bill_amount) }}</b></div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body py-2"><div class="text-muted">Total amount to be paid on this GRN</div><b class="text-warning">Rs. {{ '{:,.2f}'.format(breakdown.total_remaining) }}</b><div class="small text-muted">Supplier bill + every GRN expense</div></div></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card mb-3">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-ul me-1"></i>2. Supplier payables of this GRN</span>
+          <a href="{{ url_for('accounts.grn_payments', grn_id=selected.id, mode='EXPENSES') }}" class="btn btn-sm btn-outline-info py-0">
+            <i class="bi bi-truck"></i> Pay the GRN expenses one by one
+          </a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="small text-muted"><tr><th>Supplier payable</th><th class="text-end">Original</th><th class="text-end">Already Paid</th><th class="text-end">Amount to be paid</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for ob in breakdown.obligations if ob.kind in ['MATERIAL', 'EXPENSES'] %}
+              <tr class="{{ 'table-info' if selected_obligation and selected_obligation.key == ob.key else '' }}"
+                  data-grn-obligation-row="{{ ob.key }}" data-remaining="{{ '%.2f'|format(ob.remaining) }}">
+                <td>
+                  <b>{{ ob.label }}</b>
+                  {% if ob.hint %}<span class="d-block small text-muted fst-italic">{{ ob.hint }}</span>{% endif %}
+                </td>
+                <td class="text-end">{{ '{:,.2f}'.format(ob.original) }}</td>
+                <td class="text-end">{{ '{:,.2f}'.format(ob.paid) }}</td>
+                <td class="text-end fw-bold">{{ '{:,.2f}'.format(ob.remaining) }}</td>
+                <td><span class="badge {{ 'bg-success' if ob.status == 'Paid' else ('bg-warning text-dark' if ob.status == 'Partially Paid' else 'bg-secondary') }}">{{ ob.status }}</span></td>
+                <td><a class="btn btn-sm btn-outline-primary py-0" href="{{ url_for('accounts.grn_payments', grn_id=selected.id, charge_id=(ob.charge_id or '')) }}">Pay</a></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer small text-muted">
+          GRN expenses are not paid with this supplier amount — they have their own payment system.
+          <a href="{{ url_for('accounts.grn_payments', grn_id=selected.id, mode='EXPENSES') }}">Open the {{ expense_rows|length }} GRN expense{{ '' if expense_rows|length == 1 else 's' }} (Rs. {{ '{:,.2f}'.format(expenses_open_total) }} still to pay)</a>.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header fw-semibold"><i class="bi bi-clock-history me-1"></i>Payment history (linked to this GRN)</div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 small">
+            <thead class="text-muted"><tr><th>Date</th><th>Recipient</th><th class="text-end">Amount</th><th>Method</th><th>Reference</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            {% for pay in breakdown.payment_rows %}
+              <tr class="{{ 'text-decoration-line-through text-muted' if pay.is_void else '' }}">
+                <td>{{ pay.date_posted.strftime('%d/%b/%Y') if pay.date_posted else '—' }}</td>
+                <td>{{ pay.obligation_label }} <span class="text-muted">→ {{ pay.recipient_name or pay.recipient_type }}</span></td>
+                <td class="text-end">{{ '{:,.2f}'.format(pay.amount) }}</td>
+                <td>{{ pay.method }}</td>
+                <td>{{ pay.reference }}</td>
+                <td>{{ 'Voided' if pay.is_void else 'Posted' }}</td>
+                <td>
+                  {% if can_edit %}
+                  <form method="post" class="d-inline" action="{{ url_for('accounts.grn_payment_restore' if pay.is_void else 'accounts.grn_payment_void', payment_id=pay.id) }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token or '' }}">
+                    <button class="btn btn-sm py-0 btn-outline-secondary">{{ 'Restore' if pay.is_void else 'Void' }}</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="7" class="text-center text-muted py-3">No payments recorded yet. Cash Flow shows Rs. 0.00 for this GRN.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header fw-semibold"><i class="bi bi-wallet2 me-1"></i>3. Pay the supplier</div>
         <div class="card-body">
           {% if not can_edit %}
             <div class="alert alert-warning small">You do not have permission to post payments.</div>
@@ -165,11 +368,12 @@
                 data-total-remaining="{{ '%.2f'|format(breakdown.total_remaining) }}">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token or '' }}">
             <input type="hidden" name="grn_id" value="{{ selected.id }}">
+            <input type="hidden" name="mode" value="SUPPLIER">
             <input type="hidden" name="idempotency_key" value="grnpay-{{ submission_token }}">
             <div class="mb-2">
-              <label class="form-label small" for="grnObligationSelect">Payment recipient / obligation</label>
+              <label class="form-label small" for="grnObligationSelect">Supplier payable</label>
               <select name="obligation_key" id="grnObligationSelect" class="form-select" required>
-                {% for ob in breakdown.obligations %}
+                {% for ob in breakdown.obligations if ob.kind in ['MATERIAL', 'EXPENSES'] %}
                   <option value="{{ ob.key }}"
                           data-label="{{ ob.label }}"
                           data-original="{{ '%.2f'|format(ob.original) }}"
@@ -177,13 +381,13 @@
                           data-payable="{{ '%.2f'|format(ob.remaining) }}"
                           data-remaining="{{ '%.2f'|format(ob.remaining) }}"
                           {{ 'selected' if selected_obligation and selected_obligation.key == ob.key }}>
-                    {{ ob.label }} → {{ ob.recipient_name or ob.recipient_label }} (due {{ '{:,.2f}'.format(ob.remaining) }})
+                    {{ ob.label }} → {{ ob.recipient_name }} (due {{ '{:,.2f}'.format(ob.remaining) }})
                   </option>
                 {% endfor %}
               </select>
               <div class="form-text">
-                Stock, GRN expenses billed to the supplier, and expenses not added to the supplier ledger are
-                separate payables. Each line shows the amount still to be paid to its supplier or own recipient.
+                Only the supplier bill is payable here: stock (qty × rate) and the expenses still ticked to the
+                supplier. Every GRN expense is paid in its own section.
               </div>
             </div>
 
@@ -253,15 +457,18 @@
           </form>
           <div class="small text-muted mt-2">
             <i class="bi bi-shield-check me-1"></i>
-            Only expenses checked on the GRN are included in the supplier bill. Unchecked expenses remain payable to their own recipients and are listed above with their amount to be paid. Each save creates exactly one cash-out row in Cash Flow.
+            Only the supplier bill is paid here. Each save creates exactly one cash-out row in Cash Flow.
           </div>
         </div>
       </div>
     </div>
   </div>
+  {% endif %}
+
   {% else %}
-  <div class="alert alert-info"><i class="bi bi-info-circle me-1"></i>Select a GRN above to see its obligations, payment history and remaining balances.</div>
+  <div class="alert alert-info"><i class="bi bi-info-circle me-1"></i>Select a GRN above to see its supplier bill, its expenses, the payment history and the remaining balances.</div>
   {% endif %}
 </div>
-  <script src="{{ url_for('static', filename='grn_payments.js') }}?v=1"></script>
+<script src="{{ url_for('static', filename='grn_payments.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='grn_expense_payments.js') }}?v=1"></script>
 {% endblock %}

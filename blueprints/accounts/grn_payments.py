@@ -16,7 +16,7 @@ from models import GRN, GRNCharge, SupplierPayment, CashFlowParty, Supplier
 from app.services.grn_costing import (
     grn_breakdown, supplier_bill_breakdown, payment_obligation_label,
     OBLIGATION_MATERIAL, OBLIGATION_EXPENSES, OBLIGATION_SUPPLIER,
-    OBLIGATION_CHARGE,
+    OBLIGATION_CHARGE, parse_obligation_key,
 )
 from app.services.grn_payments import (
     save_grn_payment, save_grn_payment_expanded, void_grn_payment,
@@ -37,6 +37,64 @@ def _grn_payment_accounts():
     ).order_by(Account.category.asc(), Account.name.asc(), Account.id.asc()).all()
 
 
+MODE_SUPPLIER = 'SUPPLIER'
+MODE_EXPENSES = 'EXPENSES'
+
+#: Payment modes of Pay GRN Expenses.  The single-amount supplier form and the
+#: per-expense boxes are mutually exclusive: GRN expenses have their own unique
+#: payment system (one money field per expense), so the supplier amount field
+#: must not be on screen while an expense is being paid.
+PAYMENT_MODES = (
+    {
+        'key': MODE_SUPPLIER,
+        'label': 'Supplier bill',
+        'icon': 'bi-cash-stack',
+        'hint': 'Stock / material (qty × rate) plus the expenses still ticked to the supplier.',
+    },
+    {
+        'key': MODE_EXPENSES,
+        'label': 'GRN expenses (one by one)',
+        'icon': 'bi-truck',
+        'hint': 'Every expense — vehicle fare, loading, unloading, other — with its own amount field.',
+    },
+)
+
+
+def _expenses_open_total(bd):
+    return sum((ob.get('remaining') or 0.0) for ob in (bd or {}).get('obligations', [])
+               if ob.get('kind') == OBLIGATION_CHARGE)
+
+
+def _grn_expense_rows(bd):
+    """One row per GRN expense, newest-payable order, with its own open amount.
+
+    This is the per-expense payment system: every vehicle fare / loading /
+    unloading / other expense the operator entered on the GRN is listed with
+    the amount still payable, whoever it is owed to.
+    """
+    rows = []
+    for ob in (bd or {}).get('obligations', []):
+        if ob.get('kind') != OBLIGATION_CHARGE:
+            continue
+        rows.append({
+            'key': ob['key'],
+            'charge_id': ob.get('charge_id'),
+            'label': ob.get('label') or 'GRN expense',
+            'recipient_label': ob.get('recipient_label') or '',
+            'recipient_name': ob.get('recipient_name') or '',
+            'original': ob.get('original') or 0.0,
+            'paid': ob.get('paid') or 0.0,
+            'remaining': ob.get('remaining') or 0.0,
+            'status': ob.get('status') or 'Unpaid',
+            'billed_to_supplier': bool(ob.get('billed_to_supplier')),
+            'supplier_paid': ob.get('supplier_paid') or 0.0,
+            'recipient_paid': ob.get('recipient_paid') or 0.0,
+            'cost_treatment': ob.get('cost_treatment') or 'INVENTORY',
+            'is_landed': (ob.get('cost_treatment') or 'INVENTORY').upper() == 'INVENTORY',
+        })
+    return rows
+
+
 def _grn_payment_summary(grn, breakdown=None):
     """Display facts for one GRN: date, supplier dues and off-ledger expenses.
 
@@ -54,9 +112,13 @@ def _grn_payment_summary(grn, breakdown=None):
         'date_iso': posted.strftime('%Y-%m-%d') if posted else '',
         'material_remaining': bd.get('material_remaining', 0.0),
         'expenses_remaining': bd.get('expenses_remaining', 0.0),
-        'recipient_expenses_remaining': bd.get('additional_remaining', 0.0),
+        # Every GRN expense is its own payable, so this is the open amount of
+        # all expenses (ticked and unticked), not only the off-ledger ones.
+        'recipient_expenses_remaining': _expenses_open_total(bd),
         'supplier_ledger_remaining': (bd.get('material_remaining', 0.0)
                                       + bd.get('expenses_remaining', 0.0)),
+        'expense_count': sum(1 for ob in bd.get('obligations', [])
+                             if ob.get('kind') == OBLIGATION_CHARGE),
         'total_remaining': bd.get('total_remaining', 0.0),
     }
 
@@ -67,6 +129,11 @@ def grn_payments():
     """Select a GRN, see every obligation with paid/remaining, then pay."""
     selected_id = request.args.get('grn_id', type=int)
     selected_charge = request.args.get('charge_id', type=int)
+    mode = (request.args.get('mode') or '').strip().upper()
+    if mode not in (MODE_SUPPLIER, MODE_EXPENSES):
+        # Opening one expense (or a GRN with no stock/expense supplier payable
+        # left) starts in the per-expense system.
+        mode = MODE_EXPENSES if selected_charge else MODE_SUPPLIER
     grns = GRN.query.filter(
         GRN.is_void == False,  # noqa: E712
         GRN.is_cancelled == False,  # noqa: E712
@@ -95,6 +162,20 @@ def grn_payments():
                      if row['kind'] == OBLIGATION_MATERIAL), None)
         )
 
+    expense_rows = _grn_expense_rows(breakdown) if breakdown else []
+    if mode == MODE_EXPENSES:
+        if selected_obligation is None or selected_obligation.get('kind') != OBLIGATION_CHARGE:
+            selected_obligation = next(
+                (row for row in (breakdown['obligations'] if breakdown else [])
+                 if row['kind'] == OBLIGATION_CHARGE and row['remaining_minor'] > 0),
+                None,
+            ) or next(
+                (row for row in (breakdown['obligations'] if breakdown else [])
+                 if row['kind'] == OBLIGATION_CHARGE),
+                None,
+            )
+    expenses_open_total = sum(row['remaining'] for row in expense_rows)
+
     page_rows = []
     for g in grns:
         try:
@@ -116,6 +197,10 @@ def grn_payments():
         breakdown=breakdown,
         selected_summary=selected_summary,
         selected_obligation=selected_obligation,
+        mode=mode,
+        payment_modes=PAYMENT_MODES,
+        expense_rows=expense_rows,
+        expenses_open_total=expenses_open_total,
         accounts=_grn_payment_accounts(),
         parties=CashFlowParty.query.order_by(CashFlowParty.name.asc()).all(),
         today_date=pk_today().strftime('%Y-%m-%d'),
@@ -131,22 +216,61 @@ def grn_payment_save():
         flash('Permission denied', 'danger')
         return redirect(url_for('accounts.grn_payments'))
     grn_id = request.form.get('grn_id', type=int)
+    mode = (request.form.get('mode') or MODE_SUPPLIER).strip().upper()
     try:
-        payments = save_grn_payment_expanded(
-            grn_id=grn_id,
-            obligation_key=(request.form.get('obligation_key') or '').strip(),
-            amount=request.form.get('amount', 0),
-            method=request.form.get('method', 'Cash'),
-            payment_account_id=request.form.get('payment_account_id'),
-            date_posted=request.form.get('date_posted', ''),
-            reference=(request.form.get('reference') or '').strip(),
-            note=(request.form.get('note') or '').strip(),
-            idempotency_key=(request.form.get('idempotency_key') or '').strip() or None,
-            payment_id=request.form.get('payment_id', type=int),
-            expected_revision=request.form.get('expected_revision'),
-            allow_advance=bool(request.form.get('allow_advance')),
-            actor=current_user,
-        )
+        payments = []
+        # Per-expense payment system: every expense box that has money in it is
+        # its own voucher against its own recipient.  The supplier single-amount
+        # field is not part of this mode at all (it is hidden and disabled).
+        expense_keys = request.form.getlist('expense_key[]')
+        expense_amounts = request.form.getlist('expense_amount[]')
+        if mode == MODE_EXPENSES or expense_keys:
+            base = {
+                'grn_id': grn_id,
+                'method': request.form.get('method', 'Cash'),
+                'payment_account_id': request.form.get('payment_account_id'),
+                'date_posted': request.form.get('date_posted', ''),
+                'reference': (request.form.get('reference') or '').strip(),
+                'note': (request.form.get('note') or '').strip(),
+                'allow_advance': bool(request.form.get('allow_advance')),
+                'actor': current_user,
+            }
+            filled = [
+                (str(key or '').strip(), str(amount or '').strip())
+                for key, amount in zip(expense_keys, expense_amounts)
+                if str(amount or '').strip() not in ('', '0', '0.00', '0.0')
+            ]
+            if not filled:
+                raise ValueError('Enter an amount next to the GRN expense you want to pay.')
+            posted_ids = set()
+            for index, (key, amount) in enumerate(filled):
+                kind, _ = parse_obligation_key(key)
+                if kind != OBLIGATION_CHARGE:
+                    raise ValueError('Select a valid GRN expense to pay.')
+                payment, _created = save_grn_payment(
+                    obligation_key=key, amount=amount,
+                    idempotency_key=((request.form.get('idempotency_key') or '').strip() or None)
+                    if len(filled) == 1 else None,
+                    **base,
+                )
+                posted_ids.add(payment.id)
+                payments.append(payment)
+        else:
+            payments = save_grn_payment_expanded(
+                grn_id=grn_id,
+                obligation_key=(request.form.get('obligation_key') or '').strip(),
+                amount=request.form.get('amount', 0),
+                method=request.form.get('method', 'Cash'),
+                payment_account_id=request.form.get('payment_account_id'),
+                date_posted=request.form.get('date_posted', ''),
+                reference=(request.form.get('reference') or '').strip(),
+                note=(request.form.get('note') or '').strip(),
+                idempotency_key=(request.form.get('idempotency_key') or '').strip() or None,
+                payment_id=request.form.get('payment_id', type=int),
+                expected_revision=request.form.get('expected_revision'),
+                allow_advance=bool(request.form.get('allow_advance')),
+                actor=current_user,
+            )
         db.session.commit()
         total = sum(float(getattr(row, 'amount', 0) or 0) for row in payments)
         paid_for = ', '.join(sorted({payment_obligation_label(row) for row in payments}))
@@ -159,6 +283,8 @@ def grn_payment_save():
         logger.exception('GRN payment save failed')
         flash('Unable to save the GRN payment. Please check the details and try again.', 'danger')
     args = {'grn_id': grn_id} if grn_id else {}
+    if mode == MODE_EXPENSES:
+        args['mode'] = MODE_EXPENSES
     return redirect(url_for('accounts.grn_payments', **args))
 
 

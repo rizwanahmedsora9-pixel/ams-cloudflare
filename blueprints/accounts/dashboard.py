@@ -3,6 +3,16 @@ from ._common import *  # noqa
 
 from uuid import uuid4
 
+def _grn_expenses_open_total(bill):
+    """Every open GRN expense (each one is its own payable box)."""
+    total = bill.get('recipient_remaining', 0.0) or 0.0
+    for charge in bill.get('charged_to_supplier') or []:
+        if not charge.get('included_in_supplier_bill'):
+            continue
+        total += charge.get('remaining', 0.0) or 0.0
+    return round(total, 2)
+
+
 @accounts_bp.route('/')
 @login_required
 def dashboard():
@@ -111,9 +121,10 @@ def dashboard():
         except Exception:
             driver_outstanding_map[person.id] = 0.0
     # The modal's "Pay GRN Expenses" picker must expose the date and the REAL
-    # amount still payable.  Expenses that were not ticked "Add to supplier
-    # ledger" are included here as recipient dues, so they are never shown as
-    # an empty / zero amount just because they are outside the supplier ledger.
+    # amount still payable.  Every GRN expense is its own payable (one money
+    # field each), so the recipient-expense figure is every open expense —
+    # ticked or not — and the supplier figure is only what the supplier is
+    # still owed (stock + expenses not paid through their recipient).
     from app.services.grn_costing import supplier_bill_breakdown
     grn_payment_options = []
     for g in (GRN.query.filter(GRN.is_void == False, GRN.is_cancelled == False)
@@ -132,7 +143,7 @@ def dashboard():
             'date_iso': g.date_posted.strftime('%Y-%m-%d') if g.date_posted else '',
             'total_due': bill['total_remaining'],
             'supplier_ledger_due': bill['material_remaining'] + bill['expenses_remaining'],
-            'recipient_expenses_due': bill['recipient_remaining'],
+            'recipient_expenses_due': _grn_expenses_open_total(bill),
         })
     return render_template('accounts/dashboard.html',
                           grn_payment_options=grn_payment_options,
