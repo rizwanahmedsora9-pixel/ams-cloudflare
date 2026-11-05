@@ -86,13 +86,21 @@ the sidebar entirely.
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-full.txt
 
 python main.py            # 0.0.0.0:5000
 ```
 
-WeasyPrint needs `pango`, `cairo` and `gdk-pixbuf`. When they are missing
-(common on shared hosts) PDF downloads fall back to ReportLab.
+`requirements-full.txt` preserves the complete feature set on standard desktops
+and servers. `requirements.txt` is the smaller Flask/SQLite core for constrained
+ARM/Android environments, where packages without compatible wheels can break
+or stall installation. Add `requirements-data.txt` for spreadsheet/data-analysis
+features (pandas can require native compilation on some Termux/Python builds).
+Add `requirements-pdf.txt` for PDF exports: ReportLab provides the fallback
+renderer, while WeasyPrint adds HTML-to-PDF rendering and needs the system
+libraries `pango`, `cairo` and `gdk-pixbuf`. Install extras individually where
+the platform supports them; PDF routes are unavailable without the PDF extra.
+CI and local test runs should use `pip install -r requirements-dev.txt`.
 
 Default first-run admin (empty DB): `Admin` / `Admin@fbm12345`. Change it.
 
@@ -403,7 +411,7 @@ Exit codes: `0` everything required is done, `2` done except the listed manual s
   It never runs `git reset --hard`, `git clean`, `git stash`, or a forced checkout;
   modified tracked files stop the update and are reported instead of discarded.
 * Creates or reuses `/home/rehmanahmed/.venv` (using the same Python version as the
-  Web app) and installs `requirements.txt` with that virtualenv's own Python.
+  Web app) and installs `requirements-full.txt` (falling back to `requirements.txt` for older checkouts) with that virtualenv's own Python.
   Transient network failures are retried a bounded number of times; real errors are
   reported with pip's message.
 * Creates `instance/deploy_secret.txt` with `secrets.token_hex(32)` and mode `0600`,
@@ -531,7 +539,7 @@ the Web app, for example:
 cd /home/rehmanahmed
 python3.10 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-full.txt
 ```
 
 1. In a PythonAnywhere Bash console, generate a **new**, server-only secret:

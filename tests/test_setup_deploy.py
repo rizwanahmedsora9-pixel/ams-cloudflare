@@ -69,6 +69,7 @@ def make_upstream(tmp_path: Path) -> "tuple[Path, Path]":
     (upstream / "wsgi.py").write_text((REPO_ROOT / "wsgi.py").read_text())
     (upstream / "deploy_hook.py").write_text((REPO_ROOT / "deploy_hook.py").read_text())
     (upstream / "requirements.txt").write_text("flask>=3.1.2\n")
+    (upstream / "requirements-full.txt").write_text("-r requirements.txt\n")
     (upstream / "setup_Deploy.py").write_text((REPO_ROOT / "setup_Deploy.py").read_text())
     (upstream / "README.md").write_text("# AMS\n")
     git("add", "-A", cwd=upstream)
@@ -585,6 +586,15 @@ def test_incompatible_virtualenv_python_is_reported(harness):
     assert "--recreate-venv" in h.check("Virtualenv Python version").fix
 
 
+def test_deployment_installs_full_manifest_when_available(harness):
+    h = harness()
+
+    h.install()
+
+    assert h.runner.pip_argv
+    assert h.runner.pip_argv[0][-1].endswith("requirements-full.txt")
+
+
 def test_dependency_failure_is_reported_with_the_pip_error(harness):
     h = harness(pip_results=[(1, "ERROR: No matching distribution found for flask==9.9.9")])
 
@@ -616,13 +626,24 @@ def test_transient_dependency_failure_gives_up_after_the_bound(harness):
 
 
 def test_missing_import_is_reported_separately_from_pip(harness):
-    h = harness(imports_output="MISSING:reportlab (No module named 'reportlab')")
+    h = harness(imports_output="MISSING:flask (No module named 'flask')")
 
     code, _ = h.install()
 
     assert h.status("Dependencies") == sd.PASS, "pip itself succeeded"
     assert h.status("Dependencies importable") == sd.FAIL
-    assert "reportlab" in h.check("Dependencies importable").detail
+    assert "flask" in h.check("Dependencies importable").detail
+
+
+def test_missing_optional_pandas_does_not_fail_core_dependency_validation(harness):
+    h = harness(imports_output="IMPORTS-OK\nOPTIONAL-MISSING:pandas (No module named 'pandas')")
+
+    h.install()
+
+    assert h.status("Dependencies") == sd.PASS
+    assert h.status("Dependencies importable") == sd.PASS
+    assert h.status("Optional feature dependencies") == sd.WARN
+    assert "requirements-data.txt" in h.check("Optional feature dependencies").fix
 
 
 def test_skip_deps_is_reported_as_a_skip(harness):

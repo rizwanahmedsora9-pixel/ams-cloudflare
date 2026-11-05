@@ -1,0 +1,6 @@
+# Optional spreadsheet/data-analysis features (Data Lab and advanced imports).
+# Pandas pulls in a compatible NumPy automatically; do not pin NumPy separately.
+# On platforms without wheels (notably some Termux/Python builds), installing
+# pandas may require a native toolchain and can be skipped for the core app.
+-r requirements.txt
+pandas>=2.2,<3.0
