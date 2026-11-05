@@ -16,7 +16,7 @@
 
    A charge line carries cost facts only: type, label, amount, recipient,
    cost treatment, allocation basis and its own supplier-billing choice.
-   It deliberately has no paid/unpaid field — payment state belongs to Accounts (PAY EXISTING GRN), never to a
+   It deliberately has no paid/unpaid field — payment state belongs to Accounts (Pay GRN Expenses), never to a
    receiving document.
 
    This module owns the rows only.  All money arithmetic still comes from

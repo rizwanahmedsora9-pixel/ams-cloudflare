@@ -229,7 +229,7 @@ def test_pay_vehicle_then_supplier_then_loading(client, app):
     # 4. The GRN Payments page renders obligations + history.
     resp = client.get(f'/accounts/grn_payments?grn_id={grn_id}')
     assert resp.status_code == 200
-    assert b'PAY EXISTING GRN' in resp.data
+    assert b'Pay GRN Expenses' in resp.data
     assert b'Rana Transport' in resp.data
 
 

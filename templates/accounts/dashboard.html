@@ -403,11 +403,11 @@
                         <label class="form-label">Posted Date</label>
                         <input type="datetime-local" class="form-control" name="date_posted" value="{{ default_tx_datetime }}">
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-6" id="txAmountWrap">
                         <label class="form-label">Amount</label>
                         <input type="number" step="0.01" min="0" class="form-control" name="amount" id="tx_amount" required>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-6" id="txMethodWrap">
                         <label class="form-label">Method</label>
                         <select class="form-select" name="method">
                             <option value="Cash">Cash</option>
@@ -502,7 +502,7 @@
                         </div>
                         <div class="card-body">
                             <div class="row g-3">
-                                <div class="col-md-6">
+                                <div class="col-md-6" id="payFromAccountWrap">
                                     <label class="form-label">Pay From Account</label>
                                     <select class="form-select acc-searchable-select" data-search-placeholder="Search accounts…" name="pay_from_account_id" id="pay_from_account_id">
                                         <option value="">Select source account</option>
@@ -516,20 +516,36 @@
                                     <select class="form-select" name="pay_target" id="pay_target">
                                         <option value="company_transfer">Company Account Transfer</option>
                                         <option value="supplier">Supplier Payment</option>
-                                        <option value="grn_payment">PAY EXISTING GRN / GRN PAYMENT</option>
+                                        <option value="grn_payment">Pay GRN Expenses</option>
                                         <option value="driver">Driver Service Payment</option>
                                         <option value="client_refund">Client Refund</option>
                                         <option value="loan">Loan Payment</option>
                                         <option value="personal_expense">Personal Expense</option>
                                         <option value="other_expense">Other Expense</option>
                                     </select>
-                                    <div class="col-md-12 mt-2" id="grnPaymentWrap">
-                                        <label class="form-label">GRN to pay</label>
-                                        <select class="form-select" name="grn_payment_grn_id">
-                                            <option value="">— Open the GRN Payments page —</option>
-                                            {% for g in grn_payment_options or [] %}<option value="{{ g.id }}">{{ g.label }}</option>{% endfor %}
+                                    <div class="col-md-12 mt-2 d-none" id="grnPaymentWrap">
+                                        <label class="form-label" for="grnPaymentGrnSelect">Select GRN</label>
+                                        <select class="form-select" name="grn_payment_grn_id" id="grnPaymentGrnSelect" disabled>
+                                            <option value="">— Open Pay GRN Expenses —</option>
+                                            {% for g in grn_payment_options or [] %}
+                                            <option value="{{ g.id }}"
+                                                    data-bill-ref="{{ g.bill_ref }}"
+                                                    data-supplier="{{ g.supplier }}"
+                                                    data-date-label="{{ g.date_label }}"
+                                                    data-date-iso="{{ g.date_iso }}"
+                                                    data-total-due="{{ '%.2f'|format(g.total_due) }}"
+                                                    data-supplier-ledger-due="{{ '%.2f'|format(g.supplier_ledger_due) }}"
+                                                    data-recipient-expenses-due="{{ '%.2f'|format(g.recipient_expenses_due) }}">{{ g.label }}</option>
+                                            {% endfor %}
                                         </select>
-                                        <div class="form-text">This opens the dedicated GRN payment wizard; no money is posted from this modal for GRNs.</div>
+                                        <div id="grnPaymentSelectionInfo" class="small mt-2 p-2 border rounded d-none" aria-live="polite">
+                                            <div id="grnPaymentSelectedInfo" class="fw-bold text-info"></div>
+                                            <div id="grnPaymentDateInfo" class="text-muted"></div>
+                                            <div id="grnPaymentDueInfo" class="fw-bold text-warning"></div>
+                                            <div id="grnPaymentExpenseInfo" class="text-muted"></div>
+                                        </div>
+                                        <div id="grnPaymentEmptyInfo" class="small text-muted mt-2">Select a GRN to see its date and the amount still to be paid.</div>
+                                        <div class="form-text">This opens <strong>Pay GRN Expenses</strong>, where the amount and recipient are chosen. No money is posted from this modal.</div>
                                     </div>
                                 </div>
 
@@ -616,7 +632,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="submit" class="btn btn-primary">Submit Transaction</button>
+                <button type="submit" class="btn btn-primary" id="newTransactionSubmit">Submit Transaction</button>
             </div>
         </form>
     </div>
@@ -733,6 +749,43 @@ function clearSupplierDisplay() {
     const payableDisplay = document.getElementById('paySupplierPayableInfo');
     if (nameDisplay) nameDisplay.textContent = '';
     if (payableDisplay) payableDisplay.textContent = '';
+}
+
+function formatDashboardMoney(value) {
+    return `Rs. ${Number(value || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })}`;
+}
+
+function updateGrnPaymentInfo() {
+    const select = document.getElementById('grnPaymentGrnSelect');
+    const info = document.getElementById('grnPaymentSelectionInfo');
+    const empty = document.getElementById('grnPaymentEmptyInfo');
+    const selected = document.getElementById('grnPaymentSelectedInfo');
+    const date = document.getElementById('grnPaymentDateInfo');
+    const due = document.getElementById('grnPaymentDueInfo');
+    const expenses = document.getElementById('grnPaymentExpenseInfo');
+    if (!select || !info || !empty) return;
+    const option = select.value ? select.options[select.selectedIndex] : null;
+    if (!option) {
+        info.classList.add('d-none');
+        empty.classList.remove('d-none');
+        return;
+    }
+    const data = option.dataset || {};
+    const totalDue = Number(data.totalDue || 0);
+    const supplierDue = Number(data.supplierLedgerDue || 0);
+    const recipientDue = Number(data.recipientExpensesDue || 0);
+    if (selected) selected.textContent = `${data.billRef || option.textContent} · ${data.supplier || ''}`.trim();
+    if (date) date.textContent = `GRN date: ${data.dateLabel || 'Date not recorded'}`;
+    if (due) due.textContent = `Amount still to be paid: ${formatDashboardMoney(totalDue)}`;
+    if (expenses) {
+        expenses.textContent = `Supplier ledger due: ${formatDashboardMoney(supplierDue)} · ` +
+            `Expenses not added to supplier ledger: ${formatDashboardMoney(recipientDue)}`;
+    }
+    info.classList.remove('d-none');
+    empty.classList.add('d-none');
 }
 
 function selectPayClient(code, name, hiddenFieldId, inputId) {
@@ -872,11 +925,15 @@ function setPayTargetMode() {
     const supplierWrap = document.getElementById('supplierWrap');
     const targetLabelWrap = document.getElementById('targetLabelWrap');
     const payTo = document.getElementById('pay_to_account_id');
+    const payFrom = document.getElementById('pay_from_account_id');
     const supplierHidden = document.getElementById('supplier_id');
     const supplierInput = document.getElementById('paySupplierInput');
     const clientRefundWrap = document.getElementById('clientRefundWrap');
     const payClientInput = document.getElementById('payClientInput');
     const targetLabel = document.getElementById('target_label');
+    const grnWrap = document.getElementById('grnPaymentWrap');
+    const grnSelect = document.getElementById('grnPaymentGrnSelect');
+    const amountInput = document.getElementById('tx_amount');
     if (!payTarget || !payToWrap || !supplierWrap || !targetLabelWrap || !payTo || !supplierHidden || !targetLabel) {
         return;
     }
@@ -884,6 +941,7 @@ function setPayTargetMode() {
     const txMode = document.querySelector('input[name="tx_mode"]:checked');
     const isPayMode = txMode && (txMode.value || '').toLowerCase() === 'pay';
     const target = (payTarget.value || '').toLowerCase();
+    const isGrnExpenses = isPayMode && target === 'grn_payment';
 
     payToWrap.classList.toggle('d-none', target !== 'company_transfer');
     supplierWrap.classList.toggle('d-none', target !== 'supplier');
@@ -896,11 +954,36 @@ function setPayTargetMode() {
     if (driverInput) driverInput.required = isPayMode && target === 'driver';
     targetLabelWrap.classList.toggle('d-none', !['loan', 'personal_expense', 'other_expense'].includes(target));
 
+    // The GRN picker belongs to Pay GRN Expenses ONLY.  For a supplier payment
+    // (or any other target) it is hidden and disabled, so it can never look
+    // like a required field or change that transaction.
+    if (grnWrap) grnWrap.classList.toggle('d-none', !isGrnExpenses);
+    if (grnSelect) {
+        grnSelect.disabled = !isGrnExpenses;
+        if (!isGrnExpenses) grnSelect.value = '';
+    }
+    // No money is posted from this modal for GRN expenses; the amount/account
+    // are entered on the dedicated page.  Do not demand them here.
+    ['txAmountWrap', 'txMethodWrap', 'payFromAccountWrap'].forEach(id => {
+        const wrap = document.getElementById(id);
+        if (wrap) wrap.classList.toggle('d-none', isGrnExpenses);
+    });
+    if (amountInput) {
+        amountInput.required = !isGrnExpenses;
+        if (isGrnExpenses) amountInput.value = '';
+    }
+
     payTo.required = isPayMode && target === 'company_transfer';
+    if (payFrom) payFrom.required = isPayMode && !isGrnExpenses;
     supplierHidden.required = false;
     if (supplierInput) supplierInput.required = isPayMode && target === 'supplier';
     if (payClientInput) payClientInput.required = isPayMode && target === 'client_refund';
     targetLabel.required = isPayMode && ['loan', 'personal_expense', 'other_expense'].includes(target);
+    const submitButton = document.getElementById('newTransactionSubmit');
+    if (submitButton) {
+        submitButton.textContent = isGrnExpenses ? 'Open Pay GRN Expenses' : 'Submit Transaction';
+    }
+    updateGrnPaymentInfo();
 }
 
 function syncDriverSelection() {
@@ -1102,6 +1185,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     if (targetSelect) targetSelect.addEventListener('change', setPayTargetMode);
+    const grnPaymentSelect = document.getElementById('grnPaymentGrnSelect');
+    if (grnPaymentSelect) grnPaymentSelect.addEventListener('change', updateGrnPaymentInfo);
     if (receiveSourceType) receiveSourceType.addEventListener('change', setReceiveSourceMode);
     if (receiveAccountSelect) receiveAccountSelect.addEventListener('change', setReceiveSourceMode);
     if (amountInput) amountInput.addEventListener('input', updateReceiveSettlementState);

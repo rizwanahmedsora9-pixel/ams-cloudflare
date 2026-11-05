@@ -114,7 +114,7 @@ def test_charge_grid_has_no_paid_or_unpaid_control(costs_app):
     # The tab strip and its explanation are present instead.
     assert "grn-main-tabs" in html and "<ul class=\"nav nav-tabs" in html, "the Records | Costs tab strip must exist"
     assert ">Costs\n" in html or ">Costs<" in html
-    assert "PAY EXISTING GRN" in html
+    assert "Pay GRN Expenses" in html
 
 
 def test_removing_the_paid_field_does_not_change_received_costs(costs_app):

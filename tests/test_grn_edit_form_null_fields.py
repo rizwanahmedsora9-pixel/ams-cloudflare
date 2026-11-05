@@ -25,7 +25,7 @@ LOGIN = {"username": "Admin", "password": "Admin@fbm12345"}
 # Owner rule A1 (approved 2026-11-02): a GRN NEVER pays, so the old
 # payment/bank fields (payment_type, paid_amount, payment_account_id,
 # bank_name, account_name, account_no) are no longer on the GRN form.
-# Payments are recorded only from Accounts -> PAY EXISTING GRN.
+# Payments are recorded only from Accounts -> Pay GRN Expenses.
 GUARDED_FIELDS = (
     "supplier",
     "supplier_invoice_no",

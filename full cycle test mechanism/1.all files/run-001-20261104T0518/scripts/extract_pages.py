@@ -40,7 +40,7 @@ PAGES = [
     ('/accounts/purchase_payables', 'Purchase payables'),
     ('/accounts/payments/clients', 'Client payments'),
     ('/accounts/payments/suppliers', 'Supplier payments'),
-    ('/accounts/grn_payments', 'Pay existing GRN'),
+    ('/accounts/grn_payments', 'Pay GRN Expenses'),
     ('/cash_flow', 'Cash Flow'),
     ('/cash_flow_differences', 'Cash Flow differences'),
     ('/daily_reconciliation', 'Daily reconciliation'),

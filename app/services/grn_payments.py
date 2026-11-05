@@ -406,7 +406,7 @@ def grn_payment_integrity():
 # =========================================================================
 #  Accounts -> Pay Supplier and the supplier ledger used to post a free-floating
 #  SupplierPayment that no GRN knew about: the supplier ledger dropped, but
-#  every GRN stayed "Unpaid" and PAY EXISTING GRN still demanded the money again.
+#  every GRN stayed "Unpaid" and Pay GRN Expenses still demanded the money again.
 #  These helpers resolve the *same* GRN obligations so one payment settles one
 #  payable exactly once, whichever screen the operator used.
 

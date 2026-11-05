@@ -6,7 +6,7 @@
      * vehicle fare / transport, loading, unloading and other are separate
        cost lines with their own recipients;
      * there is NO paid/unpaid declaration anywhere on this screen.  Money is
-       paid only from Accounts -> PAY EXISTING GRN.
+       paid only from Accounts -> Pay GRN Expenses.
 
    Numbers come from app/services/grn_costs.py, which reads grn_costing.
    ========================================================================= #}
@@ -99,7 +99,7 @@
             to <b>{{ costs.end.strftime('%d/%b/%Y') if costs.end else 'today' }}</b>
         {% endif %}
         &middot; filtered total <b>Rs {{ '{:,.2f}'.format(costs.filtered_total) }}</b>
-        <span class="text-muted">(payments are recorded only in Accounts &rarr; PAY EXISTING GRN)</span>
+        <span class="text-muted">(payments are recorded only in Accounts &rarr; Pay GRN Expenses)</span>
     </div>
 
     <div class="table-responsive">
