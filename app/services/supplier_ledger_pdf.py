@@ -26,6 +26,90 @@ HEAD_BG = '#1f2937'
 ZEBRA_BG = '#f3f4f6'
 TOTAL_BG = '#e5e7eb'
 
+# --- dual-language (English + Urdu / Jameel Noori) support ----------------
+_URDU_FONT = None
+
+# Urdu phrases that are not part of the shared label dictionary (built from
+# explicit codepoints so they can never degrade into non-Urdu filler).
+_UR = {
+    'No transactions in this period.':
+        '\u0627\u0633 \u0645\u062f\u062a \u0645\u06cc\u06ba \u06a9\u0648\u0626\u06cc '
+        '\u0679\u0631\u0627\u0646\u0632\u06cc\u06a9\u0634\u0646 \u0646\u06c1\u06cc\u06ba\u06d4',
+    'Prepared by':
+        '\u062a\u06cc\u0627\u0631 \u062f\u06cc \u06af\u0626\u06cc',
+    'Authorised sign':
+        '\u0645\u062c\u0627\u0632 \u062f\u0633\u062a\u062e\u0637',
+    'Total bills (credit)': None,      # composed from LABELS below
+    'Total payments (debit)': None,    # composed from LABELS below
+    'note_line': (
+        '\u0645\u0642\u062f\u0627\u0631\u060c \u0631\u06cc\u0679 \u0627\u0648\u0631 \u0631\u0642\u0645 '
+        'GRN \u06a9\u06cc \u062a\u0641\u0635\u06cc\u0644 \u062f\u06cc\u06a9\u0627\u062a\u06cc \u06c1\u06d2'
+    ),
+    'footer_line': (
+        '\u062a\u0645\u0627\u0645 \u0633\u067e\u0644\u0627\u0626\u0631 \u062d\u0631\u06a9\u062a\u06cc\u06ba '
+        '\u0627\u0648\u067e\u0631 \u062f\u0631\u062c \u06c1\u06cc\u06ba\u06d4'
+    ),
+    'page': '\u0635\u0641\u062d\u06c1',   # "page"
+    'of': '\u0627\u0632',                   # "of"
+}
+
+
+def _ur_font():
+    """Register and return the Jameel Noori TTF name (or None)."""
+    global _URDU_FONT
+    if _URDU_FONT is None:
+        try:
+            from app.services.bilingual import register_urdu_font
+            _URDU_FONT = register_urdu_font() or ''
+        except Exception:
+            _URDU_FONT = ''
+    return _URDU_FONT or None
+
+
+def _ur_label(en):
+    """Urdu translation for *en* from the shared dictionary, with local extras."""
+    if _UR.get(en):
+        return _UR[en]
+    try:
+        from app.services.bilingual import LABELS
+        if en in LABELS:
+            return LABELS[en]
+        # case-insensitive fallbacks for a few shared labels
+        for key, val in LABELS.items():
+            if key.lower() == en.lower():
+                return val
+        if en == 'Total bills (credit)':
+            return LABELS['Total Bill'] + ' (' + LABELS['CREDIT'] + ')'
+        if en == 'Total payments (debit)':
+            return LABELS['Total'] + ' ' + '\u0627\u062f\u0627\u0626\u06af\u06cc\u0627\u06ba' \
+                + ' (' + LABELS['DEBIT'] + ')'
+        if en == 'Company stamp':
+            return LABELS['Company Stamp']
+    except Exception:
+        pass
+    return None
+
+
+def _bl(en, ur=None):
+    """Bilingual label markup: English followed by shaped Urdu in Jameel Noori."""
+    if ur is None:
+        ur = _ur_label(en)
+    font = _ur_font()
+    if not ur or not font:
+        return escape(en)
+    from app.services.bilingual import shape_urdu
+    return f'{escape(en)} <font face="{font}">{escape(shape_urdu(ur))}</font>'
+
+
+def _ur_span(key):
+    """Just the shaped Urdu span (for appending Urdu to English sentences)."""
+    ur = _UR.get(key) or _ur_label(key)
+    font = _ur_font()
+    if not ur or not font:
+        return ''
+    from app.services.bilingual import shape_urdu
+    return f' <font face="{font}">{escape(shape_urdu(ur))}</font>'
+
 
 def _fonts():
     """Return (regular, bold, italic) font names, preferring a Unicode TTF."""
@@ -146,9 +230,9 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
         left.append(Paragraph(escape(company_phone), s_small))
 
     meta_rows = [
-        [Paragraph('STATEMENT NO.', s_label), Paragraph(escape(statement_no or '-'), s_text)],
-        [Paragraph('GENERATED', s_label), Paragraph(escape(generated_at.strftime('%d-%b-%Y %I:%M %p')), s_text)],
-        [Paragraph('PERIOD', s_label), Paragraph(escape(period), s_text)],
+        [Paragraph(_bl('STATEMENT NO.'), s_label), Paragraph(escape(statement_no or '-'), s_text)],
+        [Paragraph(_bl('GENERATED'), s_label), Paragraph(escape(generated_at.strftime('%d-%b-%Y %I:%M %p')), s_text)],
+        [Paragraph(_bl('PERIOD'), s_label), Paragraph(escape(period), s_text)],
     ]
     meta = Table(meta_rows, colWidths=[27 * mm, 58 * mm])
     meta.setStyle(TableStyle([
@@ -157,7 +241,7 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
         ('TOPPADDING', (0, 0), (-1, -1), 1.5), ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
     ]))
     title_box = Table(
-        [[Paragraph('SUPPLIER LEDGER', s_title)]],
+        [[Paragraph(_bl('SUPPLIER LEDGER'), s_title)]],
         colWidths=[usable_w * 0.42], rowHeights=[9 * mm],
     )
     title_box.setStyle(TableStyle([
@@ -178,28 +262,29 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
     ]))
 
     # ---- supplier + summary ------------------------------------------
-    party = [Paragraph('SUPPLIER', s_label), Spacer(1, 1.5 * mm),
+    party = [Paragraph(_bl('SUPPLIER'), s_label), Spacer(1, 1.5 * mm),
              Paragraph(escape((supplier.name or '-').upper()), s_value)]
     if getattr(supplier, 'address', None):
         party.append(Paragraph(escape(supplier.address), s_text))
     if getattr(supplier, 'phone', None):
-        party.append(Paragraph(f'Phone: {escape(supplier.phone)}', s_text))
+        party.append(Paragraph(_bl('Phone') + f': {escape(supplier.phone)}', s_text))
 
     closing = float(closing_balance or 0)
     if closing > 0.005:
-        state_text = 'Payable to supplier'
+        state_text = _bl('Payable to supplier')
     elif closing < -0.005:
-        state_text = 'Advance paid to supplier'
+        state_text = _bl('Advance paid to supplier')
     else:
-        state_text = 'Settled'
+        state_text = _bl('Settled')
     summary_rows = [
-        ['Balance brought forward', _money(balance_brought_forward)],
-        ['Total bills (credit)', _money(total_credit)],
-        ['Total payments (debit)', _money(total_debit)],
-        ['Closing balance', _money(closing)],
+        [_bl('Balance brought forward'), _money(balance_brought_forward)],
+        [_bl('Total bills (credit)'), _money(total_credit)],
+        [_bl('Total payments (debit)'), _money(total_debit)],
+        [_bl('Closing balance'), _money(closing)],
     ]
     summary = Table(
-        [[Paragraph(escape(k), s_td), Paragraph(escape(v), s_td_r)] for k, v in summary_rows],
+        # k already contains bilingual markup from _bl() (English part escaped there)
+        [[Paragraph(k, s_td), Paragraph(escape(v), s_td_r)] for k, v in summary_rows],
         colWidths=[47 * mm, 33 * mm],
     )
     summary.setStyle(TableStyle([
@@ -210,7 +295,7 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
         ('LEFTPADDING', (0, 0), (-1, -1), 5), ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
-    summary_block = [summary, Spacer(1, 1.5 * mm), Paragraph(escape(state_text), s_small)]
+    summary_block = [summary, Spacer(1, 1.5 * mm), Paragraph(state_text, s_small)]  # already bilingual markup
     party_block = Table([[party, summary_block]], colWidths=[usable_w * 0.5, usable_w * 0.5])
     party_block.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -385,7 +470,7 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
     s_tot.fontSize, s_tot.leading = tot_size + 0.1, (tot_size + 0.1) * 1.35
     s_tot_r.fontSize, s_tot_r.leading = tot_size, tot_size * 1.35
 
-    head_row = [Paragraph(label, head_style[key]) for key, label, *_ in col_plan]
+    head_row = [Paragraph(_bl(label), head_style[key]) for key, label, *_ in col_plan]
 
     def _particulars(entry, item_name=None, first=True):
         """Particulars cell.
@@ -470,7 +555,7 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
 
     # Totals: label spanning the first seven columns, then debit | credit | balance.
     totals = Table(
-        [[Paragraph('Totals for period (closing balance)', s_tot),
+        [[Paragraph(_bl('Totals for period (closing balance)'), s_tot),
           Paragraph(totals_debit, s_tot_r),
           Paragraph(totals_credit, s_tot_r),
           Paragraph(totals_closing, s_tot_r)]],
@@ -485,13 +570,14 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
         ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
     note_line = Paragraph('Qty, Rate and Amount show the GRN line detail; '
-                          'Debit, Credit and Balance show the ledger movement.', s_small)
+                          'Debit, Credit and Balance show the ledger movement.'
+                          + _ur_span('note_line'), s_small)
 
-    ledger_section = [Paragraph('TRANSACTIONS', s_section), Spacer(1, 1.5 * mm)]
+    ledger_section = [Paragraph(_bl('TRANSACTIONS'), s_section), Spacer(1, 1.5 * mm)]
     if not groups:
         empty_table = Table(
             [head_row,
-             [Paragraph('No transactions in this period.', s_td_c)] + [''] * (len(col_keys) - 1)],
+             [Paragraph(_bl('No transactions in this period.'), s_td_c)] + [''] * (len(col_keys) - 1)],
             colWidths=col_w, repeatRows=1,
         )
         empty_table.setStyle(TableStyle(list(base_style) + [
@@ -557,9 +643,9 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
                 ledger_section.append(KeepTogether(table))
 
     sig = Table(
-        [[Paragraph('______________________<br/>Prepared by', s_sig),
-          Paragraph('______________________<br/>Authorised sign', s_sig),
-          Paragraph('______________________<br/>Company stamp', s_sig)]],
+        [[Paragraph('______________________<br/>' + _bl('Prepared by'), s_sig),
+          Paragraph('______________________<br/>' + _bl('Authorised sign'), s_sig),
+          Paragraph('______________________<br/>' + _bl('Company stamp'), s_sig)]],
         colWidths=[usable_w / 3.0] * 3,
     )
     sig.setStyle(TableStyle([
@@ -569,7 +655,7 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
     footer_block = KeepTogether([
         Spacer(1, 12 * mm), sig, Spacer(1, 4 * mm),
         Paragraph('All supplier movements for the selected period are listed above. '
-                  'Balances are shown in rupees (Rs.).', s_small),
+                  'Balances are shown in rupees (Rs.).' + _ur_span('footer_line'), s_small),
     ])
 
     # ---- document -----------------------------------------------------
@@ -604,8 +690,17 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
             self.setFillColor(colors.HexColor(MUTED))
             self.drawString(margin, margin - 8 * mm,
                             f'Supplier ledger - {supplier.name or ""} - generated {generated_at.strftime("%d-%b-%Y %I:%M %p")}')
-            self.drawRightString(page_w - margin, margin - 8 * mm,
-                                 f'Page {self._pageNumber} of {total}')
+            page_en = f'Page {self._pageNumber} of {total}'
+            self.drawRightString(page_w - margin, margin - 8 * mm, page_en)
+            ur_font = _ur_font()
+            if ur_font:
+                from app.services.bilingual import shape_urdu
+                from reportlab.pdfbase import pdfmetrics as _pm
+                urdu_page = shape_urdu(_UR['page'] + f' {self._pageNumber} ' + _UR['of'] + f' {total}')
+                gap = _pm.stringWidth(page_en, body, 6.8) + 3 * mm
+                self.setFont(ur_font, 6.8)
+                self.drawRightString(page_w - margin - gap, margin - 8 * mm, urdu_page)
+                self.setFont(body, 6.8)
             self.restoreState()
 
     doc = BaseDocTemplate(
