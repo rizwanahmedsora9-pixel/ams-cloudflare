@@ -6,7 +6,7 @@ authority itself):
 * A1 — a GRN never pays.  This report is a *cost* report: it shows what the
   business owes/spent on stock and on the incidental costs of receiving it.
   It never shows a paid/unpaid declaration, because every payment lives in
-  Accounts (``Accounts -> PAY EXISTING GRN``).
+  Accounts (``Accounts -> Pay GRN Expenses``).
 * The supplier material amount is exactly ``sum(qty * rate)``.  Vehicle
   fare, transport, loading, unloading and other charges are listed as their
   own cost kinds.  Each expense's own billing checkbox decides whether it is

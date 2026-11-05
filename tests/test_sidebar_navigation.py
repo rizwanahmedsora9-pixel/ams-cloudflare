@@ -162,7 +162,7 @@ def test_admin_sidebar_categories_and_item_grouping(client):
         "Daily Reconciliation",
         "PAY GRN (STOCK / EXPENSES)",
         "Pay Supplier",
-        "PAY EXISTING GRN",
+        "Pay GRN Expenses",
         "Profit Reports",
     ]
     assert by_label["Ledger"] == [

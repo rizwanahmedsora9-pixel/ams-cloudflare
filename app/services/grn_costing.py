@@ -4,7 +4,7 @@ Owner rules (approved 2026-11-02):
 
 A1  A GRN NEVER pays.  It records material received, purchase costs, charge
     details and payment obligations only.  No payment/settlement/cash row is
-    created here.  All money is paid from Accounts -> PAY EXISTING GRN.
+    created here.  All money is paid from Accounts -> Pay GRN Expenses.
 
 A2  Supplier Ledger credit for a GRN is material
     ``sum(GRNItem.qty * GRNItem.price_at_time)`` plus only the individual

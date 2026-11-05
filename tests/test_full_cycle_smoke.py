@@ -118,7 +118,7 @@ def cycle(app, client):
     assert "GRN added successfully" in resp.get_data(as_text=True)
 
     # A1: the GRN never pays.  Record the supplier's part payment from
-    # Accounts -> PAY EXISTING GRN instead (the legacy paid_amount fields in
+    # Accounts -> Pay GRN Expenses instead (the legacy paid_amount fields in
     # the GRN payload above are intentionally ignored).
     with app.app_context():
         cycle_grn_id = GRN.query.filter(GRN.manual_bill_no.like("%CYCLE-GRN-1%")).one().id

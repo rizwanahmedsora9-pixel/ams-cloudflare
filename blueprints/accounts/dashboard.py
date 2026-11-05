@@ -110,11 +110,30 @@ def dashboard():
             driver_outstanding_map[person.id] = driver_outstanding(person.id)
         except Exception:
             driver_outstanding_map[person.id] = 0.0
-    grn_payment_options = [
-        {'id': g.id, 'label': (g.manual_bill_no or g.auto_bill_no or f"GRN-{g.id}") + ' · ' + (g.supplier or '')}
-        for g in GRN.query.filter(GRN.is_void == False, GRN.is_cancelled == False)
-                          .order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(200).all()
-    ]
+    # The modal's "Pay GRN Expenses" picker must expose the date and the REAL
+    # amount still payable.  Expenses that were not ticked "Add to supplier
+    # ledger" are included here as recipient dues, so they are never shown as
+    # an empty / zero amount just because they are outside the supplier ledger.
+    from app.services.grn_costing import supplier_bill_breakdown
+    grn_payment_options = []
+    for g in (GRN.query.filter(GRN.is_void == False, GRN.is_cancelled == False)
+                        .order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(200).all()):
+        try:
+            bill = supplier_bill_breakdown(g)
+        except Exception:
+            continue
+        date_label = g.date_posted.strftime('%d/%b/%Y') if g.date_posted else 'Date not recorded'
+        grn_payment_options.append({
+            'id': g.id,
+            'label': f"{bill['bill_ref']} · {bill['supplier'] or 'Supplier not recorded'} · {date_label}",
+            'bill_ref': bill['bill_ref'],
+            'supplier': bill['supplier'] or '',
+            'date_label': date_label,
+            'date_iso': g.date_posted.strftime('%Y-%m-%d') if g.date_posted else '',
+            'total_due': bill['total_remaining'],
+            'supplier_ledger_due': bill['material_remaining'] + bill['expenses_remaining'],
+            'recipient_expenses_due': bill['recipient_remaining'],
+        })
     return render_template('accounts/dashboard.html',
                           grn_payment_options=grn_payment_options,
                           client_payments_today=client_payments_today,

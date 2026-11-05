@@ -4,10 +4,10 @@ Owner contract (A3): the stock value of a GRN (qty × rate) and the GRN
 expenses that were ticked "add to supplier ledger" are TWO separate payables.
 This suite pins the operator-visible halves:
 
-  * the screen offers a stock box and an expenses box, each with its own
-    "Pay full" and its own remaining amount;
+  * the screen offers a stock box, a supplier-billed expenses box and one box
+    per expense with its own recipient, each with its own amount and "Pay full";
   * expenses that were NOT ticked never appear in the supplier box — they stay
-    payable to their own recipient on PAY EXISTING GRN;
+    payable to their own recipient on Pay GRN Expenses;
   * posting the stock box settles stock only and leaves the expenses due;
   * posting the expenses box settles expenses only and leaves stock due;
   * posting only one line in a two-line run is honoured (no silent waterfall);
@@ -106,9 +106,12 @@ def test_screen_shows_stock_and_expenses_as_two_boxes(client, app):
     assert html.count('data-pay-block="EXPENSES"') == 1
     assert "Stock / material" in html
     assert "GRN expenses billed to supplier" in html
-    assert html.count("Pay full") >= 2
-    assert html.count('name="pay_obligation_key[]"') == 2
-    assert html.count('name="pay_amount[]"') == 2
+    assert html.count("Pay full") >= 3
+    assert html.count('name="pay_obligation_key[]"') == 3
+    assert html.count('name="pay_amount[]"') == 3
+    assert 'data-pay-block="CHARGE:' in html
+    assert "GRN expenses not added to supplier ledger" in html
+    assert "Amount to be paid" in html
 
     # Stock 150,000 and the ticked 5,000 are distinct figures on the page.
     assert "150,000.00" in html
@@ -234,7 +237,8 @@ def test_unticked_expense_is_paid_to_its_own_recipient(client, app):
         key = f"CHARGE:{tea.id}"
         assert grn_breakdown(db.session.get(GRN, grn_id))["supplier_bill_amount"] == pytest.approx(155000)
 
-    pay(client, app, grn_id, cash_id, [(key, "500")])
+    response = pay(client, app, grn_id, cash_id, [(key, "500")])
+    assert b"GRN expenses to their own recipients" in response.data
     with app.app_context():
         bill = grn_breakdown(db.session.get(GRN, grn_id))
         assert bill["additional_remaining"] == 0
@@ -243,6 +247,10 @@ def test_unticked_expense_is_paid_to_its_own_recipient(client, app):
         assert bill["expenses_remaining"] == pytest.approx(5000)
         assert build_supplier_financial_ledger(
             db.session.get(Supplier, supplier_id))["closing_balance"] == pytest.approx(155000)
+
+    # The own-recipient box is now explicitly shown as settled.
+    html = client.get(f"/accounts/pay_grn?grn_id={grn_id}").get_data(as_text=True)
+    assert re.search(r'data-pay-block="CHARGE:%d"\s+data-remaining="0.00"' % tea.id, html)
 
 
 def test_pay_existing_grn_page_lists_every_obligation(client, app):
@@ -268,3 +276,58 @@ def test_screen_links_are_reachable_from_accounts(client, app):
     assert "Stock due:" in grn_page
     assert "GRN expenses due to supplier:" in grn_page
     assert f"/accounts/pay_grn?grn_id={grn_id}" in grn_page
+
+
+def test_dashboard_grn_picker_is_hidden_for_supplier_payment_but_exposes_due_facts(client, app):
+    """The stray GRN field is only for the Pay GRN Expenses route."""
+    login(client)
+    supplier_id, _cash_id = seed(app)
+    grn_id = receive_grn(client, app, supplier_id, bill="PG-DASH-1")
+
+    html = client.get("/accounts/").get_data(as_text=True)
+    assert '<option value="grn_payment">Pay GRN Expenses</option>' in html
+    assert re.search(r'<div class="[^"]*\bd-none\b[^"]*"\s+id="grnPaymentWrap"', html)
+    assert re.search(r'id="grnPaymentGrnSelect"[^>]*\bdisabled\b', html)
+    assert "Amount still to be paid" in html
+    assert "Expenses not added to supplier ledger" in html
+    # The picker's server-authoritative values include the unticked 500.
+    assert 'data-date-label="20/Oct/2026"' in html
+    assert 'data-total-due="155500.00"' in html
+    assert 'data-recipient-expenses-due="500.00"' in html
+    assert f'value="{grn_id}"' in html
+
+
+def test_pay_grn_expenses_shows_selected_date_and_amount_without_js(client, app):
+    """An off-ledger expense opens with its real payable amount and GRN date."""
+    login(client)
+    supplier_id, _cash_id = seed(app)
+    grn_id = receive_grn(client, app, supplier_id, bill="PG-FULL-1")
+    with app.app_context():
+        tea = GRNCharge.query.filter_by(grn_id=grn_id, recipient_name="Tea shop").one()
+        tea_id = tea.id
+
+    html = client.get(
+        f"/accounts/grn_payments?grn_id={grn_id}&charge_id={tea_id}"
+    ).get_data(as_text=True)
+    assert "Pay GRN Expenses" in html
+    assert "Selected GRN date" in html
+    assert "20/Oct/2026" in html
+    assert "Amount to be paid now" in html
+    assert "Expenses not added to supplier ledger" in html
+    assert re.search(r'id="grnPaymentPayable">\s*Rs\. 500\.00', html)
+    assert re.search(
+        r'<option value="CHARGE:%d"[^>]*\bselected\b' % tea_id, html, re.S)
+    assert 'data-recipient-expenses-due="500.00"' in html
+
+
+def test_pay_grn_expenses_defaults_to_an_open_payable_after_stock_is_settled(client, app):
+    """A settled stock row must not hide the next GRN expense amount."""
+    login(client)
+    supplier_id, cash_id = seed(app)
+    grn_id = receive_grn(client, app, supplier_id, bill="PG-OPEN-1")
+    pay(client, app, grn_id, cash_id, [(f"MATERIAL:{grn_id}", "150000")])
+
+    html = client.get(f"/accounts/grn_payments?grn_id={grn_id}").get_data(as_text=True)
+    assert re.search(r'id="grnPaymentPayable">\s*Rs\. 5,000\.00', html)
+    assert re.search(
+        r'<option value="EXPENSES:%d"[^>]*\bselected\b' % grn_id, html, re.S)

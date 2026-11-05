@@ -289,7 +289,7 @@ SIDEBAR_LINKS: Tuple[NavLink, ...] = (
     ),
     NavLink(
         key="grn_payments",
-        label="PAY EXISTING GRN",
+        label="Pay GRN Expenses",
         icon="bi-cash-coin",
         endpoint="accounts.grn_payments",
         fallback_url="/accounts/grn_payments",

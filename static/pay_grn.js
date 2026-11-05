@@ -120,10 +120,11 @@
             readonly: false
         };
         var submit = form.querySelector("#payGrnSubmit");
-        if (submit && submit.disabled) {
-            // Server disabled it because the role may not post payments.
-            state.readonly = form.getAttribute("data-can-edit") === "0";
-        }
+        var canEdit = (submit && submit.getAttribute("data-can-edit"))
+            || form.getAttribute("data-can-edit") || "1";
+        // Server-side permission is authoritative; the calculator must never
+        // re-enable a submit button that the server disabled.
+        state.readonly = canEdit === "0";
 
         form.addEventListener("input", refresh);
         form.addEventListener("change", refresh);

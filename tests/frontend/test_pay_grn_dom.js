@@ -4,8 +4,9 @@
    `data-remaining` produced by app/services/grn_costing.py.  This test pins
    the browser-only contract:
 
-     1. "Pay full" fills exactly what that ONE payable is due;
-     2. the entered total adds both boxes and never merges the payables;
+     1. "Pay full" fills exactly what that ONE payable is due, including an
+        expense that was not added to the supplier ledger;
+     2. the entered total adds every box and never merges the payables;
      3. an amount above a payable is flagged and blocked before submit;
      4. an empty submit is refused;
      5. the calculator never disables a permitted submit.
@@ -34,6 +35,11 @@ const PAGE = `<!doctype html><html><body>
     <input type="hidden" name="pay_obligation_key[]" value="EXPENSES:7">
     <input type="number" name="pay_amount[]" id="payGrnExpenses">
     <button type="button" data-pay-full="payGrnExpenses">Pay full</button>
+  </div>
+  <div data-pay-block="CHARGE:31" data-remaining="500.00">
+    <input type="hidden" name="pay_obligation_key[]" value="CHARGE:31">
+    <input type="number" name="pay_amount[]" id="payGrnCharge31">
+    <button type="button" data-pay-full="payGrnCharge31">Pay full</button>
   </div>
   <b id="payGrnEntered">Rs. 0.00</b>
   <div id="payGrnStatus" class="d-none"></div>
@@ -119,6 +125,18 @@ d.querySelector('[data-pay-block="EXPENSES"]').setAttribute("data-remaining", "0
 d.getElementById("payGrnExpenses").disabled = true;
 expensesFull.click();
 check("Pay full does nothing on a settled payable", d.getElementById("payGrnExpenses").value === "");
+
+/* 7. An expense not added to the supplier ledger has its own payable box. */
+const chargeFull = d.querySelector('[data-pay-full="payGrnCharge31"]');
+chargeFull.click();
+check("own-recipient expense Pay full uses its own due",
+    d.getElementById("payGrnCharge31").value === "500.00");
+check("entered total includes off-ledger expenses",
+    d.getElementById("payGrnEntered").textContent === "Rs. 150,500.00");
+input("payGrnCharge31", "600");
+check("own-recipient expense overpayment is flagged",
+    d.getElementById("payGrnCharge31").classList.contains("is-invalid"));
+check("own-recipient expense overpayment is blocked", submit().defaultPrevented);
 
 if (fail) {
     console.log("\n" + fail + " check(s) failed; " + pass + " passed.");

@@ -1,4 +1,4 @@
-"""PAY EXISTING GRN / PAY GRN / GRN PAYMENT — the ONLY place purchase money is paid.
+"""Pay GRN Expenses — the ONLY place purchase money is paid.
 
 Owner rule A1: GRN entry never pays.  These screens (and the "Make New
 Transaction" modal's `grn_payment` target) are where full, partial and repeated
@@ -37,6 +37,30 @@ def _grn_payment_accounts():
     ).order_by(Account.category.asc(), Account.name.asc(), Account.id.asc()).all()
 
 
+def _grn_payment_summary(grn, breakdown=None):
+    """Display facts for one GRN: date, supplier dues and off-ledger expenses.
+
+    The off-ledger figure is the amount of expenses whose "Add to supplier
+    ledger" box was NOT ticked.  They are still payable, just to their own
+    recipient, so the GRN picker must never show them as zero.
+    """
+    bd = breakdown or grn_breakdown(grn)
+    posted = getattr(grn, 'date_posted', None)
+    return {
+        'bill_ref': bd.get('bill_ref') or f"GRN-{grn.id}",
+        'supplier': bd.get('supplier') or '',
+        'date_posted': posted,
+        'date_label': posted.strftime('%d/%b/%Y') if posted else 'Date not recorded',
+        'date_iso': posted.strftime('%Y-%m-%d') if posted else '',
+        'material_remaining': bd.get('material_remaining', 0.0),
+        'expenses_remaining': bd.get('expenses_remaining', 0.0),
+        'recipient_expenses_remaining': bd.get('additional_remaining', 0.0),
+        'supplier_ledger_remaining': (bd.get('material_remaining', 0.0)
+                                      + bd.get('expenses_remaining', 0.0)),
+        'total_remaining': bd.get('total_remaining', 0.0),
+    }
+
+
 @accounts_bp.route('/grn_payments', methods=['GET'])
 @login_required
 def grn_payments():
@@ -49,26 +73,40 @@ def grn_payments():
     ).order_by(GRN.date_posted.desc(), GRN.id.desc()).limit(500).all()
     selected = db.session.get(GRN, selected_id) if selected_id else None
     breakdown = grn_breakdown(selected) if selected else None
+    selected_summary = _grn_payment_summary(selected, breakdown) if selected and breakdown else None
     selected_obligation = None
     if breakdown and selected_charge:
-        for row in breakdown['obligations']:
-            if row['charge_id'] == selected_charge:
-                selected_obligation = row
-                break
-    if breakdown and selected_obligation is None and selected_charge is None:
-        # default: the stock / material payable (A3 keeps expenses separate)
         selected_obligation = next(
-            (r for r in breakdown['obligations'] if r['kind'] == OBLIGATION_MATERIAL), None)
+            (row for row in breakdown['obligations']
+             if row['charge_id'] == selected_charge),
+            None,
+        )
+    if breakdown and selected_obligation is None:
+        # Prefer an OPEN obligation.  When stock is already paid, the next
+        # supplier expense or own-recipient expense must show its amount
+        # instead of leaving the form on a settled Rs. 0.00 stock row.
+        open_rows = [row for row in breakdown['obligations']
+                     if row['remaining_minor'] > 0]
+        selected_obligation = (
+            next((row for row in open_rows if row['kind'] == OBLIGATION_MATERIAL), None)
+            or next((row for row in open_rows if row['kind'] == OBLIGATION_EXPENSES), None)
+            or (open_rows[0] if open_rows else None)
+            or next((row for row in breakdown['obligations']
+                     if row['kind'] == OBLIGATION_MATERIAL), None)
+        )
 
     page_rows = []
     for g in grns:
         try:
             bd = grn_breakdown(g)
+            summary = _grn_payment_summary(g, bd)
         except Exception:
             bd = None
+            summary = None
         page_rows.append({
             'grn': g,
             'breakdown': bd,
+            'summary': summary,
         })
 
     return render_template(
@@ -76,6 +114,7 @@ def grn_payments():
         page_rows=page_rows,
         selected=selected,
         breakdown=breakdown,
+        selected_summary=selected_summary,
         selected_obligation=selected_obligation,
         accounts=_grn_payment_accounts(),
         parties=CashFlowParty.query.order_by(CashFlowParty.name.asc()).all(),
@@ -331,10 +370,16 @@ def pay_grn_save():
         flash('Unable to save the GRN payment. Please check the details and try again.', 'danger')
         return redirect(url_for('accounts.pay_grn', grn_id=grn_id))
     total = sum(float(getattr(p, 'amount', 0) or 0) for p in posted)
-    labels = ', '.join(sorted({
-        'stock' if (p.payment_kind or '') != 'GRN_EXPENSES' else 'GRN expenses'
-        for p in posted
-    }))
+
+    def _paid_for_label(payment):
+        kind = (getattr(payment, 'payment_kind', '') or '').upper()
+        if kind == 'GRN_EXPENSES':
+            return 'GRN expenses billed to supplier'
+        if kind == 'GRN_CHARGE':
+            return 'GRN expenses to their own recipients'
+        return 'stock'
+
+    labels = ', '.join(sorted({_paid_for_label(p) for p in posted}))
     flash(f'Rs. {total:,.2f} paid for {labels} on this GRN. Cash Flow and the ledgers are updated.', 'success')
     return redirect(url_for('accounts.pay_grn', grn_id=grn_id))
 

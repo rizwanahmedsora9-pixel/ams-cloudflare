@@ -87,7 +87,7 @@ def grn():
                 return redirect(url_for('grn'))
             # Owner rule A1: a GRN NEVER pays.  No payment amount, method,
             # account or bank detail is accepted on a receive document.  All
-            # payments are posted from Accounts -> PAY EXISTING GRN.
+            # payments are posted from Accounts -> Pay GRN Expenses.
             paid_amount = 0.0
             payment_type = 'Credit'
             payment_account_id = None
