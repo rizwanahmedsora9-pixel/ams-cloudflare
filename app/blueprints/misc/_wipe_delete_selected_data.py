@@ -96,6 +96,59 @@ def delete_selected_data():
             db.session.delete(tx)
         db.session.flush()
 
+    def _purge_grn_payment_ledger(grn_ids):
+        """Remove GRN payments BEFORE their GRN rows, reversing the cash first.
+
+        ``supplier_payment.grn_id`` / ``supplier_payment.grn_charge_id`` and
+        ``account_transaction.grn_id`` are foreign keys to the GRN, while the
+        payment/ledger rows are only removed much later in the wipe (or not at
+        all in a GRN-only wipe).  A yard that has paid even one GRN therefore
+        died with "FOREIGN KEY constraint failed" and nothing was deleted.
+
+        Each payment owns one authoritative AccountTransaction: reverse its
+        balance effect and remove it together with the payment, so the cash
+        account never keeps a movement for a document that no longer exists.
+        Other ledger rows attributed to the GRN keep their cash movement and
+        only lose the attribution.
+        """
+        from app.services.accounting import _void_account_tx
+
+        ids = [int(g) for g in (grn_ids or []) if g]
+        if not ids:
+            return 0
+        charge_ids = [
+            row[0] for row in db.session.query(GRNCharge.id)
+            .filter(GRNCharge.grn_id.in_(ids)).all()
+        ]
+        conditions = [SupplierPayment.grn_id.in_(ids)]
+        if charge_ids:
+            conditions.append(SupplierPayment.grn_charge_id.in_(charge_ids))
+        payments = SupplierPayment.query.filter(or_(*conditions)).all()
+
+        payment_ids = [p.id for p in payments]
+        if payment_ids:
+            txs = AccountTransaction.query.filter(
+                AccountTransaction.source_type == 'GRN_PAYMENT',
+                AccountTransaction.source_id.in_(payment_ids),
+            ).all()
+            if txs:
+                tx_ids = [tx.id for tx in txs]
+                CashFlowEntry.query.filter(
+                    CashFlowEntry.account_tx_id.in_(tx_ids)
+                ).update({'account_tx_id': None}, synchronize_session=False)
+                for tx in txs:
+                    _void_account_tx(tx)      # restore the account balance
+                    db.session.delete(tx)
+            for payment in payments:
+                db.session.delete(payment)
+            db.session.flush()
+
+        AccountTransaction.query.filter(
+            AccountTransaction.grn_id.in_(ids)
+        ).update({'grn_id': None}, synchronize_session=False)
+        db.session.flush()
+        return len(payments)
+
     forbidden_targets = {
         'clients',
         'materials',
@@ -113,7 +166,13 @@ def delete_selected_data():
     }
     blocked = sorted(set(targets).intersection(forbidden_targets))
     if blocked and not hard_delete_override:
-        flash(f'Hard delete blocked for: {", ".join(blocked)}. Use suspend/void workflows instead.', 'danger')
+        flash(
+            'Hard delete blocked for: '
+            f'{", ".join(blocked)}. Nothing was deleted. Tick "Enable hard cleanup '
+            'for blocked datasets" and type DELETE ALL DATA to wipe them, or clear '
+            'those boxes to wipe only the rest.',
+            'danger',
+        )
         return redirect(url_for('settings'))
     if blocked and hard_delete_override:
         flash(f'Hard cleanup override enabled for: {", ".join(blocked)}', 'warning')
@@ -160,6 +219,10 @@ def delete_selected_data():
             _tq(BookingAllocationRepairArchive).delete()
             _tq(BookingAllocation).delete()
             _tq(DirectSaleItem).delete()
+            # GRN payments + their ledger rows reference the GRN rows: remove
+            # them first or SQLite aborts the whole wipe on that foreign key.
+            _purge_grn_payment_ledger(
+                [row[0] for row in _tq(GRN).with_entities(GRN.id).all()])
             _tq(GRNCharge).delete()
             _tq(GRNItem).delete()
             _tq(GRN).delete()
@@ -258,10 +321,16 @@ def delete_selected_data():
             # Sale line items may reference GRN lots (grn_item_id → grn_item).
             # Unlink before deleting the lots, or the FK gate aborts the wipe.
             _tq(DirectSaleItem).update({'grn_item_id': None}, synchronize_session=False)
+            # Accounts payments made against these GRNs reference them too:
+            # reverse their cash effect and remove them before the GRN rows.
+            purged_payments = _purge_grn_payment_ledger(
+                [row[0] for row in _tq(GRN).with_entities(GRN.id).all()])
             _tq(GRNCharge).delete()
             _tq(GRNItem).delete()
             _tq(GRN).delete()
             deleted_info.append('GRN Records')
+            if purged_payments:
+                deleted_info.append(f'GRN Payments ({purged_payments})')
 
         if 'entry' in targets:
             _tq(Entry).delete()
@@ -436,6 +505,12 @@ def delete_selected_data():
                 {'category_id': None, 'subcategory_id': None, 'party_id': None},
                 synchronize_session=False,
             )
+            # GRN expenses and the payments that settle them keep the recipient
+            # NAME (free text) but point at the party master: unlink them first
+            # or deleting the parties fails on a foreign key and no data is
+            # wiped at all.
+            _tq(GRNCharge).update({'recipient_party_id': None}, synchronize_session=False)
+            _tq(SupplierPayment).update({'recipient_party_id': None}, synchronize_session=False)
             _tq(CashFlowSubcategory).delete()
             _tq(CashFlowCategory).delete()
             _tq(CashFlowParty).delete()
