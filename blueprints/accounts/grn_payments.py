@@ -9,12 +9,19 @@ Owner rule A3: a GRN shows TWO supplier payables — the stock / material amount
 and the GRN expenses ticked "Add to supplier ledger" — plus one payable per
 unticked expense recipient.  ``/accounts/pay_grn`` is the screen that keeps
 them apart; ``/accounts/grn_payments`` remains the full obligation breakdown.
+
+Owner rule (2026-11-05): the "Make New Transaction" modal posts the per-expense
+payments itself (``/accounts/grn_expenses/pay``, one voucher per filled box),
+and reads its rows from ``/accounts/api/grn_expense_payments/<grn_id>``.  Those
+rows are the expenses the supplier ledger does NOT carry — no stock, no qty, no
+rate — each with its own Total / Paid / To pay.
 """
 from ._common import *  # noqa
 import secrets
 from models import GRN, GRNCharge, SupplierPayment, CashFlowParty, Supplier
 from app.services.grn_costing import (
     grn_breakdown, supplier_bill_breakdown, payment_obligation_label,
+    grn_expense_payment_rows,
     OBLIGATION_MATERIAL, OBLIGATION_EXPENSES, OBLIGATION_SUPPLIER,
     OBLIGATION_CHARGE, parse_obligation_key,
 )
@@ -345,6 +352,121 @@ def grn_obligations_api(grn_id):
             for row in bd['payment_rows']
         ],
     })
+
+
+@accounts_bp.route('/api/grn_expense_payments/<int:grn_id>')
+@login_required
+def grn_expense_payments_api(grn_id):
+    """One row per GRN expense (Total / Paid / To pay) for the transaction modal.
+
+    Read-only.  ``payment_rows`` are the expenses the supplier ledger does not
+    carry (their own recipient), ``supplier_billed_rows`` the ticked ones, and
+    ``accounts`` the cash / bank accounts the operator may pay from.
+    """
+    grn = db.session.get(GRN, grn_id)
+    if grn is None or bool(getattr(grn, 'is_void', False)) or bool(getattr(grn, 'is_cancelled', False)):
+        return jsonify({'ok': False, 'error': 'GRN not found or cancelled.'}), 404
+    bd = grn_breakdown(grn)
+    rows = grn_expense_payment_rows(grn, bd)
+    date_posted = rows.get('date_posted')
+    return jsonify({
+        'ok': True,
+        'grn': {
+            'id': grn.id,
+            'bill_ref': rows['bill_ref'],
+            'supplier': rows['supplier'],
+            'date_label': date_posted.strftime('%d/%b/%Y') if date_posted else 'Date not recorded',
+            'date_iso': date_posted.strftime('%Y-%m-%d') if date_posted else '',
+        },
+        **{key: value for key, value in rows.items() if key != 'date_posted'},
+        'accounts': [
+            {'id': a.id, 'name': a.name, 'category': (a.category or '').upper(),
+             'balance': float(a.balance or 0)}
+            for a in _grn_payment_accounts()
+        ],
+        'can_edit': _grn_payments_permission_ok(),
+    })
+
+
+@accounts_bp.route('/grn_expenses/pay', methods=['POST'])
+@login_required
+def grn_expenses_pay_from_modal():
+    """Post one voucher per filled expense box straight from the transaction modal.
+
+    The modal offers the **per-expense payment system only**: the unticked
+    "own recipient" expenses, each with its own amount field.  It never pays
+    stock, never carries a quantity or a rate, and never posts the supplier
+    bill.  Every filled box becomes its own ``GRN_CHARGE`` voucher through the
+    same engine (and the same guards) as Pay GRN Expenses.
+    """
+    if not _grn_payments_permission_ok():
+        flash('Permission denied', 'danger')
+        return redirect(url_for('accounts.dashboard'))
+    # These names are deliberately distinct from the ordinary transaction
+    # fields (grn_id / payment_account_id) so the same modal can post either an
+    # ordinary transaction or these per-expense payments without the two ever
+    # reading each other's values.
+    grn_id = request.form.get('grn_expense_grn_id', type=int)
+    try:
+        if not grn_id:
+            raise ValueError('Select a GRN to pay its expenses.')
+        grn = db.session.get(GRN, grn_id)
+        if grn is None or bool(getattr(grn, 'is_void', False)) or bool(getattr(grn, 'is_cancelled', False)):
+            raise ValueError('GRN not found or cancelled.')
+
+        bd = grn_breakdown(grn)
+        payable = {row['key']: row for row in grn_expense_payment_rows(grn, bd)['payment_rows']}
+
+        keys = request.form.getlist('expense_key[]')
+        amounts = request.form.getlist('expense_amount[]')
+        filled = [
+            (str(key or '').strip(), str(amount or '').strip())
+            for key, amount in zip(keys, amounts)
+            if str(amount or '').strip() not in ('', '0', '0.00', '0.0')
+        ]
+        if not filled:
+            raise ValueError('Enter the amount next to at least one GRN expense you want to pay.')
+        for key, _amount in filled:
+            name = payable.get(key, {}).get('label') or 'this expense'
+            if key not in payable:
+                raise ValueError(
+                    f'{name} is not an expense the supplier ledger leaves out — '
+                    'pay it on Pay GRN Expenses.'
+                )
+        account_id = request.form.get('grn_expense_account_id', type=int)
+        if not account_id:
+            raise ValueError('Select the cash / bank account the money is paid from.')
+
+        posted = []
+        token = (request.form.get('grn_expense_idempotency_key') or '').strip() or None
+        for index, (key, amount) in enumerate(filled):
+            payment, _created = save_grn_payment(
+                grn_id=grn.id,
+                obligation_key=key,
+                amount=amount,
+                method=request.form.get('grn_expense_method', 'Cash'),
+                payment_account_id=account_id,
+                date_posted=request.form.get('date_posted', ''),
+                reference=(request.form.get('grn_expense_reference') or '').strip(),
+                note=(request.form.get('note') or '').strip(),
+                idempotency_key=f'{token}-{index}' if token else None,
+                actor=current_user,
+            )
+            posted.append(payment)
+        db.session.commit()
+        total = sum(float(getattr(row, 'amount', 0) or 0) for row in posted)
+        paid_for = ', '.join(sorted({row.recipient_name or row.recipient_type or 'GRN expense'
+                                     for row in posted}))
+        flash(f'GRN expenses of Rs. {total:,.2f} paid ({paid_for}). '
+              'Each expense is its own cash-out row; the supplier ledger is untouched.', 'success')
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'danger')
+    except Exception:
+        db.session.rollback()
+        logger.exception('Pay GRN expenses from the transaction modal failed')
+        flash('Unable to pay the GRN expenses. Please check the details and try again.', 'danger')
+    return redirect(url_for('accounts.dashboard'))
 
 
 @accounts_bp.route('/api/supplier_open_obligations/<int:supplier_id>')

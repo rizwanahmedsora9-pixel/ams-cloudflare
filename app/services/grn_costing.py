@@ -872,6 +872,85 @@ def grn_breakdown(grn):
     }
 
 
+def grn_expense_payment_rows(grn, breakdown=None):
+    """Every GRN expense as one payment row: Total, Paid and To pay.
+
+    This is the **one-by-one expense payment system** (owner rule A3): a vehicle
+    fare, a loading charge, an unloading charge or any other expense the
+    operator entered on the GRN is paid on its own, to its own recipient, with
+    its own amount field.  Nothing here is stock: no quantity, no rate and no
+    supplier material amount ever appears on these rows.
+
+    Two payment routes may settle one expense, and they never add up twice:
+
+      * ``to_supplier``  — only when the row is ticked "Add to supplier ledger",
+        the part the supplier bill still carries;
+      * ``to_recipient`` — always, paid straight to the expense's recipient.
+
+    ``paid`` is the money already spent on THIS expense through either route,
+    so ``original = paid + remaining`` holds for every row.
+
+    ``payment_rows`` are the unticked expenses only — the ones the supplier
+    ledger does not carry at all.  ``supplier_billed_rows`` lists the ticked
+    ones, and those are settled through the supplier bill instead.
+
+    Every figure comes from :func:`grn_breakdown`; this helper only selects and
+    renames, so no screen can invent its own version of an expense payable.
+    """
+    bd = breakdown if breakdown is not None else grn_breakdown(grn)
+    rows = []
+    for ob in bd.get('obligations') or []:
+        if ob.get('kind') != OBLIGATION_CHARGE:
+            continue
+        remaining_minor = int(ob.get('remaining_minor') or 0)
+        billed = bool(ob.get('billed_to_supplier'))
+        rows.append({
+            'key': ob.get('key'),
+            'charge_id': ob.get('charge_id'),
+            'label': ob.get('label') or 'GRN expense',
+            'detail': ob.get('hint') or '',
+            'recipient_type': ob.get('recipient_type') or 'OTHER',
+            'recipient_label': ob.get('recipient_label') or '',
+            'recipient_name': ob.get('recipient_name') or '',
+            'cost_treatment': ob.get('cost_treatment') or 'INVENTORY',
+            'total': ob.get('original') or 0.0,
+            'total_minor': int(ob.get('original_minor') or 0),
+            'paid': ob.get('paid') or 0.0,
+            'paid_minor': int(ob.get('paid_minor') or 0),
+            'remaining': ob.get('remaining') or 0.0,
+            'remaining_minor': remaining_minor,
+            'status': ob.get('status') or 'Unpaid',
+            'billed_to_supplier': billed,
+            'supplier_paid': ob.get('supplier_paid') or 0.0,
+            'recipient_paid': ob.get('recipient_paid') or 0.0,
+            # Where each rupee of this expense can still go.
+            'to_supplier': (ob.get('remaining') or 0.0) if billed else 0.0,
+            'to_recipient': ob.get('remaining') or 0.0,
+        })
+    payment_rows = [row for row in rows if not row['billed_to_supplier']]
+    supplier_rows = [row for row in rows if row['billed_to_supplier']]
+    return {
+        'grn_id': bd.get('grn_id'),
+        'bill_ref': bd.get('bill_ref') or '',
+        'supplier': bd.get('supplier') or '',
+        'date_posted': getattr(grn, 'date_posted', None),
+        # The per-expense system itself: expenses the supplier ledger does NOT carry.
+        'payment_rows': payment_rows,
+        'payment_total': _f(sum(row['total_minor'] for row in payment_rows)),
+        'payment_paid': _f(sum(row['paid_minor'] for row in payment_rows)),
+        'payment_remaining': _f(sum(row['remaining_minor'] for row in payment_rows)),
+        # Ticked expenses: settled by the supplier bill, listed for completeness.
+        'supplier_billed_rows': supplier_rows,
+        'supplier_billed_total': _f(sum(row['total_minor'] for row in supplier_rows)),
+        'supplier_billed_paid': _f(sum(row['paid_minor'] for row in supplier_rows)),
+        'supplier_billed_remaining': _f(sum(row['remaining_minor'] for row in supplier_rows)),
+        'supplier_ledger_due': (bd.get('material_remaining', 0.0) or 0.0)
+                                + (bd.get('expenses_remaining', 0.0) or 0.0),
+        'material_remaining': bd.get('material_remaining', 0.0) or 0.0,
+        'total_remaining': bd.get('total_remaining', 0.0) or 0.0,
+    }
+
+
 def supplier_bill_breakdown(grn):
     """One GRN's supplier payables, split the way the operator pays them (A3).
 
@@ -1229,7 +1308,7 @@ __all__ = [
     'supplier_billed_charge_minor', 'supplier_ledger_credit_minor', 'grn_breakdown',
     'charge_recipient_paid_minor', 'charge_recipient_open_minor', 'expense_route_allocation',
     'parse_obligation_key', 'make_obligation_key', 'supplier_obligation_paid_minor',
-    'supplier_bill_breakdown',
+    'supplier_bill_breakdown', 'grn_expense_payment_rows',
     'payment_obligation_label', 'OBLIGATION_SUPPLIER', 'OBLIGATION_MATERIAL',
     'OBLIGATION_EXPENSES', 'OBLIGATION_CHARGE', 'PAYMENT_KIND_BY_OBLIGATION',
     'OBLIGATION_LABEL',
