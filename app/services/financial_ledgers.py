@@ -63,6 +63,7 @@ from app.services.grn_costing import (
     active_charges,
     supplier_material_minor,
     supplier_billed_charge_minor,
+    expense_route_allocation,
 )
 
 
@@ -1964,8 +1965,28 @@ def build_party_financial_ledger(party, **filters):
             continue
         grn = db.session.get(GRN, charge.grn_id)
         if grn is not None and charge_supplier_billed_minor(charge, grn) > 0:
-            # This selected expense is billed through the supplier ledger;
-            # unselected rows on the same GRN still reach this party ledger.
+            # This selected expense is billed through the supplier ledger, so
+            # the party must not show a second payable for it.  It can still be
+            # settled directly with the recipient from Accounts → Pay GRN
+            # Expenses; show exactly that settled amount here so the payment
+            # debit is matched by its charge credit instead of leaving the
+            # recipient looking overpaid (an unexplained "credit" balance).
+            route = expense_route_allocation(grn).get(charge.id) or {}
+            settled_with_recipient = _decimal(route.get("recipient_paid_minor") or 0) / Decimal(100)
+            if settled_with_recipient <= 0:
+                continue
+            rows.append(_row(
+                date_value=getattr(grn, "date_posted", None) if grn else getattr(charge, "created_at", None),
+                row_type="CHARGE",
+                reference=(getattr(grn, "manual_bill_no", None) or getattr(grn, "auto_bill_no", None)
+                           or f"GRN-{charge.grn_id}") if grn else f"GRN-{charge.grn_id}",
+                description=(charge.label or charge.charge_type or "Charge"),
+                credit=settled_with_recipient,
+                source_type="GRNCharge", source_id=charge.id, party_id=party.id,
+                note=(f"GRN #{charge.grn_id} · paid directly to recipient "
+                      f"(billed to supplier) · {getattr(charge, 'cost_treatment', '') or ''}").strip(),
+                source=charge,
+            ))
             continue
         rows.append(_row(
             date_value=getattr(grn, "date_posted", None) if grn else getattr(charge, "created_at", None),
