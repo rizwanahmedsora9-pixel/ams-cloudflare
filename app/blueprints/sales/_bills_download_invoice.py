@@ -1,6 +1,56 @@
 """bills — split from sales.py."""
 from ._common import *  # noqa
 
+def _material_urdu_names():
+    """``{english material name (casefolded): urdu name}`` for printed bills.
+
+    Materials carry an optional Urdu name (``Material.name_ur``) that the Urdu
+    bill prints instead of the English brand name; anything without one keeps
+    its English name so a bill is never left with a blank line.
+    """
+    try:
+        rows = Material.query.filter(
+            Material.name_ur.isnot(None), Material.name_ur != ''
+        ).all()
+    except Exception:
+        return {}
+    return {(r.name or '').strip().casefold(): r.name_ur.strip()
+            for r in rows if (r.name or '').strip() and (r.name_ur or '').strip()}
+
+
+def _field(item, *names, default=None):
+    """Read *names* from a dict row or an ORM/namespace object."""
+    for name in names:
+        if isinstance(item, dict):
+            value = item.get(name)
+        else:
+            value = getattr(item, name, None)
+        if value not in (None, ''):
+            return value
+    return default
+
+
+def _with_urdu_item_names(items, lang):
+    """Return bill rows with ``name_ur`` filled from the material catalogue."""
+    rows = []
+    names = _material_urdu_names() if lang == 'ur' else {}
+    for item in items or []:
+        name = _field(item, 'name', 'product_name', 'material_name', 'material',
+                      default='')
+        urdu = ''
+        if lang == 'ur':
+            urdu = str(_field(item, 'name_ur', default='') or '').strip()
+            if not urdu:
+                urdu = names.get(str(name).strip().casefold(), '')
+        rows.append({
+            'name': name,
+            'name_ur': urdu,
+            'qty': _field(item, 'qty', default=0),
+            'price_at_time': _field(item, 'price_at_time', default=0),
+        })
+    return rows
+
+
 @bp.route('/download_invoice/<path:bill_no>')
 @login_required
 def download_invoice(bill_no):
@@ -310,6 +360,8 @@ def download_invoice(bill_no):
         lang = 'ur'
     else:
         lang = 'en'
+    # The Urdu receipt prints the material's Urdu name where one is recorded.
+    items = _with_urdu_item_names(items, lang)
     tx_code, tx_label, tx_note = _resolve_transaction_type(bill_type, bill_obj, entry_hint_id=entry_hint_id)
     if lang == 'ur':
         from app.services.bilingual import urdu_tx_label, urdu_tx_note

@@ -185,6 +185,13 @@ def _matches_compound(node, compound: str) -> bool:
     if not compound or compound == '*':
         return True
     compound = re.split(r'[>+~]', compound)[-1]     # child/sibling -> own part
+    # Structural pseudo-classes cannot be evaluated on this DOM.  ``:first-child``
+    # used to compare literally and never matched, which silently dropped rules
+    # such as ``.rcpt-table td.bill-no { white-space: nowrap }`` -- so bill
+    # numbers wrapped.  Dropping the pseudo-class matches the element instead.
+    compound = re.sub(r'::?[\w-]+(?:\([^)]*\))?', '', compound)
+    if not compound:
+        return True
     tag = re.match(r'^([a-zA-Z][\w-]*)', compound)
     if tag and node.tag != tag.group(1).lower():
         return False
@@ -319,10 +326,70 @@ _TONES = {
 }
 
 
+def _box_values(value):
+    """``(top, right, bottom, left)`` in points for a CSS box shorthand.
+
+    ``padding: 14px 20px 10px`` (the receipt header) is expanded the CSS way;
+    a single value applies to all four sides.  ``None`` means "not set".
+    """
+    if not value:
+        return (0.0, 0.0, 0.0, 0.0)
+    parts = [_parse_pt(p) for p in str(value).split() if p.strip()]
+    parts = [p or 0.0 for p in parts]
+    if not parts:
+        return (0.0, 0.0, 0.0, 0.0)
+    if len(parts) == 1:
+        top = right = bottom = left = parts[0]
+    elif len(parts) == 2:
+        top, right = parts
+        bottom, left = top, right
+    elif len(parts) == 3:
+        top, right, bottom = parts
+        left = right
+    else:
+        top, right, bottom, left = parts[:4]
+    return (top, right, bottom, left)
+
+
+def _border_width(value):
+    """Border thickness in points from ``2.5px solid #000`` (0 when absent)."""
+    match = re.search(r'(\d+(?:\.\d+)?)\s*(px|pt|mm|cm)?', str(value or ''))
+    if not match:
+        return 0.0
+    size = _parse_pt(match.group(1) + (match.group(2) or 'px'))
+    return float(size or 0.0)
+
+
+def _border_colour(value):
+    match = re.search(r'#([0-9a-fA-F]{3,8})', str(value or ''))
+    if not match:
+        return '#000000'
+    hexval = match.group(1)
+    if len(hexval) == 3:
+        hexval = ''.join(c * 2 for c in hexval)
+    return '#' + hexval[:6]
+
+
 def resolve(css: Css, node, inherited=None) -> dict:
     """Compute the effective style of *node* (inheritance + cascade)."""
     base = dict(inherited or {})
     decls = css.declarations(node)
+
+    # ``padding`` / ``margin`` / borders are inherited through ``base`` above
+    # only because ``base`` starts as a copy of the parent style.  They are
+    # *not* inherited properties in CSS, so a header with a 3px bottom border
+    # must not stamp that rule under every one of its descendants.
+    for side in ('top', 'right', 'bottom', 'left'):
+        base[f'pad-{side}'] = 0.0
+        base[f'margin-{side}'] = 0.0
+    base['rule-below'] = False
+    base['box'] = False
+    base['border-width'] = 0.0
+    base['shade'] = False
+    base['width'] = None
+    base['flex1'] = False
+    base['justify'] = None
+    base['column'] = False
 
     for prop in _INHERITED:
         if prop in decls:
@@ -366,31 +433,43 @@ def resolve(css: Css, node, inherited=None) -> dict:
     base['color'] = colour
 
     # --- box geometry (not inherited) --------------------------------
-    padding = decls.get('padding')
-    pad = _parse_pt(padding) if padding else None
-    for side in ('left', 'right', 'top', 'bottom'):
-        value = _parse_pt(decls.get(f'padding-{side}'))
-        base[f'pad-{side}'] = value if value is not None else (pad or 0)
+    # ``padding: 14px 20px 10px`` is a *list*; the first value is the vertical
+    # padding and the second the horizontal one, so both are unpacked instead
+    # of "unparseable -> 0".
+    pad_top, pad_right, pad_bottom, pad_left = _box_values(decls.get('padding'))
+    for side, value in (('top', pad_top), ('right', pad_right),
+                        ('bottom', pad_bottom), ('left', pad_left)):
+        explicit = _parse_pt(decls.get(f'padding-{side}'))
+        base[f'pad-{side}'] = explicit if explicit is not None else value
 
-    margin = decls.get('margin')
-    mar = _parse_pt(margin) if margin else None
-    for side in ('left', 'right', 'top', 'bottom'):
-        value = _parse_pt(decls.get(f'margin-{side}'))
-        if value is None and mar is not None:
-            value = mar
-        base[f'margin-{side}'] = value or 0
+    mar_top, mar_right, mar_bottom, mar_left = _box_values(decls.get('margin'))
+    for side, value in (('top', mar_top), ('right', mar_right),
+                        ('bottom', mar_bottom), ('left', mar_left)):
+        explicit = _parse_pt(decls.get(f'margin-{side}'))
+        if explicit is None:
+            explicit = _parse_pt(decls.get('margin-block-start' if side == 'top'
+                                           else 'margin-block-end'
+                                           if side == 'bottom' else ''))
+        base[f'margin-{side}'] = explicit if explicit is not None else value
 
     border = decls.get('border') or ''
+    # A rule is only drawn under a line when the bottom border is really set;
+    # the previous heuristic also fired on ``border: 2.5px solid`` (the
+    # document title badge) and painted a stray line over the header.
     base['rule-below'] = bool(
-        re.search(r'border-bottom', ' '.join(decls)) or
-        ('border' in decls and re.search(r'\d', border or ''))
+        re.search(r'[1-9]', str(decls.get('border-bottom', '') or '')) or
+        re.search(r'[1-9]', str(decls.get('border-block-end', '') or ''))
     )
-    if 'border-bottom' in decls:
-        base['rule-below'] = bool(re.search(r'[1-9]', decls['border-bottom']))
     base['box'] = bool(
-        re.search(r'[1-9]', decls.get('border', '') or '') or
-        any(k in decls for k in ('border-left', 'border-right'))
-    )
+        re.search(r'[1-9]', str(decls.get('border', '') or '')) or
+        any(re.search(r'[1-9]', str(decls.get(k) or ''))
+            for k in ('border-left', 'border-right', 'border-top',
+                      'border-bottom')))
+    base['border-width'] = _border_width(decls.get('border') or
+                                         decls.get('border-bottom') or '')
+    base['border-color'] = _border_colour(decls.get('border') or
+                                          decls.get('border-bottom') or '')
+    base['shade_color'] = '#ffffff'
 
     display = (decls.get('display') or '').lower()
     base['display'] = display
@@ -401,6 +480,15 @@ def resolve(css: Css, node, inherited=None) -> dict:
     base['column'] = flex_dir.startswith('column')
 
     weight_justify = (decls.get('justify-content') or '').lower()
+    base['justify-self'] = {
+        'flex-start': 'left', 'start': 'left', 'left': 'left',
+        'flex-end': 'right', 'end': 'right', 'right': 'right',
+        'center': 'center',
+    }.get(weight_justify)
+    if base['justify-self'] is None:
+        # An RTL document starts at the right edge, exactly like the browser
+        # layout the receipt template was designed against.
+        base['justify-self'] = 'right' if base['rtl'] else 'left'
     if 'space-between' in weight_justify:
         base['justify'] = 'between'
     elif 'flex-end' in weight_justify or 'right' in weight_justify:
@@ -455,21 +543,23 @@ class Line:
 
 
 class TableBlock:
-    __slots__ = ('rows', 'style', 'render_scale')
+    __slots__ = ('rows', 'style', 'render_scale', 'rtl')
 
-    def __init__(self, rows, style):
+    def __init__(self, rows, style, rtl=False):
         self.rows = rows        # [[{'text','style','colspan','header'}...]]
         self.style = style
+        self.rtl = bool(rtl)     # mirrored column order (Urdu documents)
         self.render_scale = 0.0  # set when the table had to be squeezed
 
 
 class RowBlock:
     """A flex row: side-by-side cells that must stay on one line."""
-    __slots__ = ('cells', 'weights')
+    __slots__ = ('cells', 'weights', 'rtl')
 
-    def __init__(self, cells, weights=None):
+    def __init__(self, cells, weights=None, rtl=False):
         self.cells = cells          # [[block, ...]] one list per column
         self.weights = weights or [1.0] * len(cells)
+        self.rtl = bool(rtl)
 
 
 _BLOCK_TAGS = {
@@ -531,9 +621,7 @@ def layout(node, css, style=None, blocks=None, urdu_primary=False):
         cells = _flex_cells(node, css, style)
         if len(cells) > 1:
             weights = _flex_weights(node, css, style, len(cells))
-            if style.get('rtl') or 'rtl' in (node.attrs.get('dir') or '').lower():
-                weights = list(reversed(weights))
-            blocks.append(RowBlock(cells, weights))
+            blocks.append(RowBlock(cells, weights, rtl=bool(style.get('rtl'))))
             return blocks
         # a single-cell flex container flows like a block
         for cell in cells:
@@ -588,17 +676,12 @@ def _flex_cells(node, css, style):
             continue
         child_style = resolve(css, child, style)
         cell_blocks = []
-        if child_style.get('flex') and _has_block_children(child):
-            cell_blocks = layout(child, css, child_style,
-                                 urdu_primary=style.get('rtl', False))
-        else:
-            cell_blocks = layout(child, css, child_style,
-                                 urdu_primary=style.get('rtl', False))
+        cell_blocks = layout(child, css, child_style,
+                             urdu_primary=style.get('rtl', False))
         if cell_blocks:
             columns.append(cell_blocks)
-    # ``flex-direction: row`` in an RTL document reverses the visual order.
-    if style.get('rtl') or 'rtl' in (node.attrs.get('dir') or '').lower():
-        columns.reverse()
+    # NOTE: ``flex-direction: row`` in an RTL document starts at the right
+    # edge; :func:`_render_row` reverses the columns once, from ``RowBlock.rtl``.
     return columns
 
 
@@ -700,12 +783,13 @@ def _build_table(node, css, style, urdu_primary=False):
                 'colspan': _int(cell_node.attrs.get('colspan'), 1),
             })
         if cells:
-            if style.get('rtl'):
-                cells.reverse()
             rows.append(cells)
     if not rows:
         return None
-    return TableBlock(rows, style)
+    # ``direction: rtl`` mirrors the columns; :func:`_render_table` flips the
+    # cells (keeping ``colspan`` groups intact) so the first markup column is
+    # printed on the right edge.
+    return TableBlock(rows, style, rtl=bool(style.get('rtl')))
 
 
 def _descend(node, tags):
@@ -748,13 +832,12 @@ def _escape(text: str) -> str:
     return (text or '').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
-def _style_sheet(style, body_font, bold_font, urdu_font):
-    """ParagraphStyle for a resolved CSS style."""
+def _style_sheet(style, body_font, bold_font):
+    """ParagraphStyle for a resolved CSS style (Latin text)."""
     from reportlab.lib.styles import ParagraphStyle
 
     size = float(style.get('font-size') or _DEFAULT_FONT_SIZE)
-    bold = style.get('bold')
-    font = bold_font if bold else body_font
+    font = bold_font if style.get('bold') else body_font
     if style.get('italic'):
         font = body_font
     leading = float(style.get('line-height-pt') or 0) or size * 1.28
@@ -769,60 +852,95 @@ def _style_sheet(style, body_font, bold_font, urdu_font):
         spaceAfter=float(style.get('margin-bottom') or 0),
         leftIndent=0,
         rightIndent=0,
-        wordWrap='RTL' if style.get('rtl') else 'LTR',
+        wordWrap='LTR',
     )
 
 
-def _inline_markup(line: Line, bold_font: str, urdu_font: str | None,
-                   urdu_factor: float) -> str:
-    """ReportLab inline markup for one line.
+def _urdu_size(style) -> float:
+    """Point size used for an Urdu run inside a cell/paragraph."""
+    from app.services.bilingual import urdu_size_for_html
+    return urdu_size_for_html(float(style.get('font-size') or _DEFAULT_FONT_SIZE))
 
-    Legacy bilingual lines append Urdu translations after the English text.
-    Single-language Urdu lines keep their ordered inline segments instead.
+
+def _paragraph(segments, style, body_font, bold_font, available=None):
+    """Build the right flowable for *segments* (``[(text, style, is_urdu)]``).
+
+    Latin-only content keeps the classic ReportLab ``Paragraph`` (cheap,
+    fully featured).  Anything that contains shaped Urdu goes through
+    :class:`app.services.urdu_text.UrduParagraph`, which draws each glyph at
+    the position HarfBuzz gave it - without that, Nastaleeq marks collapse
+    onto the baseline and the words read as gibberish.
     """
-    if line.ordered is not None:
-        return _ordered_markup(line.ordered, urdu_font,
-                               rtl=bool(line.style.get('rtl')))
-    body = _escape(line.text)
-    for text, run_style in line.runs:
-        if not urdu_font or not text:
-            continue
-        body += ' ' + _urdu_markup(text, run_style, urdu_font, urdu_factor)
-    return body
+    from app.services import urdu_text as U
+    from reportlab.platypus import Paragraph
 
+    base_size = float(style.get('font-size') or _DEFAULT_FONT_SIZE)
+    colour = style.get('color') or '#000000'
+    bold = bool(style.get('bold'))
+    font = bold_font if bold else body_font
+    align = style.get('align') if style.get('align') in _ALIGN else 'left'
 
-def _ordered_markup(segments, urdu_font, rtl=False):
-    """Shape Urdu segments in place; Latin data stays in its original font.
+    if align == 'left' and style.get('rtl'):
+        # RTL text starts at the right edge unless the template pins an
+        # explicit alignment (``.text-end`` on totals stays right).
+        align = style.get('justify-self') or 'right'
 
-    ReportLab draws left-to-right, so an RTL line is emitted in reverse visual
-    order (the Urdu shaping itself already returns visual glyph order).
-    """
-    ordered = list(segments)
-    if rtl:
-        ordered.reverse()
-    parts = []
-    for text, style, is_urdu in ordered:
+    has_urdu = any(is_urdu for _t, _s, is_urdu in segments)
+    if not has_urdu:
+        markup = ''.join(_escape(text) for text, _s, _u in segments if text)
+        pstyle = _style_sheet(style, body_font, bold_font)
+        return Paragraph(markup or '&nbsp;', pstyle)
+
+    spans = []
+    for text, seg_style, is_urdu in segments:
         if not text:
             continue
-        if is_urdu and urdu_font:
-            from app.services.bilingual import shape_urdu, urdu_size_for_html
-            size = urdu_size_for_html(float(style.get('font-size') or _DEFAULT_FONT_SIZE))
-            colour = style.get('color') or '#000000'
-            parts.append(f'<font face="{urdu_font}" size="{size}" color="{colour}">'
-                         f'{_escape(shape_urdu(text))}</font>')
-        else:
-            parts.append(_escape(text))
-    return ''.join(parts)
+        size = (_urdu_size(seg_style) if is_urdu
+                else float(seg_style.get('font-size') or base_size))
+        seg_colour = seg_style.get('color') or colour
+        seg_bold = bool(seg_style.get('bold'))
+        spans.append(U.Span(
+            text,
+            urdu=is_urdu,
+            font=(bold_font if seg_bold else body_font),
+            size=size,
+            color=seg_colour,
+            bold=seg_bold,
+            nowrap=bool(seg_style.get('nowrap')),
+        ))
+    leading = None
+    if any(s.urdu for s in spans):
+        from app.services.bilingual import urdu_line_factor
+        leading = urdu_line_factor(max(s.size for s in spans))
+    return U.UrduParagraph(
+        spans,
+        leading=leading,
+        align=align,
+        color=colour,
+        style=style,
+    )
 
 
-def _urdu_markup(text, run_style, urdu_font, urdu_factor=1.0) -> str:
-    """Shaped Urdu in Jameel Noori at a readable size."""
-    from app.services.bilingual import shape_urdu, urdu_size_for_html
-    shaped = _escape(shape_urdu(text))
-    base = float(run_style.get('font-size') or 7.4) * urdu_factor
-    size = urdu_size_for_html(base)
-    return (f'<font face="{urdu_font}" size="{size}" '
-            f'color="#4b5563">{shaped}</font>')
+def _segments_for_line(line: Line):
+    """``[(text, style, is_urdu)]`` for a
+    :class:`Line` built by :func:`layout`."""
+    if line.ordered is not None:
+        return [(text, style, bool(is_urdu))
+                for text, style, is_urdu in line.ordered if text]
+    segments = [(line.text, line.style, False)]
+    for text, run_style in line.runs:
+        segments.append((text, run_style, True))
+    return [s for s in segments if s[0]]
+
+
+def _segments_for_cell(cell):
+    if cell.get('ordered') is not None:
+        return [(text, style, bool(is_urdu))
+                for text, style, is_urdu in cell['ordered'] if text]
+    segments = [(cell['text'], cell['style'], False)]
+    for text, run_style in cell.get('urdu', []):
+        segments.append((text, run_style, True))
+    return [s for s in segments if s[0]]
 
 
 def build_story(blocks, body_font, bold_font, urdu_font, usable_width):
@@ -839,7 +957,33 @@ def build_story(blocks, body_font, bold_font, urdu_font, usable_width):
             import logging
             logging.getLogger(__name__).exception(
                 'Skipped a PDF block that could not be laid out')
+            # A single bad flowable must not silently erase a section of the
+            # document: keep its text as a plain line instead.
+            try:
+                story.extend(_fallback_flowables(block, body_font))
+            except Exception:
+                pass
     return story
+
+
+def _fallback_flowables(block, body_font):
+    """Best-effort plain-text rendering of a block that failed to lay out."""
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph
+
+    texts = []
+    if isinstance(block, Line):
+        texts = [block.text] + [text for text, _s in block.runs]
+        if block.ordered:
+            texts = [''.join(t for t, _s, _u in block.ordered)]
+    elif isinstance(block, (TableBlock,)):
+        for row in block.rows:
+            texts.append('   '.join(c.get('text') or '' for c in row))
+    elif isinstance(block, RowBlock):
+        return []
+    style = ParagraphStyle('pdfFallback', fontName=body_font, fontSize=7.5,
+                           leading=10)
+    return [Paragraph(_escape(t), style) for t in texts if (t or '').strip()]
 
 
 def _append_block(block, story, body_font, bold_font, urdu_font, usable_width):
@@ -847,99 +991,154 @@ def _append_block(block, story, body_font, bold_font, urdu_font, usable_width):
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
     if isinstance(block, Line):
-        if not block.text and not block.runs:
+        segments = _segments_for_line(block)
+        if not segments:
             story.append(Spacer(1, 2))
             return story
-        pstyle = _style_sheet(block.style, body_font, bold_font, urdu_font)
-        if block.ordered and any(u for _t, _s, u in block.ordered):
-            from app.services.bilingual import urdu_line_factor
-            pstyle.leading = max(pstyle.leading, urdu_line_factor(pstyle.fontSize))
-        markup = _inline_markup(block, bold_font, urdu_font, 1.0)
-        story.append(Paragraph(markup, pstyle))
+        story.append(_paragraph(segments, block.style, body_font, bold_font,
+                                usable_width))
         if block.style.get('rule-below'):
+            # Honour the box's bottom padding: Nastaleeq descenders hang well
+            # below the baseline, and without the gap the rule cuts through
+            # the last word of the heading.
+            from reportlab.platypus import Spacer
+            pad = float(block.style.get('pad-bottom') or 0)
+            urdu_line = any(is_urdu for _t, _s, is_urdu in segments)
+            story.append(Spacer(1, max(pad, 2.0 if urdu_line else 0.5)))
             story.append(_rule(usable_width, block.style, colors))
-    elif isinstance(block, TableBlock):
+        return story
+    if isinstance(block, TableBlock):
         story.append(_render_table(block, body_font, bold_font, urdu_font,
                                    usable_width, colors, Paragraph, Table,
                                    TableStyle))
         story.append(Spacer(1, 3))
-    elif isinstance(block, RowBlock):
+        return story
+    if isinstance(block, RowBlock):
         story.append(_render_row(block, body_font, bold_font, urdu_font,
                                  usable_width, colors, Paragraph, Table,
                                  TableStyle))
         story.append(Spacer(1, 3))
+        return story
     return story
 
 
 def _rule(width, style, colors):
     from reportlab.platypus import Table, TableStyle
-    thickness = 1.0 if style.get('bold') else 0.6
-    table = Table([['']], colWidths=[width], rowHeights=[0.1], hAlign='LEFT')
+    thickness = float(style.get('border-width') or 0) or (
+        1.0 if style.get('bold') else 0.6)
+    colour = style.get('border-color') or '#000000'
+    table = Table([['']], colWidths=[max(width, 1)], rowHeights=[0.1],
+                  hAlign='LEFT')
     table.setStyle(TableStyle([
-        ('LINEABOVE', (0, 0), (-1, 0), thickness, colors.HexColor('#000000')),
+        ('LINEABOVE', (0, 0), (-1, 0), min(thickness, 3.0),
+         _rl_colour(colour)),
     ]))
     return table
 
 
 def _render_table(block, body_font, bold_font, urdu_font, usable_width,
                   colors, Paragraph, Table, TableStyle):
-    from app.services.bilingual import shape_urdu, urdu_size_for_html
-
     ncols = max(sum(c['colspan'] for c in row) for row in block.rows)
     col_widths = _column_widths(block, ncols, usable_width, body_font,
                                 bold_font, urdu_font)
+    rows = block.rows
+    if block.rtl:
+        # An RTL table mirrors its columns: the first cell of the markup lands
+        # in the right-most column.  ``colspan`` cells keep their span, and
+        # every ``ALIGN`` column index is mirrored at the end.
+        rows = [_mirror_row(row, ncols) for row in rows]
     data, styles = [], []
-    for r, row in enumerate(block.rows):
+    for r, row in enumerate(rows):
         out = []
         col_index = 0
         for cell in row:
+            if cell is None:            # covered by a mirrored colspan
+                out.append('')
+                col_index += 1
+                continue
             style = cell['style']
-            if cell.get('ordered') is not None:
-                markup = _ordered_markup(cell['ordered'], urdu_font,
-                                         rtl=bool(style.get('rtl')))
-            else:
-                markup = _escape(cell['text'])
-            run_markup = ''
-            for text, _run_style in cell.get('urdu', []):
-                if not urdu_font or not text:
-                    continue
-                size = urdu_size_for_html(float(style.get('font-size')
-                                                or _DEFAULT_FONT_SIZE))
-                run_markup += (f'<font face="{urdu_font}" size="{size}">'
-                               f'{_escape(shape_urdu(text))}</font>')
-            if run_markup and cell.get('ordered') is None:
-                available = (col_widths[col_index]
-                             if col_index < len(col_widths) else usable_width)
-                markup += _urdu_separator(cell, style, run_markup,
-                                          available - 2, body_font, bold_font)
-            if not markup:
-                markup = '&nbsp;'
-            pstyle = _style_sheet(style, body_font, bold_font, urdu_font)
+            segments = _segments_for_cell(cell)
+            span = max(1, int(cell.get('colspan', 1)))
+            span_widths = col_widths[col_index:col_index + span]
+            available = sum(span_widths) if span_widths else usable_width
             if block.render_scale and block.render_scale < 1.0:
-                pstyle.fontSize *= block.render_scale
-            pstyle.leading = max(pstyle.fontSize * 1.24, pstyle.leading)
-            if cell.get('ordered') and any(u for _t, _s, u in cell['ordered']):
-                from app.services.bilingual import urdu_line_factor
-                pstyle.leading = max(pstyle.leading, urdu_line_factor(pstyle.fontSize))
-            out.append(Paragraph(markup, pstyle))
+                # Dense table: shrink the type *before* the paragraph is built.
+                # Scaling afterwards leaves ReportLab's cached fragments and
+                # line breaks at the old size, so a figure that now fits still
+                # wrapped mid-number.
+                style = _scaled_style(style, block.render_scale)
+            flowable = _paragraph(segments, style, body_font, bold_font,
+                                  available - 2)
+            out.append(flowable)
+            for _ in range(span - 1):
+                out.append('')
+            if span > 1:
+                # Real merge so ReportLab hands the full width to the
+                # flowable; without the SPAN the label wraps inside the first
+                # column and spills out of the table.
+                # Rows are already mirrored, so ``col_index`` is the
+                # physical (left-to-right) start of this cell.
+                styles.append(('SPAN', (col_index, r),
+                               (col_index + span - 1, r)))
             if cell['header']:
-                styles.append(('BACKGROUND', (len(out) - 1, r),
-                               (len(out) - 1, r), colors.HexColor('#eceff1')))
-            if style.get('align') == 'right':
-                styles.append(('ALIGN', (len(out) - 1, r),
-                               (len(out) - 1, r), 'RIGHT'))
-            out.extend([''] * (cell['colspan'] - 1))
-            col_index += cell['colspan']
+                styles.append(('BACKGROUND', (col_index, r),
+                               (col_index + span - 1, r),
+                               colors.HexColor('#eceff1')))
+            if isinstance(flowable, Paragraph) and (
+                    getattr(flowable.style, 'wordWrap', '') == 'RTL' or
+                    block.rtl):
+                # A Latin-only cell inside an RTL table can still be a label
+                # (e.g. a colspan summary row): align it with the Urdu cells
+                # instead of stranding it on the wrong edge.
+                flowable.style.alignment = _ALIGN['right']
+            cell_align = flowable.style.alignment if isinstance(flowable, Paragraph) \
+                else _ALIGN.get(getattr(flowable, 'align', 'left'), 0)
+            # ``col_index`` is already a physical column of the mirrored row;
+            # deriving it from the cell count is wrong once a row carries a
+            # span (the count stops matching the column index).
+            column = col_index
+            if style.get('align') == 'right' or (
+                    style.get('rtl') and cell_align == 0
+                    and style.get('justify-self') == 'right'):
+                styles.append(('ALIGN', (column, r), (column, r), 'RIGHT'))
+            elif cell_align == _ALIGN['center']:
+                styles.append(('ALIGN', (column, r), (column, r), 'CENTER'))
+            col_index += span
         while len(out) < ncols:
             out.append('')
         data.append(out)
     if not data:
         return Table([['']], colWidths=[usable_width], hAlign='LEFT')
+    # ``colspan`` placeholders make the row lists *shorter* than the cell
+    # count (a 2-cell ``colspan=3`` row is one placeholder plus one value).
+    # ReportLab then treats the row as having variable width and sizes the
+    # table from the cells, appending columns -- the extra blank strip on the
+    # right of the bill.  Pad every row to exactly ``ncols`` first.
+    for out in data:
+        while len(out) < ncols:
+            out.append('')
+        del out[ncols:]
 
+    # Pin the geometry.  ReportLab treats a column holding a flowable whose
+    # width cannot be derived from string metrics as "variable width" and then
+    # re-sizes *every* column from the cells' ``minWidth()`` -- which is how a
+    # BILL # column ended up narrower than ``MB NO.7001`` and wrapped it, and
+    # how the table grew past the printable area.
+    col_widths = [float(w) for w in list(col_widths[:ncols])]
     table = Table(data, colWidths=col_widths, repeatRows=1, hAlign='LEFT')
+    table._argW = list(col_widths)
+    table._ncols = ncols
+    table._colWidths = list(col_widths)
+    table._colpositions = [0.0]
+    total = 0.0
+    for width in col_widths:
+        total += width
+        table._colpositions.append(total)
+    table._width = total
+    table._width_calculated_once = 1
     table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#8b8f96')),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('LEFTPADDING', (0, 0), (-1, -1), 2.5),
         ('RIGHTPADDING', (0, 0), (-1, -1), 2.5),
         ('TOPPADDING', (0, 0), (-1, -1), 2),
@@ -948,26 +1147,25 @@ def _render_table(block, body_font, bold_font, urdu_font, usable_width,
     return table
 
 
-def _urdu_separator(cell, style, run_markup, available, body_font,
-                    bold_font=None):
-    """Space before the Urdu run, or ``<br/>`` when it will not fit inline.
+def _mirror_row(row, ncols):
+    """Cells of *row* in mirrored order, with ``None`` for span placeholders."""
+    out = []
+    for cell in reversed(row):
+        out.append(cell)
+        out.extend([None] * (cell.get('colspan', 1) - 1))
+    if len(out) != ncols:
+        out = out[:ncols] + [None] * max(0, ncols - len(out))
+    return out
 
-    Splitting a currency figure across two lines ("600,000" / ".00") is far
-    worse than dropping the translation onto its own line, so the separator is
-    chosen from the measured width of both runs against the column width.
-    """
-    from reportlab.pdfbase import pdfmetrics
-    if not available or available <= 0:
-        return ' ' + run_markup
-    face = bold_font if (bold_font and style.get('bold')) else body_font
-    size = float(style.get('font-size') or _DEFAULT_FONT_SIZE)
-    try:
-        need = (pdfmetrics.stringWidth(cell['text'] or '', face, size) + 3.0 +
-                pdfmetrics.stringWidth(_strip_markup(run_markup), face,
-                                       size * 1.08))
-    except Exception:
-        return ' ' + run_markup
-    return ('<br/>' if need > available else ' ') + run_markup
+
+def _scaled_style(style, factor):
+    """Copy of *style* with its type sizes multiplied by *factor*."""
+    scaled = dict(style)
+    for key in ('font-size', 'line-height-pt'):
+        value = scaled.get(key)
+        if value:
+            scaled[key] = float(value) * factor
+    return scaled
 
 
 def _strip_markup(markup: str) -> str:
@@ -983,6 +1181,7 @@ def _column_widths(block, ncols, usable_width, body_font, bold_font=None,
     to say, so a wide description column still gets the room it needs.
     """
     from reportlab.pdfbase import pdfmetrics
+    from app.services import urdu_text as U
 
     wants = [1.0] * ncols
     minimums = [1.0] * ncols
@@ -994,60 +1193,62 @@ def _column_widths(block, ncols, usable_width, body_font, bold_font=None,
             style = cell['style']
             size = float(style.get('font-size') or _DEFAULT_FONT_SIZE)
             face = bold_font if (bold_font and style.get('bold')) else body_font
-            text = cell['text'] or ''
-            segments = cell.get('ordered')
-            if segments and urdu_font:
-                whole = _segments_width(segments, face, size, urdu_font)
-                # Nastaleeq words must not be squeezed into a column sized for
-                # empty Latin text; treat the whole label as the hard minimum.
-                longest = whole
+            segments = _segments_for_cell(cell)
+            latin = ''.join(t for t, _s, u in segments if not u)
+            urdu = ' '.join(t for t, _s, u in segments if u)
+            whole = U.latin_width(latin, face, size)
+            if urdu:
+                usize = _urdu_size(style)
+                uwidth = U.measure_run(urdu, usize)
+                whole += uwidth + (2.0 if latin.strip() else 0.0)
+                longest = max(U.latin_width(max(latin.split(), key=len,
+                                                default=''), face, size),
+                              uwidth)
             else:
-                tokens = text.split() or ['']
-                longest = max((pdfmetrics.stringWidth(t, face, size)
-                               for t in tokens), default=0.0)
-                whole = pdfmetrics.stringWidth(text, face, size)
-            pad = 7.0
+                longest = max((U.latin_width(t, face, size)
+                               for t in (latin.split() or [''])), default=0.0)
             if style.get('nowrap'):
-                minimums[index] = max(minimums[index], whole + pad)
-                wants[index] = max(wants[index], whole + pad)
+                minimums[index] = max(minimums[index], whole)
+                wants[index] = max(wants[index], whole)
             else:
-                minimums[index] = max(minimums[index], longest + pad)
+                minimums[index] = max(minimums[index], longest)
                 wants[index] = max(wants[index],
-                                   min(whole + pad, usable_width * 0.34))
+                                   min(whole, usable_width * 0.34))
             index += cell['colspan']
 
+    # Cell padding is constant: it must stay out of the shrink calculation, or
+    # the scaled type still does not fit the scaled column and figures wrap
+    # mid-number ("600,000.0" / "0").
+    pad = 5.5
+    padding = pad * ncols
+    room = max(usable_width - padding, 1.0)
     total_min = sum(minimums) or 1.0
-    if total_min > usable_width:
+    if total_min > room:
         # The table needs more room than the sheet has (very dense ledgers on
-        # A5).  Fit the columns to the page proportionally and flag the block
-        # so the renderer shrinks the type instead of letting figures wrap.
-        block.render_scale = usable_width / total_min
-        return [m * block.render_scale for m in minimums]
+        # A5).  Shrink the type and flag the block so the renderer scales the
+        # flowables to match instead of letting figures wrap.
+        block.render_scale = room / total_min
+        return [m * block.render_scale + pad for m in minimums]
 
-    spare = usable_width - total_min
+    spare = room - total_min
     extra_wanted = [max(0.0, w - m) for w, m in zip(wants, minimums)]
     total_extra = sum(extra_wanted)
     if total_extra <= 0:
-        return [m + spare * (m / total_min) for m in minimums]
-    return [m + spare * (e / total_extra)
+        return [m + spare * (m / total_min) + pad for m in minimums]
+    return [m + spare * (e / total_extra) + pad
             for m, e in zip(minimums, extra_wanted)]
 
 
 def _segments_width(segments, face, size, urdu_font):
-    from reportlab.pdfbase import pdfmetrics
-    from app.services.bilingual import shape_urdu, urdu_size_for_html
+    from app.services import urdu_text as U
     total = 0.0
     for text, style, is_urdu in segments:
         if not text:
             continue
-        try:
-            if is_urdu:
-                usize = urdu_size_for_html(float(style.get('font-size') or size))
-                total += pdfmetrics.stringWidth(shape_urdu(text), urdu_font, usize)
-            else:
-                total += pdfmetrics.stringWidth(text, face, size)
-        except Exception:
-            total += len(text) * size * 0.5
+        if is_urdu:
+            total += U.measure_run(text, _urdu_size(style or {}))
+        else:
+            total += U.latin_width(text, face, size)
     return total
 
 
@@ -1058,12 +1259,18 @@ def _render_row(block, body_font, bold_font, urdu_font, usable_width,
     total = sum(weights) or 1.0
     widths = [usable_width * (w / total) for w in weights]
     cells = []
-    for column, width in zip(block.cells, widths):
+    columns = block.cells
+    if block.rtl:
+        # ``flex-direction: row`` inside an RTL document lays the first item
+        # out at the right edge; the PDF table runs left-to-right.
+        columns = list(reversed(columns))
+        widths = list(reversed(widths))
+    for column, width in zip(columns, widths):
         inner = build_story(column, body_font, bold_font, urdu_font,
-                            width - 4)
+                            max(width - 4, 4))
         if inner:
             nest = Table([[item] for item in inner],
-                         colWidths=[width - 4], hAlign='LEFT')
+                         colWidths=[max(width - 4, 4)], hAlign='LEFT')
             nest.setStyle(TableStyle([
                 ('LEFTPADDING', (0, 0), (-1, -1), 0),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 0),

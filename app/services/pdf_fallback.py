@@ -123,11 +123,20 @@ class _HtmlToFlowables(HTMLParser):
         tag = tag.lower()
         ad = {k.replace('-', '_') if k == 'class' else k: v for k, v in attrs}
         ad['class'] = dict(attrs).get('class', '')
+        if tag == 'style':
+            # ``<style>`` may live in ``<head>``, which is otherwise skipped.
+            # It used to be swallowed by ``_skip_depth`` so a template that
+            # styles itself in ``<head>`` rendered completely unstyled.
+            node = Node('style', ad, self._stack[-1])
+            self._stack[-1].append(node)
+            self._stack.append(node)
+            self._skip_depth += 1
+            return
         if self._skip_depth:
             if tag not in _VOID_TAGS:
                 self._skip_depth += 1
             return
-        if tag in _SKIP_CONTENT_TAGS and tag != 'style':
+        if tag in _SKIP_CONTENT_TAGS:
             self._skip_depth = 1
             return
         if _is_chrome(attrs):

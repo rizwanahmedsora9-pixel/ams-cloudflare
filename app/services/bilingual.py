@@ -608,6 +608,9 @@ _SALES = '\u0641\u0631\u0648\u062e\u062a'                     # sales
 _SPENT = '\u062e\u0631\u0686'                                 # spent
 _RECORDS = '\u0631\u06cc\u06a9\u0627\u0631\u0688\u0632'        # records
 _SETTLED = '\u062a\u0633\u0648\u06cc\u06c1'                   # settled
+_BAGS = '\u0628\u0648\u0631\u06cc\u0627\u06ba'                       # bags
+_KG = '\u06a9\u06cc \u062c\u06cc'                            # kg
+_LABOUR = '\u0645\u0632\u062f\u0648\u0631\u06cc'                        # labour
 
 LABELS = {
     # document titles
@@ -800,8 +803,14 @@ LABELS = {
     # --- receipt / statement furniture ---------------------------------
     # These labels were previously left untranslated, so a "bilingual" PDF
     # still showed English-only headings such as "Current Bill Total:".
-    '(Sign Here)': '(یہاں دستخط کریں)',
-    '(Stamp Here)': '(یہاں مہر لگائیں)',
+    'Sign Here': 'یہاں دستخط کریں',
+    'Stamp Here': 'یہاں مہر لگائیں',
+    'Bags': _BAGS,
+    'Bag': _BAGS,
+    'Kg': _KG,
+    'KG': _KG,
+    'Labor': _LABOUR,
+    'Labour': _LABOUR,
     'Account No.': 'اکاؤنٹ نمبر',
     'Account Statement For': 'اکاؤنٹ اسٹیٹمنٹ برائے',
     'Actual Purchase Cost & Payments': 'اصل ' + _PURCHASE + ' ' + _COST + ' اور ادائیگیاں',

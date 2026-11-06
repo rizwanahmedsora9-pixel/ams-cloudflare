@@ -5,6 +5,9 @@ class Material(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), nullable=False)
     name = db.Column(db.String(100), nullable=False)
+    # Urdu name printed on the Urdu bill/receipt.  Empty means "no Urdu name
+    # recorded", and the bill then prints the English name unchanged.
+    name_ur = db.Column(db.String(150), default='', nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('material_category.id'), index=True, nullable=True)
     unit_price = db.Column(db.Float, default=0)
     total = db.Column(db.Float, default=0)

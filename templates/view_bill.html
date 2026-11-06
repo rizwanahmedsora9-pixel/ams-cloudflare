@@ -464,7 +464,11 @@
             <tbody>
                 {% for item in items %}
                 <tr>
+                    {% if bill_lang == 'ur' and item.name_ur %}
+                    <td class="text-start fw-bold">{{ item.name_ur|bill_label(bill_lang) }}</td>
+                    {% else %}
                     <td class="text-start fw-bold">{{ item.name or item.material_name or item.product_name or item.mat_name }}</td>
+                    {% endif %}
                     <td class="text-end">{{ fmt_num(item.qty) }}</td>
                     <td class="text-end">{{ fmt_num(item.price_at_time) }}</td>
                     <td class="text-end">{{ fmt_num((item.qty or 0) * (item.price_at_time or 0)) }}</td>
@@ -612,11 +616,11 @@
         <div class="rcpt-sig-row">
             <div class="rcpt-sig-block">
                 <div class="rcpt-sig-label">{{ 'Receiver / Authorized Sign'|bill_label(bill_lang) }}</div>
-                <div class="rcpt-sig-sub">{{ '(Sign Here)'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-sig-sub">{{ 'Sign Here'|bill_label(bill_lang) }}</div>
             </div>
             <div class="rcpt-sig-block right-align">
                 <div class="rcpt-sig-label">{{ 'Company Stamp'|bill_label(bill_lang) }}</div>
-                <div class="rcpt-sig-sub">{{ '(Stamp Here)'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-sig-sub">{{ 'Stamp Here'|bill_label(bill_lang) }}</div>
             </div>
         </div>
         <div class="rcpt-credits">
