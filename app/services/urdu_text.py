@@ -339,8 +339,8 @@ class UrduParagraph(_Flowable):
 
         The *first* run that carries a strong direction sets the line, so
 
-        * ``06 [نومبر] 2026 03:55 [شام]`` starts with a figure (neutral), the
-          month is the first strong run, and the whole line is right to left;
+        * ``[شام] 03:55 06 [نومبر] 2026`` starts with an Urdu period label,
+          so the whole receipt date line is right to left;
         * ``[کوڈ:] LTC-001`` starts with an Urdu label, so it is right to left
           while ``LTC-001`` itself still reads left to right;
         * a bare amount or phone number has no strong direction at all and
@@ -373,7 +373,7 @@ class UrduParagraph(_Flowable):
         """Physical (left-to-right) order of one line, as :class:`LineRun`s.
 
         Each inline run keeps its words *and* its own spaces, so
-        ``"06 نومبر 2026"`` stays one drawing operation with its gaps intact;
+        ``"شام 03:55 06 نومبر 2026"`` keeps its runs and gaps intact;
         the runs themselves are ordered right to left in an RTL line, and an
         Urdu run reverses its tokens (a space reverses with them, which is
         exactly the bidi behaviour).

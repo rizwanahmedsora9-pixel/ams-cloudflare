@@ -1184,21 +1184,41 @@ def bill_label(text, lang: str = 'en'):
     return text
 
 
+def _ltr_bdi(text: str):
+    """Return an isolated left-to-right run for figures in an Urdu document."""
+    from markupsafe import Markup, escape
+    return Markup('<bdi dir="ltr">{}</bdi>').format(escape(str(text)))
+
+
 def bill_date(value, lang: str = 'en'):
-    """Format a bill timestamp; Urdu mode translates month names and AM/PM."""
+    """Format a bill timestamp.
+
+    Urdu bills use the simple reading order requested for receipts:
+    ``صبح/شام → time → date → Urdu month → year``.  Each figure group is an
+    LTR isolate, so both the browser and the ReportLab fallback keep ``05:03``
+    and ``06`` in that order while the surrounding Urdu line remains RTL.
+    """
     if value is None:
         return ''
     if not hasattr(value, 'strftime'):
         return str(value)
-    formatted = value.strftime('%d %b %Y  %I:%M %p')
     if (lang or 'en').strip().lower() not in ('ur', 'urdu', 'urd'):
-        return formatted
+        return value.strftime('%d %b %Y  %I:%M %p')
+
     from markupsafe import Markup
-    for en, ur in _URDU_MONTHS.items():
-        formatted = re.sub(r'\b' + en + r'\b', lambda m, ur=ur: str(_urdu_span(ur)), formatted)
-    formatted = re.sub(r'\bAM\b', lambda m: str(_urdu_span('صبح')), formatted)
-    formatted = re.sub(r'\bPM\b', lambda m: str(_urdu_span('شام')), formatted)
-    return Markup(formatted)
+
+    # Keep the spaces inside their neighbouring runs.  The fallback renderer
+    # reverses inline runs for an RTL line; standalone whitespace would be
+    # discarded there and make the date pieces touch each other.
+    period = 'صبح' if getattr(value, 'hour', 0) < 12 else 'شام'
+    month = _URDU_MONTHS.get(value.strftime('%b'), value.strftime('%b'))
+    return Markup('{}{}{}{}{}').format(
+        _urdu_span(period + ' '),
+        _ltr_bdi(value.strftime('%I:%M ')),
+        _ltr_bdi(value.strftime('%d ')),
+        _urdu_span(month + ' '),
+        _ltr_bdi(value.strftime('%Y')),
+    )
 
 
 def _urdu_css() -> str:
