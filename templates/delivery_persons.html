@@ -10,11 +10,15 @@
 <div class="card border-0 shadow-sm mb-4" style="background: #1e293b; border: 2px solid #475569 !important; border-radius: 15px;">
     <div class="card-body">
         <form method="POST" action="{{ url_for('add_delivery_person') }}" class="row g-2 align-items-end">
-            <div class="col-md-6">
+            <div class="col-md-3">
                 <label class="text-white-50 small fw-bold mb-1">DELIVERY PERSON NAME</label>
                 <input type="text" name="name" class="form-control bg-dark text-white border-secondary" placeholder="Enter driver name" required>
             </div>
             <div class="col-md-4">
+                <label class="text-white-50 small fw-bold mb-1">NAME (URDU) — printed on Urdu bills</label>
+                <input type="text" name="name_ur" dir="rtl" lang="ur" class="form-control bg-dark text-white border-secondary" placeholder="مثلاً дода محمد">
+            </div>
+            <div class="col-md-3">
                 <label class="text-white-50 small fw-bold mb-1">PHONE NUMBER</label>
                 <input type="text" name="phone" class="form-control bg-dark text-white border-secondary" placeholder="Optional phone number">
             </div>
@@ -71,6 +75,8 @@
             <div class="modal-body">
                 <label class="text-white-50 small fw-bold mb-1">NAME</label>
                 <input type="text" name="name" value="{{ row.name }}" class="form-control bg-dark text-white border-secondary" required>
+                <label class="text-white-50 small fw-bold mb-1 mt-3">NAME (URDU) — printed on Urdu bills</label>
+                <input type="text" name="name_ur" value="{{ row.name_ur or '' }}" dir="rtl" lang="ur" class="form-control bg-dark text-white border-secondary" placeholder="مثلاً دودا محمد">
                 <label class="text-white-50 small fw-bold mb-1 mt-3">PHONE NUMBER</label>
                 <input type="text" name="phone" value="{{ row.phone or '' }}" class="form-control bg-dark text-white border-secondary" placeholder="Optional phone number">
             </div>

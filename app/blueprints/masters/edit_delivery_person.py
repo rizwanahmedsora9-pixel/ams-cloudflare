@@ -28,6 +28,7 @@ def edit_delivery_person(id):
 
     old_name = (row.name or '').strip()
     row.name = new_name
+    row.name_ur = (request.form.get('name_ur') or '').strip()
     row.phone = new_phone or None
 
     if old_name and old_name.lower() != new_name.lower():

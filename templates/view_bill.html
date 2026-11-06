@@ -382,7 +382,11 @@
                 {% if type == 'GRN' %}
                 <div class="rcpt-party-name">{{ bill.supplier_name or ('N/A'|bill_label(bill_lang)) }}</div>
                 {% else %}
+                {% if bill_lang == 'ur' and client_name_ur %}
+                <div class="rcpt-party-name">{{ client_name_ur|bill_label(bill_lang) }}</div>
+                {% else %}
                 <div class="rcpt-party-name">{{ bill.client_name or (client.name if client else ('N/A'|bill_label(bill_lang))) }}</div>
+                {% endif %}
                 {% if client and client.code %}
                 <div class="rcpt-party-sub">{{ 'Code:'|bill_label(bill_lang) }} {{ client.code }}</div>
                 {% endif %}
@@ -436,7 +440,7 @@
             {% if delivery_people is defined and delivery_people %}
             <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ ('Delivery Persons' if delivery_people|length > 1 else 'Delivery Person')|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ ", ".join(delivery_people) }}</span></div>
             {% elif bill.driver_name is defined and bill.driver_name %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Delivery Person'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.driver_name }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Delivery Person'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{% if bill_lang == 'ur' and driver_name_ur %}{{ driver_name_ur|bill_label(bill_lang) }}{% else %}{{ bill.driver_name }}{% endif %}</span></div>
             {% endif %}
             {% if bill.supplier_invoice_no is defined and bill.supplier_invoice_no %}
             <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Supplier Invoice #'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.supplier_invoice_no }}</span></div>
