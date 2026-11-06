@@ -151,7 +151,7 @@
         <div>
             <div class="rcpt-co-name">{{ co_name }}</div>
             <div class="rcpt-co-sub">{{ co_address }}</div>
-            <div class="rcpt-co-phone">{{ co_phone }}</div>
+            <div class="rcpt-co-phone"><bdi dir="ltr">{{ co_phone }}</bdi></div>
         </div>
         <div class="rcpt-header-right">
             <div class="rcpt-doc-type">SUPPLIER PAYMENT</div>
@@ -172,7 +172,7 @@
                 <div class="rcpt-party-sub">{{ supplier.address }}</div>
                 {% endif %}
                 {% if supplier and supplier.phone %}
-                <div class="rcpt-party-sub">{{ supplier.phone }}</div>
+                <div class="rcpt-party-sub"><bdi dir="ltr">{{ supplier.phone }}</bdi></div>
                 {% endif %}
             </div>
             <div class="rcpt-amount-hero">

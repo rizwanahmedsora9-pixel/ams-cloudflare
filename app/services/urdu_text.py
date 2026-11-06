@@ -111,12 +111,38 @@ def pua_text(glyphs) -> str:
     return ''.join(chr(PUA_BASE + g[0]) for g in glyphs)
 
 
+def glyphs_width(glyphs) -> float:
+    """Ink width of a shaped run, in font units.
+
+    Nastaleeq moves marks *outside* their advance (``x_offset``), so summing
+    the advances alone under-reports the run: a column sized from the advance
+    sum clipped the last letter of ``ریٹ``.  The widest drawn position wins.
+    """
+    pen = 0.0
+    reach = 0.0
+    for _gid, advance, x_offset, _y_offset in glyphs:
+        reach = max(reach, pen + x_offset + advance)
+        pen += advance
+    return max(pen, reach)
+
+
 def measure_run(text: str, size: float) -> float:
-    """Width in points of a shaped Urdu run at *size*."""
+    """Width in points of a shaped Urdu run at *size*.
+
+    The word gaps are counted at the width the renderer actually draws them
+    (:func:`_word_space`), not the font's 5-unit space glyph - otherwise a
+    measured label was ~2pt narrower than the drawn one and a table column
+    sized from it wrapped its header for the sake of a fraction of a point
+    ("مقدار / ریٹ" broke into two lines).
+    """
     glyphs = shape_glyphs(text)
     if not glyphs:
         return 0.0
-    return sum(g[1] for g in glyphs) * size / UPEM
+    width = glyphs_width(glyphs) * size / UPEM
+    gaps = len([chunk for chunk in (text or '').split(' ') if chunk]) - 1
+    if gaps > 0:
+        width += gaps * _word_space(size)
+    return width
 
 
 def latin_width(text: str, font: str, size: float) -> float:
@@ -135,10 +161,10 @@ class Span:
     """One inline run: either Latin text drawn by ReportLab, or Urdu text."""
 
     __slots__ = ('text', 'urdu', 'font', 'size', 'color', 'bold', 'rise',
-                 'nowrap')
+                 'nowrap', 'rtl')
 
     def __init__(self, text, urdu, font, size, color='#000000', bold=False,
-                 rise=0.0, nowrap=False):
+                 rise=0.0, nowrap=False, rtl=False):
         self.text = text
         self.urdu = urdu
         self.font = font
@@ -149,6 +175,10 @@ class Span:
         # ``nowrap`` (CSS ``white-space: nowrap``) keeps the run on one line:
         # a bill number must never be split into ``MB`` / ``NO.7001``.
         self.nowrap = bool(nowrap)
+        # ``rtl`` is the run's own ``dir="rtl"`` (an Urdu label inside an
+        # otherwise left-to-right line).  It sets the direction of the line it
+        # starts, exactly like an inline RTL run does in a browser.
+        self.rtl = bool(rtl)
 
     def __repr__(self):     # pragma: no cover - debugging aid
         return f'Span({self.text!r}, urdu={self.urdu})'
@@ -184,11 +214,15 @@ class UrduParagraph(_Flowable):
         sizes = [s.size for s in self.spans] or [8.0]
         self.size = max(sizes)
         urdu = any(s.urdu for s in self.spans)
-        self.leading = float(leading or 0) or (
-            B.urdu_line_factor(self.size) if urdu else self.size * 1.28)
-        if urdu:
-            # Nastaleeq needs room for the deep descenders and high marks.
-            self.leading = max(self.leading, B.urdu_line_factor(self.size))
+        # Base (Latin) leading, and the Nastaleeq leading used only by lines
+        # that actually carry Urdu.  Nastaleeq sits low with deep descenders
+        # and high marks, so its lines need more room - but pushing *every*
+        # line of a mixed paragraph apart made a line of figures look stranded
+        # from the Urdu line above it.
+        self._latin_leading = float(leading or 0) or self.size * 1.28
+        self._urdu_leading = max(B.urdu_line_factor(self.size),
+                                 self._latin_leading)
+        self.leading = self._urdu_leading if urdu else self._latin_leading
         self.align = align if align in ('left', 'right', 'center', 'justify') \
             else 'left'
         # ``bidi_rtl`` is the paragraph's base direction: an Urdu document
@@ -261,9 +295,10 @@ class UrduParagraph(_Flowable):
                     current.append(word)
                     used += word.width
                 continue
-            if current and word.span.nowrap and current[-1].span is word.span:
-                # Part of an unbreakable run that already started on this
-                # line: keep the whole run together.
+            if current and word.span.nowrap:
+                # ``white-space: nowrap`` (the receipt's date block, a bill
+                # number) keeps the run on one line even past the edge; the
+                # browser does the same instead of wrapping.
                 current.append(word)
                 used += word.width
                 continue
@@ -282,16 +317,56 @@ class UrduParagraph(_Flowable):
         if not lines:
             lines = [[]]
         self._lines = [self._reorder(line) for line in lines]
+        # Remember each line's own direction and leading: a line of figures has
+        # no Urdu and keeps the tight Latin leading, while an Urdu line gets
+        # the room its descenders and marks need.
+        self._line_flags = [self._line_is_rtl(line) for line in lines]
+        self._line_leading = [
+            self._urdu_leading if self._line_uses_urdu(line)
+            else self._latin_leading
+            for line in lines
+        ]
         self._width = width
-        self._height = max(self.leading * len(lines), self.leading)
+        self._height = sum(self._line_leading) or self.leading
         return width, self._height
 
+    @staticmethod
+    def _line_uses_urdu(line) -> bool:
+        return any(not word.space and word.span.urdu for word in line)
+
     def _line_is_rtl(self, line) -> bool:
-        if self.align == 'right' and self.bidi_rtl:
+        """Direction of one wrapped line, decided the way Unicode bidi does it.
+
+        The *first* run that carries a strong direction sets the line, so
+
+        * ``06 [نومبر] 2026 03:55 [شام]`` starts with a figure (neutral), the
+          month is the first strong run, and the whole line is right to left;
+        * ``[کوڈ:] LTC-001`` starts with an Urdu label, so it is right to left
+          while ``LTC-001`` itself still reads left to right;
+        * a bare amount or phone number has no strong direction at all and
+          stays a plain left-to-right line - never mirrored.
+        """
+        has_rtl_run = any(not word.space and (word.span.urdu or word.span.rtl)
+                          for word in line)
+        if not has_rtl_run:
+            # A line made only of Latin words and figures keeps its logical
+            # order: bidi resolves such a run as left to right even inside an
+            # Urdu document, so an amount or a phone number is never mirrored.
+            return False
+        if self.bidi_rtl:
+            # Inside an Urdu paragraph the *base* direction wins: a date that
+            # starts with the figure ``06`` is still an Urdu line, and starts
+            # at the right edge like the lines around it.
             return True
         for word in line:
-            if not word.space and word.span.urdu:
+            # Left-to-right paragraph: the first strong run decides.
+            if word.space:
+                continue
+            span = word.span
+            if span.urdu or span.rtl:
                 return True
+            if span.text and span.text.strip():
+                return False
         return False
 
     def _reorder(self, line):
@@ -322,12 +397,14 @@ class UrduParagraph(_Flowable):
         logical = []
         for _key, group, urdu in groups:
             words = list(group)
+            if urdu:
+                # An Urdu run reads right to left: its own words (and their
+                # gaps) reverse with it, which is exactly the bidi behaviour.
+                words.reverse()
             start_gap = bool(words and words[0].space
                              and words[0].is_breaking_space)
             end_gap = bool(words and words[-1].space
                            and words[-1].is_breaking_space)
-            if urdu:
-                words.reverse()
             while words and words[0].space:
                 words.pop(0)
             while words and words[-1].space:
@@ -342,46 +419,68 @@ class UrduParagraph(_Flowable):
         if not logical:
             return []
 
+        # An Urdu line lays its runs out right to left, exactly as the bidi
+        # algorithm (and therefore the browser's own print preview) does.
         physical = list(reversed(logical)) if base_rtl else list(logical)
-        for index in range(1, len(physical)):
-            left, right = physical[index - 1], physical[index]
-            if base_rtl:
-                earlier, later = right, left       # RTL: right-hand run first
-            else:
-                earlier, later = left, right
-            # Whitespace on *either* side of the logical boundary is the only
-            # thing separating ``مینول بل:`` from ``MB NO.9101``; without it the
-            # label and the bill number collide.  The gap is appended to the
-            # left-hand run so it is drawn where the two meet.
-            if not (earlier.end_gap or later.start_gap):
+
+        # Whitespace on *either* side of a run boundary is the only thing
+        # separating ``مینول بل:`` from ``MB NO.9102`` or ``06`` from ``نومبر``;
+        # without it the label and the figures collide.  The gap is drawn on
+        # the left-hand run, where the two meet on the paper.
+        logical_index = {id(run): index for index, run in enumerate(logical)}
+        for run in physical:
+            run.starts_gap = False
+            run.ends_gap = False
+        for index in range(len(physical) - 1):
+            left, right = physical[index], physical[index + 1]
+            left_at = logical_index[id(left)]
+            right_at = logical_index[id(right)]
+            if abs(left_at - right_at) != 1:
+                continue        # not neighbours in the text, no gap between
+            earlier, later = (left, right) if left_at < right_at else (right, left)
+            if earlier.end_gap or later.start_gap:
+                left.ends_gap = True
+                right.starts_gap = True
+        for index, run in enumerate(physical):
+            if not run.ends_gap:
                 continue
-            gap = later.words[0].space_width()
+            neighbour = (physical[index + 1] if index + 1 < len(physical)
+                         else None)
+            gap = _separator_width(run, neighbour)
             if gap <= 0:
                 continue
-            separator = Word(left.words[-1].span, ' ', space=True)
+            separator = Word(run.words[-1].span, ' ', space=True)
             separator.is_breaking_space = True
             separator.width = gap
-            left.words.append(separator)
-            left.width += gap
+            run.words.append(separator)
+            run.width += gap
         return physical
 
     # -- drawing ---------------------------------------------------------
     def draw(self):
         canvas = self.canv
-        y = self._height - self.leading + (
-            self.leading - self.size) * 0.30
-        for line in self._lines:
+        leadings = getattr(self, '_line_leading', [])
+        y = self._height
+        for index, line in enumerate(self._lines):
+            leading = (leadings[index] if index < len(leadings)
+                       else self.leading)
+            # Baseline of this line: one leading below the top of its band,
+            # with the small optical drop Nastaleeq needs.
+            y -= leading
+            baseline = y + (leading - self.size) * 0.30
             line_width = sum(run.width for run in line)
             if self.align == 'right':
                 x = self._width - line_width
             elif self.align == 'center':
+                # Centre the line *as it reads*: an Urdu line is centred as a
+                # block, and a line of figures is centred between itself, never
+                # offset by the width difference between the two scripts.
                 x = (self._width - line_width) / 2.0
             else:
                 x = 0.0
             for run in line:
-                self._draw_run(canvas, run, x, y)
+                self._draw_run(canvas, run, x, baseline)
                 x += run.width
-            y -= self.leading
         try:
             canvas.setTextRenderMode(0)
         except Exception:
@@ -420,13 +519,16 @@ class UrduParagraph(_Flowable):
         drawn = []          # (x, y, text) — emitted right to left at the end
         for word in run.words:
             if word.space:
-                # A space has no glyph of its own here (the bundled face maps
-                # it to a 5-unit advance).  Advance the pen by a real word gap
-                # and keep a literal space in the text layer so the words of
-                # the PDF do not run together.
-                gap = _space_advance() * scale
-                drawn.append((pen, y + span.rise, ' '))
-                pen += gap
+                # The bundled face maps U+0020 to a 5-unit advance (a quarter
+                # of a point at 10pt), so a literal space joins two Urdu words
+                # into one blob - the "مینول بل:" that read as a single word
+                # and the figure groups of the date line that touched.  The
+                # word gap is drawn at a fixed fraction of the type size and a
+                # literal space keeps the PDF text layer readable.
+                gap = _word_space(size) if word.is_breaking_space else 0.0
+                if gap > 0:
+                    drawn.append((pen, y + span.rise, ' '))
+                    pen += gap
                 continue
             glyphs = word.glyphs or []
             chunk, chunk_x = '', None
@@ -492,7 +594,14 @@ class UrduParagraph(_Flowable):
             self.wrap(availWidth)
         if self._height <= availHeight:
             return [self]
-        fit = int(float(availHeight) // max(self.leading, 0.1))
+        # Lines carry their own leading, so walk them until the space runs out
+        # instead of dividing the remaining height by one fixed value.
+        fit, used = 0, 0.0
+        for leading in self._line_leading:
+            if used + leading > availHeight:
+                break
+            used += leading
+            fit += 1
         if fit < 1:
             return []
         head = self._clone(self._lines[:fit])
@@ -501,13 +610,16 @@ class UrduParagraph(_Flowable):
         return [head, tail] if tail else [head]
 
     def _clone(self, lines):
-        clone = UrduParagraph(list(self.spans), leading=self.leading,
+        clone = UrduParagraph(list(self.spans), leading=self._urdu_leading,
                               align=self.align, color=self.color,
                               space_before=0, space_after=0, style=self.style,
                               bidi_rtl=self.bidi_rtl)
         clone._lines = [list(line) for line in lines]
+        start = self._lines.index(lines[0]) if lines else 0
+        clone._line_flags = self._line_flags[start:start + len(lines)]
+        clone._line_leading = self._line_leading[start:start + len(lines)]
         clone._width = self._width
-        clone._height = max(self.leading * len(lines), self.leading)
+        clone._height = sum(clone._line_leading) or clone.leading
         return clone
 
     def __repr__(self):     # pragma: no cover - debugging aid
@@ -523,7 +635,8 @@ class LineRun:
     id="line-run" instead of one fragment per word.
     """
 
-    __slots__ = ('span', 'words', 'width', 'start_gap', 'end_gap')
+    __slots__ = ('span', 'words', 'width', 'start_gap', 'end_gap',
+                 'starts_gap', 'ends_gap')
 
     def __init__(self, span, words):
         self.span = span
@@ -531,13 +644,36 @@ class LineRun:
         self.width = 0.0
         self.start_gap = False    # logical space before this run
         self.end_gap = False      # logical space after this run
+        self.starts_gap = False   # physical: a gap to draw before this run
+        self.ends_gap = False     # physical: a gap to draw after this run
 
     def text(self):
         return ''.join(w.text for w in self.words)
 
+    def space_width(self) -> float:
+        """Width of the word gap this run starts or ends with."""
+        for word in self.words:
+            if word.space:
+                return word.space_width()
+        return 0.0
+
     def measure(self):
         self.width = sum(w.width for w in self.words)
         return self.width
+
+
+def _separator_width(left, right) -> float:
+    """Width of the word gap between two neighbouring runs."""
+    widths = []
+    for run in (left, right):
+        if run is None:
+            continue
+        span = run.span
+        if span.urdu:
+            widths.append(_word_space(span.size))
+        else:
+            widths.append(latin_width(' ', span.font, span.size))
+    return max(widths) if widths else 0.0
 
 
 def _space_advance() -> int:
@@ -548,6 +684,19 @@ def _space_advance() -> int:
                          * UPEM))
     except Exception:
         return int(UPEM * 0.25)
+
+
+def _word_space(size: float) -> float:
+    """Width of the gap between two words at *size*.
+
+    The bundled Nastaleeq face maps ``U+0020`` to a 5-unit advance (a quarter
+    of a point at 10pt), so drawing a literal space between two Urdu words
+    joins them into one unreadable blob - which is what made ``مینول بل:`` look
+    like a single word and pushed the figures on the date line together.  Word
+    gaps are therefore drawn at a fixed fraction of the type size, like the
+    browser's own word spacing.
+    """
+    return max(float(size or 0) * 0.24, 1.4)
 
 
 def _text_width(text: str, size: float) -> float:
@@ -574,22 +723,58 @@ class Word:
         """Width of one word separator for this word's run."""
         span = self.span
         if span.urdu:
-            return _space_advance() * span.size / UPEM
+            return _word_space(span.size)
         return latin_width(' ', span.font, span.size)
 
     def measure(self):
         """Cache this word's shaped glyphs and its width in points."""
         span = self.span
         if span.urdu:
-            self.glyphs = [] if self.space else (shape_glyphs(self.text) or [])
+            if self.space:
+                # A word gap inside an Urdu run is drawn at the same width the
+                # layout reserves for it, or every subsequent run shifts.
+                self.glyphs = []
+                self.width = (_word_space(span.size)
+                              if self.is_breaking_space else 0.0)
+                return self.width
+            self.glyphs = shape_glyphs(self.text) or []
             if self.glyphs:
-                self.width = (sum(g[1] for g in self.glyphs)
-                              * span.size / UPEM)
+                self.width = glyphs_width(self.glyphs) * span.size / UPEM
             else:
                 self.width = latin_width(self.text, span.font, span.size)
         else:
             self.width = latin_width(self.text, span.font, span.size)
         return self.width
+
+
+# ---------------------------------------------------------------------------
+# Runs the bidi algorithm must not mirror
+# ---------------------------------------------------------------------------
+
+# Figures, and the punctuation that glues them together: ``30,000``,
+# ``03:55``, ``0300-1234567``, ``+92331-0000993``, ``MB NO.9102`` is *not*
+# numeric but ``9102`` is.  A run made only of these always reads left to
+# right, which is why a browser never prints ``000,03`` inside an Urdu line.
+_NUMERIC_RUN = re.compile(r'^[\s0-9+.,:/()%#-]+$')
+
+# Characters that only exist to hold a run in place (bidi isolates/controls).
+_INVISIBLE = re.compile(
+    r'[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\u061c\u00ad]')
+
+
+def is_numeric_run(text: str) -> bool:
+    """True when *text* is figures only (never reordered by bidi)."""
+    probe = _INVISIBLE.sub('', text or '')
+    if not probe.strip():
+        return False
+    if not any(ch.isdigit() for ch in probe):
+        return False
+    return bool(_NUMERIC_RUN.match(probe))
+
+
+def strip_bidi_controls(text: str) -> str:
+    """Remove invisible bidi control characters (zero-width marks stay)."""
+    return _INVISIBLE.sub('', text or '')
 
 
 # ---------------------------------------------------------------------------
