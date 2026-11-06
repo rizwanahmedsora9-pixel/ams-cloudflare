@@ -64,7 +64,7 @@ _WORDS = {
     'zeeshan': 'ذیشان',
     # ---- Clans / surnames of the Gujrat region ----
     'awan': 'اعوان', 'bhatti': 'بھٹی', 'butt': 'بٹ', 'chadhar': 'چدھڑ',
-    'cheema': 'چیمہ', 'gujjar': 'گوجر', 'hanjra': 'ہنجڑہ', 'jatt': 'جٹ',
+    'cheema': 'چیمہ', 'gujjar': 'گجر', 'gujar': 'گجر', 'hanjra': 'ہنجڑہ', 'jatt': 'جٹ',
     'gondal': 'گوندل', 'khokhar': 'کھوکھر', 'rajput': 'راجپوت',
     'sandhu': 'سندھو', 'sial': 'سیال', 'tarar': 'ترار', 'virk': 'ورک',
     'warraich': 'وڑائچ', 'waraich': 'وڑائچ',

@@ -72,7 +72,7 @@ def test_gujrat_clans():
     assert urdu_name('GONDAL') == 'گوندل'
     assert urdu_name('TARAR') == 'ترار'
     assert urdu_name('CHEEMA') == 'چیمہ'
-    assert urdu_name('GUJJAR') == 'گوجر'
+    assert urdu_name('GUJJAR') == 'گجر'
 
 
 def test_true_initialisms_are_still_spelled_out():
