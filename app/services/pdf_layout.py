@@ -49,7 +49,7 @@ def _iter_rule_blocks(text):
 
 _INHERITED = {
     'color', 'font-size', 'font-weight', 'font-style', 'font-family',
-    'text-align', 'line-height', 'letter-spacing', 'text-transform',
+    'text-align', 'line-height', 'letter-spacing', 'text-transform', 'direction',
 }
 
 _DEFAULT_FONT_SIZE = 8.2      # pt used by the old fallback for body text
@@ -347,6 +347,11 @@ def resolve(css: Css, node, inherited=None) -> dict:
     if not isinstance(base.get('font-size'), (int, float)):
         base['font-size'] = _DEFAULT_FONT_SIZE
 
+    direction = (decls.get('direction') or node.attrs.get('dir') or
+                 base.get('direction') or 'ltr').strip().lower()
+    base['direction'] = direction
+    base['rtl'] = direction == 'rtl'
+
     weight = (base.get('font-weight') or 'normal').lower()
     base['bold'] = weight in ('bold', 'bolder', '600', '700', '800', '900')
     base['italic'] = (base.get('font-style') or '').lower() in ('italic', 'oblique')
@@ -432,13 +437,18 @@ def resolve(css: Css, node, inherited=None) -> dict:
 # ---------------------------------------------------------------------------
 
 class Line:
-    """An inline run of text plus the runs nested inside it (``.ur`` spans)."""
-    __slots__ = ('text', 'style', 'runs')
+    """An inline run of text plus the runs nested inside it (``.ur`` spans).
+
+    ``ordered`` is used by single-language Urdu bills: segments stay in visual
+    document order instead of appending every Urdu span after the Latin text.
+    """
+    __slots__ = ('text', 'style', 'runs', 'ordered')
 
     def __init__(self, text, style):
         self.text = text
         self.style = style
         self.runs = []          # [(text, style)] appended after the main text
+        self.ordered = None     # [(text, style, is_urdu)] for Urdu-only bills
 
     def add_run(self, text, style):
         self.runs.append((text, style))
@@ -502,21 +512,28 @@ def _apply_case(text: str, style) -> str:
     return text.upper() if style.get('upper') else text
 
 
-def layout(node, css, style=None, blocks=None):
-    """Flow *node*'s children into ``blocks`` (list of layout blocks)."""
+def layout(node, css, style=None, blocks=None, urdu_primary=False):
+    """Flow *node*'s children into ``blocks`` (list of layout blocks).
+
+    ``urdu_primary`` is set for single-language Urdu bills.  In that mode the
+    ``.ur`` spans are the document text (not optional translations appended
+    after an English line), so they are kept in inline order and measured.
+    """
     if blocks is None:
         blocks = []
     style = style or resolve(css, node)
 
-    if 'ur' in node.classes:
+    if 'ur' in node.classes and not urdu_primary:
         return blocks
 
     display = style.get('display', '')
     if style.get('flex'):
         cells = _flex_cells(node, css, style)
         if len(cells) > 1:
-            blocks.append(RowBlock(cells, _flex_weights(node, css, style,
-                                                        len(cells))))
+            weights = _flex_weights(node, css, style, len(cells))
+            if style.get('rtl') or 'rtl' in (node.attrs.get('dir') or '').lower():
+                weights = list(reversed(weights))
+            blocks.append(RowBlock(cells, weights))
             return blocks
         # a single-cell flex container flows like a block
         for cell in cells:
@@ -524,7 +541,7 @@ def layout(node, css, style=None, blocks=None):
         return blocks
 
     if node.tag == 'table':
-        table = _build_table(node, css, style)
+        table = _build_table(node, css, style, urdu_primary=urdu_primary)
         if table is not None:
             blocks.append(table)
         return blocks
@@ -538,7 +555,18 @@ def layout(node, css, style=None, blocks=None):
         for child in node.children:
             if not isinstance(child, Node):
                 continue
-            layout(child, css, resolve(css, child, style), blocks)
+            layout(child, css, resolve(css, child, style), blocks,
+                   urdu_primary=urdu_primary)
+        return blocks
+
+    if urdu_primary:
+        segments = _ordered_segments(node, css, style)
+        text = _collapse(''.join(t for t, _s, _u in segments)).strip()
+        if not text:
+            return blocks
+        line = Line(_apply_case(text, style), style)
+        line.ordered = segments
+        blocks.append(line)
         return blocks
 
     text = _inline_text(node, css, style)
@@ -561,13 +589,15 @@ def _flex_cells(node, css, style):
         child_style = resolve(css, child, style)
         cell_blocks = []
         if child_style.get('flex') and _has_block_children(child):
-            cell_blocks = layout(child, css, child_style)
+            cell_blocks = layout(child, css, child_style,
+                                 urdu_primary=style.get('rtl', False))
         else:
-            cell_blocks = layout(child, css, child_style)
+            cell_blocks = layout(child, css, child_style,
+                                 urdu_primary=style.get('rtl', False))
         if cell_blocks:
             columns.append(cell_blocks)
-    # ``flex-direction: row`` in an RTL document reverses the visual order
-    if 'rtl' in (node.attrs.get('dir') or '').lower():
+    # ``flex-direction: row`` in an RTL document reverses the visual order.
+    if style.get('rtl') or 'rtl' in (node.attrs.get('dir') or '').lower():
         columns.reverse()
     return columns
 
@@ -613,7 +643,37 @@ def _urdu_runs(node, css, style):
     return out
 
 
-def _build_table(node, css, style):
+def _ordered_segments(node, css, style):
+    """Inline segments in document order, marking Urdu spans for shaping."""
+    out = []
+    if 'ur' in node.classes:
+        text = _collapse(node.raw_text()).strip()
+        return [(text, resolve(css, node, style), True)] if text else []
+
+    def walk(item, parent_style):
+        if isinstance(item, str):
+            if item:
+                out.append((item, parent_style, False))
+            return
+        local = resolve(css, item, parent_style)
+        if 'ur' in item.classes:
+            text = _collapse(item.raw_text()).strip()
+            if text:
+                out.append((text, local, True))
+            return
+        if item.tag in ('br', 'hr'):
+            out.append((' ', local, False))
+            return
+        for child in item.children:
+            walk(child, local)
+
+    local = resolve(css, node, style)
+    for child in node.children:
+        walk(child, local)
+    return out
+
+
+def _build_table(node, css, style, urdu_primary=False):
     rows = []
     for row_node in _descend(node, ('thead', 'tbody', 'tfoot', 'tr')):
         if row_node.tag != 'tr':
@@ -623,16 +683,25 @@ def _build_table(node, css, style):
             if not isinstance(cell_node, Node) or cell_node.tag not in ('td', 'th'):
                 continue
             cell_style = resolve(css, cell_node, style)
-            text = _apply_case(_inline_text(cell_node, css, cell_style), cell_style)
-            urdu = _urdu_runs(cell_node, css, cell_style)
+            if urdu_primary or cell_style.get('rtl'):
+                segments = _ordered_segments(cell_node, css, cell_style)
+                text = _collapse(''.join(t for t, _s, _u in segments)).strip()
+                urdu = []
+            else:
+                segments = None
+                text = _inline_text(cell_node, css, cell_style)
+                urdu = _urdu_runs(cell_node, css, cell_style)
             cells.append({
-                'text': text,
+                'text': _apply_case(text, cell_style),
                 'urdu': urdu,
+                'ordered': segments,
                 'style': cell_style,
                 'header': cell_node.tag == 'th',
                 'colspan': _int(cell_node.attrs.get('colspan'), 1),
             })
         if cells:
+            if style.get('rtl'):
+                cells.reverse()
             rows.append(cells)
     if not rows:
         return None
@@ -700,19 +769,50 @@ def _style_sheet(style, body_font, bold_font, urdu_font):
         spaceAfter=float(style.get('margin-bottom') or 0),
         leftIndent=0,
         rightIndent=0,
-        wordWrap='LTR',
+        wordWrap='RTL' if style.get('rtl') else 'LTR',
     )
 
 
 def _inline_markup(line: Line, bold_font: str, urdu_font: str | None,
                    urdu_factor: float) -> str:
-    """ReportLab inline markup for one line, with the Urdu runs appended."""
+    """ReportLab inline markup for one line.
+
+    Legacy bilingual lines append Urdu translations after the English text.
+    Single-language Urdu lines keep their ordered inline segments instead.
+    """
+    if line.ordered is not None:
+        return _ordered_markup(line.ordered, urdu_font,
+                               rtl=bool(line.style.get('rtl')))
     body = _escape(line.text)
     for text, run_style in line.runs:
         if not urdu_font or not text:
             continue
         body += ' ' + _urdu_markup(text, run_style, urdu_font, urdu_factor)
     return body
+
+
+def _ordered_markup(segments, urdu_font, rtl=False):
+    """Shape Urdu segments in place; Latin data stays in its original font.
+
+    ReportLab draws left-to-right, so an RTL line is emitted in reverse visual
+    order (the Urdu shaping itself already returns visual glyph order).
+    """
+    ordered = list(segments)
+    if rtl:
+        ordered.reverse()
+    parts = []
+    for text, style, is_urdu in ordered:
+        if not text:
+            continue
+        if is_urdu and urdu_font:
+            from app.services.bilingual import shape_urdu, urdu_size_for_html
+            size = urdu_size_for_html(float(style.get('font-size') or _DEFAULT_FONT_SIZE))
+            colour = style.get('color') or '#000000'
+            parts.append(f'<font face="{urdu_font}" size="{size}" color="{colour}">'
+                         f'{_escape(shape_urdu(text))}</font>')
+        else:
+            parts.append(_escape(text))
+    return ''.join(parts)
 
 
 def _urdu_markup(text, run_style, urdu_font, urdu_factor=1.0) -> str:
@@ -751,6 +851,9 @@ def _append_block(block, story, body_font, bold_font, urdu_font, usable_width):
             story.append(Spacer(1, 2))
             return story
         pstyle = _style_sheet(block.style, body_font, bold_font, urdu_font)
+        if block.ordered and any(u for _t, _s, u in block.ordered):
+            from app.services.bilingual import urdu_line_factor
+            pstyle.leading = max(pstyle.leading, urdu_line_factor(pstyle.fontSize))
         markup = _inline_markup(block, bold_font, urdu_font, 1.0)
         story.append(Paragraph(markup, pstyle))
         if block.style.get('rule-below'):
@@ -784,23 +887,27 @@ def _render_table(block, body_font, bold_font, urdu_font, usable_width,
 
     ncols = max(sum(c['colspan'] for c in row) for row in block.rows)
     col_widths = _column_widths(block, ncols, usable_width, body_font,
-                                bold_font)
+                                bold_font, urdu_font)
     data, styles = [], []
     for r, row in enumerate(block.rows):
         out = []
         col_index = 0
         for cell in row:
             style = cell['style']
-            markup = _escape(cell['text'])
+            if cell.get('ordered') is not None:
+                markup = _ordered_markup(cell['ordered'], urdu_font,
+                                         rtl=bool(style.get('rtl')))
+            else:
+                markup = _escape(cell['text'])
             run_markup = ''
-            for text, _run_style in cell['urdu']:
+            for text, _run_style in cell.get('urdu', []):
                 if not urdu_font or not text:
                     continue
                 size = urdu_size_for_html(float(style.get('font-size')
                                                 or _DEFAULT_FONT_SIZE))
                 run_markup += (f'<font face="{urdu_font}" size="{size}">'
                                f'{_escape(shape_urdu(text))}</font>')
-            if run_markup:
+            if run_markup and cell.get('ordered') is None:
                 available = (col_widths[col_index]
                              if col_index < len(col_widths) else usable_width)
                 markup += _urdu_separator(cell, style, run_markup,
@@ -811,6 +918,9 @@ def _render_table(block, body_font, bold_font, urdu_font, usable_width,
             if block.render_scale and block.render_scale < 1.0:
                 pstyle.fontSize *= block.render_scale
             pstyle.leading = max(pstyle.fontSize * 1.24, pstyle.leading)
+            if cell.get('ordered') and any(u for _t, _s, u in cell['ordered']):
+                from app.services.bilingual import urdu_line_factor
+                pstyle.leading = max(pstyle.leading, urdu_line_factor(pstyle.fontSize))
             out.append(Paragraph(markup, pstyle))
             if cell['header']:
                 styles.append(('BACKGROUND', (len(out) - 1, r),
@@ -864,7 +974,8 @@ def _strip_markup(markup: str) -> str:
     return re.sub(r'<[^>]+>', '', markup or '')
 
 
-def _column_widths(block, ncols, usable_width, body_font, bold_font=None):
+def _column_widths(block, ncols, usable_width, body_font, bold_font=None,
+                   urdu_font=None):
     """Column widths from the longest unbreakable token in each column.
 
     Text that cannot wrap (dates, bill numbers, amounts) sets a hard minimum;
@@ -884,10 +995,17 @@ def _column_widths(block, ncols, usable_width, body_font, bold_font=None):
             size = float(style.get('font-size') or _DEFAULT_FONT_SIZE)
             face = bold_font if (bold_font and style.get('bold')) else body_font
             text = cell['text'] or ''
-            tokens = text.split() or ['']
-            longest = max((pdfmetrics.stringWidth(t, face, size)
-                           for t in tokens), default=0.0)
-            whole = pdfmetrics.stringWidth(text, face, size)
+            segments = cell.get('ordered')
+            if segments and urdu_font:
+                whole = _segments_width(segments, face, size, urdu_font)
+                # Nastaleeq words must not be squeezed into a column sized for
+                # empty Latin text; treat the whole label as the hard minimum.
+                longest = whole
+            else:
+                tokens = text.split() or ['']
+                longest = max((pdfmetrics.stringWidth(t, face, size)
+                               for t in tokens), default=0.0)
+                whole = pdfmetrics.stringWidth(text, face, size)
             pad = 7.0
             if style.get('nowrap'):
                 minimums[index] = max(minimums[index], whole + pad)
@@ -913,6 +1031,24 @@ def _column_widths(block, ncols, usable_width, body_font, bold_font=None):
         return [m + spare * (m / total_min) for m in minimums]
     return [m + spare * (e / total_extra)
             for m, e in zip(minimums, extra_wanted)]
+
+
+def _segments_width(segments, face, size, urdu_font):
+    from reportlab.pdfbase import pdfmetrics
+    from app.services.bilingual import shape_urdu, urdu_size_for_html
+    total = 0.0
+    for text, style, is_urdu in segments:
+        if not text:
+            continue
+        try:
+            if is_urdu:
+                usize = urdu_size_for_html(float(style.get('font-size') or size))
+                total += pdfmetrics.stringWidth(shape_urdu(text), urdu_font, usize)
+            else:
+                total += pdfmetrics.stringWidth(text, face, size)
+        except Exception:
+            total += len(text) * size * 0.5
+    return total
 
 
 def _render_row(block, body_font, bold_font, urdu_font, usable_width,

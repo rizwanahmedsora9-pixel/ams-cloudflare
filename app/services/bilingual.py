@@ -1,8 +1,10 @@
-"""Dual-language (English + Urdu) PDF support.
+"""English / Urdu PDF support.
 
-Every PDF the app saves is rendered in two languages inside the same
-document: the original English text plus Urdu translations rendered in the
-Jameel Noori Nastaleeq font (bundled at ``static/fonts/JameelNooriNastaleeq.ttf``).
+Non-bill exports use the legacy dual-language layer: the original English text
+plus Urdu translations rendered in the Jameel Noori Nastaleeq font (bundled at
+``static/fonts/JameelNooriNastaleeq.ttf``).  Bills and receipts instead use the
+single-language helpers at the bottom of this module so each document is either
+fully English or fully Urdu, never a mixed bilingual receipt.
 
 Two rendering paths are covered:
 
@@ -1019,9 +1021,223 @@ def apply_bilingual(html: str) -> str:
 
     Injects the Jameel Noori ``@font-face`` CSS and Urdu label spans.  Safe to
     call on any rendered template; idempotent.
+
+    NOTE: this mixed English+Urdu layer is retained for non-bill documents
+    (ledgers, statements, reports).  Bills and receipts use :func:`apply_urdu`
+    / plain English instead, so each bill is a single-language document.
     """
     if not html:
         return html
     if _MARKER in html:
         return html
     return bilingual_css() + inject_urdu_labels(html)
+
+
+# --------------------------------------------------------------------------
+# Single-language Urdu mode (bills / receipts)
+# --------------------------------------------------------------------------
+# Bills are offered as two separate documents: English only, or Urdu only.
+# ``apply_urdu`` therefore does NOT append translations beside English labels.
+# The bill templates emit Urdu labels through the ``bill_label`` / ``bill_date``
+# Jinja filters when ``bill_lang == 'ur'``; this helper only adds the Nastaleeq
+# font face and switches the receipt wrapper to RTL.  User-entered names, notes,
+# bill numbers and material names are never machine-translated.
+
+_URDU_MARKER = '<!--ams-urdu-v1-->'
+_HAS_URDU = re.compile(r'[\u0600-\u06FF\uFB50-\uFEFF]')
+
+# Transaction-type badges resolved by ``billing._resolve_transaction_type``.
+_URDU_TX = {
+    'general_transaction': 'عمومی ٹرانزیکشن',
+    'grn_purchase': 'جی آر این / خریداری',
+    'payment_only': 'صرف ادائیگی',
+    'direct_sale_cash': 'براہ راست فروخت (نقد)',
+    'direct_sale_credit': 'براہ راست فروخت (ادھار)',
+    'direct_sale_mixed': 'براہ راست فروخت (بک شدہ + بقایا)',
+    'direct_sale_booked': 'براہ راست فروخت (بک شدہ ڈیلیوری)',
+    'direct_sale_open_khata': 'براہ راست فروخت (کھلا کھاتہ)',
+    'direct_sale': 'براہ راست فروخت',
+    'invoice': 'انوائس',
+    'cancellation': 'منسوخی',
+    'delivery': 'ڈیلیوری',
+    'booking': 'بکنگ',
+    'pending_adjustment': 'زیر التوا / ایڈجسٹمنٹ',
+}
+_URDU_NOTE_PHRASES = {
+    'Stock receiving purchase bill': 'اسٹاک وصولی خریداری بل',
+    'General invoice record': 'عمومی انوائس ریکارڈ',
+    'Booking cancellation / reversal': 'بکنگ منسوخی / واپسی',
+    'Material delivery transaction': 'میٹیریل ڈیلیوری ٹرانزیکشن',
+    'Booked / reserved material bill': 'بک شدہ / محفوظ میٹیریل بل',
+}
+_URDU_METHOD = {
+    'Cash': 'نقد', 'Bank': 'بینک', 'Card': 'کارڈ',
+    'Cheque': 'چیک', 'Check': 'چیک', 'Online': 'آن لائن',
+    'Receipt': 'رسید', 'Payment': 'ادائیگی',
+}
+_URDU_CATEGORY = {
+    'Cash': 'نقد', 'Credit Customer': 'ادھار گاہک',
+    'Booked + Due': 'بک شدہ + بقایا', 'Booking Delivery': 'بکنگ ڈیلیوری',
+    'Open Khata': 'کھلا کھاتہ', 'Mixed Transaction': 'مخلوط ٹرانزیکشن',
+}
+
+# Bill-specific fixed text that is not part of the shared ledger label dict.
+_BILL_LABELS = {
+    'N/A': 'غیر موجود',
+    'Open URL': 'یو آر ایل کھولیں',
+    'Thank you for your business!': 'آپ کے کاروبار کا شکریہ۔',
+    'Software by AMS SYSTEM FOR EASE': 'سافٹ ویئر: اے ایم ایس سسٹم فار ایز',
+    'Payment Received': 'وصول شدہ ادائیگی',
+    'via': 'بذریعہ',
+    'GRN expense': 'جی آر این خرچہ',
+    'Unattributed landed cost': 'غیر منسوب لینڈڈ لاگت',
+    'Supplier bill': 'سپلائر بل',
+    'Stock / material amount': 'اسٹاک / میٹیریل رقم',
+    'GRN expenses billed to supplier': 'سپلائر کو بل کیے گئے GRN اخراجات',
+    'Supplier advance': 'سپلائر ایڈوانس',
+    'Legacy GRN payment': 'پرانی GRN ادائیگی',
+    'GRN charge': 'GRN خرچہ',
+    'Transportation': 'نقل و حمل',
+    'Other Expenses': 'دیگر اخراجات',
+    'Vehicle / Transporter': 'گاڑی / ٹرانسپورٹر',
+    'Loading / Labour': 'لوڈنگ / لیبر',
+    'Other Party': 'دیگر پارٹی',
+    'Unassigned (legacy charge)': 'غیر تفویض شدہ (پرانا خرچہ)',
+}
+_BILL_LABELS.update(_URDU_METHOD)
+
+_URDU_MONTHS = {
+    'Jan': 'جنوری', 'Feb': 'فروری', 'Mar': 'مارچ', 'Apr': 'اپریل',
+    'May': 'مئی', 'Jun': 'جون', 'Jul': 'جولائی', 'Aug': 'اگست',
+    'Sep': 'ستمبر', 'Oct': 'اکتوبر', 'Nov': 'نومبر', 'Dec': 'دسمبر',
+}
+
+
+def urdu_tx_label(code: str, fallback: str = '') -> str:
+    """Urdu badge text for a transaction-type *code* (falls back to *fallback*)."""
+    return _URDU_TX.get((code or '').strip(), fallback)
+
+
+def urdu_tx_note(note: str) -> str:
+    """Urdu version of the short transaction note shown on a bill.
+
+    Known fixed phrases and the ``Method:`` / ``Sale Category:`` prefixes are
+    translated; free-text reasons typed by the user are left untouched.
+    """
+    note = (note or '').strip()
+    if not note:
+        return note
+    if note in _URDU_NOTE_PHRASES:
+        return _URDU_NOTE_PHRASES[note]
+    if note.startswith('Method:'):
+        val = note[len('Method:'):].strip()
+        return 'طریقہ: ' + _URDU_METHOD.get(val, val)
+    if note.startswith('Sale Category:'):
+        val = note[len('Sale Category:'):].strip()
+        return 'فروخت کا زمرہ: ' + _URDU_CATEGORY.get(val, val)
+    return note
+
+
+def _urdu_span(text: str):
+    """Return an RTL Urdu span as safe Jinja markup."""
+    from markupsafe import Markup, escape
+    return Markup('<span class="ur" lang="ur" dir="rtl">{}</span>').format(escape(str(text)))
+
+
+def bill_label(text, lang: str = 'en'):
+    """Translate a fixed bill label/value when *lang* is Urdu.
+
+    English mode returns the original string untouched.  Urdu mode replaces the
+    label with a single RTL span; it never appends Urdu beside English.  Unknown
+    user-entered text is preserved verbatim (proper nouns, notes, references).
+    """
+    if text is None:
+        return ''
+    text = str(text)
+    if (lang or 'en').strip().lower() not in ('ur', 'urdu', 'urd') or not text:
+        return text
+    key = text.strip()
+    trailing = ':' if key.endswith(':') else ''
+    base = key[:-1].strip() if trailing else key
+    ur = _BILL_LABELS.get(base)
+    if ur is None:
+        ur = LABELS.get(base)
+    if ur is None:
+        lowered = base.lower()
+        for en, value in LABELS.items():
+            if en.lower() == lowered:
+                ur = value
+                break
+    if ur is not None:
+        return _urdu_span(ur + trailing)
+    if _HAS_URDU.search(text):
+        return _urdu_span(text)
+    return text
+
+
+def bill_date(value, lang: str = 'en'):
+    """Format a bill timestamp; Urdu mode translates month names and AM/PM."""
+    if value is None:
+        return ''
+    if not hasattr(value, 'strftime'):
+        return str(value)
+    formatted = value.strftime('%d %b %Y  %I:%M %p')
+    if (lang or 'en').strip().lower() not in ('ur', 'urdu', 'urd'):
+        return formatted
+    from markupsafe import Markup
+    for en, ur in _URDU_MONTHS.items():
+        formatted = re.sub(r'\b' + en + r'\b', lambda m, ur=ur: str(_urdu_span(ur)), formatted)
+    formatted = re.sub(r'\bAM\b', lambda m: str(_urdu_span('صبح')), formatted)
+    formatted = re.sub(r'\bPM\b', lambda m: str(_urdu_span('شام')), formatted)
+    return Markup(formatted)
+
+
+def _urdu_css() -> str:
+    """``@font-face`` + RTL rules for a single-language Urdu receipt."""
+    file_url = 'file://' + JAMEEL_NOORI_TTF.replace(os.sep, '/')
+    return (
+        '<style id="ams-urdu-css">'
+        '@font-face {'
+        f'  font-family: "{URDU_FONT_FAMILY}";'
+        '  src: url("/static/fonts/JameelNooriNastaleeq.ttf") format("truetype"),'
+        f'       url("{file_url}") format("truetype");'
+        '  font-weight: normal; font-style: normal;'
+        '}'
+        '.rcpt-wrapper[dir="rtl"] { direction: rtl; text-align: right; }'
+        '.rcpt-wrapper[dir="rtl"] .ur {'
+        f'  font-family: "{URDU_FONT_FAMILY}", "Noto Nastaliq Urdu", serif;'
+        '  direction: rtl; unicode-bidi: embed;'
+        '  font-size: 1.08em; line-height: 1.9;'
+        '  letter-spacing: normal; text-transform: none;'
+        '}'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-detail-val,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-doc-no,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-doc-date,'
+        '.rcpt-wrapper[dir="rtl"] td.text-end {'
+        '  direction: ltr; unicode-bidi: embed;'
+        '}'
+        '</style>'
+    )
+
+
+def _set_receipt_rtl(html: str) -> str:
+    """Add ``dir="rtl" lang="ur"`` to the receipt wrapper when missing."""
+    pattern = re.compile(r'(<div\b[^>]*class="[^"]*\brcpt-wrapper\b[^"]*")', re.I)
+    match = pattern.search(html)
+    if not match or re.search(r'\bdir\s*=', match.group(1), re.I):
+        return html
+    return pattern.sub(lambda m: m.group(1) + ' dir="rtl" lang="ur"', html, count=1)
+
+
+def apply_urdu(html: str) -> str:
+    """Return *html* ready for a single-language Urdu bill PDF/print.
+
+    The bill template has already selected Urdu labels via ``bill_lang``.  This
+    injects the bundled Jameel Noori font and RTL layout only.  It is idempotent
+    and does not translate or reorder user-entered Latin data.
+    """
+    if not html:
+        return html
+    if _URDU_MARKER in html or _MARKER in html:
+        return html
+    return _urdu_css() + _URDU_MARKER + _set_receipt_rtl(html)
