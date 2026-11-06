@@ -108,6 +108,7 @@ def add_material():
     try:
         new_mat = Material(
             name=name,
+            name_ur=(request.form.get('material_name_ur') or '').strip(),
             code=code,
             category_id=category.id if category else None,
             unit=unit,
@@ -124,7 +125,9 @@ def add_material():
         )
         return redirect(url_for('materials'))
     if request.args.get('ajax'):
-        return jsonify({'success': True, 'id': new_mat.id, 'name': new_mat.name, 'code': new_mat.code, 'price': new_mat.unit_price, 'unit': new_mat.unit})
+        return jsonify({'success': True, 'id': new_mat.id, 'name': new_mat.name,
+                        'name_ur': new_mat.name_ur or '', 'code': new_mat.code,
+                        'price': new_mat.unit_price, 'unit': new_mat.unit})
     flash('Brand Added', 'success')
     return redirect(url_for('materials'))
 
@@ -203,6 +206,8 @@ def edit_material(id):
         _cascade_rename(old_name, new_name)
 
         m.name = new_name
+        if 'material_name_ur' in request.form:
+            m.name_ur = (request.form.get('material_name_ur') or '').strip()
         m.code = new_code
         m.unit = new_unit
         if category_id:

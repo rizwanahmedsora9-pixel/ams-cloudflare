@@ -120,3 +120,108 @@ def test_choke_point_returns_pdf(app):
     assert body.startswith(b'%PDF-')
     assert resp.headers['Content-Type'] == 'application/pdf'
     assert 'BILL-bilingual.pdf' in resp.headers['Content-Disposition']
+
+
+# ---------------------------------------------------------------------------
+# Nastaleeq shaping / bidi regressions (Urdu bill PDFs)
+# ---------------------------------------------------------------------------
+
+def _urdu_spans(*pairs):
+    from app.services import urdu_text as U
+    return [U.Span(text, urdu, 'Helvetica', 9) for text, urdu in pairs]
+
+
+def test_urdu_run_reversal_keeps_a_gap_between_label_and_value():
+    """``مینول بل:`` and ``MB NO.9101`` must not touch on the page."""
+    from app.services import urdu_text as U
+    para = U.UrduParagraph(_urdu_spans(('مینول بل:', True), (' MB NO.9101', False)),
+                           align='right')
+    para.wrap(300)
+    runs = [run for line in para._lines for run in line]
+    # RTL: the Urdu label is the right-most run, the identifier the left-most.
+    assert runs[-1].text().strip() == 'بل: مینول'
+    assert runs[0].text().strip() == 'MB NO.9101'
+    between = runs[0].text()[-1] + runs[1].text()[0]
+    assert ' ' in between or runs[0].text().endswith(' ') or runs[1].text().startswith(' ')
+
+
+def test_latin_identifier_is_not_split_across_lines():
+    """A bill number must never wrap into ``MB`` / ``NO.9101``."""
+    from app.services import urdu_text as U
+    para = U.UrduParagraph(
+        [U.Span('MB NO.9101', False, 'Helvetica-Bold', 7, nowrap=True)],
+        align='right')
+    para.wrap(30)                     # narrower than the token wants
+    assert para._height == para.leading
+
+
+def test_urdu_words_are_separated_in_the_text_layer():
+    """Every Urdu word is its own drawing operation with a real space gap."""
+    from app.services import urdu_text as U
+    para = U.UrduParagraph(_urdu_spans(('موجودہ بل کا کل:', True)), align='right')
+    para.wrap(300)
+    run = para._lines[0][0]
+    words = [w for w in run.words if not w.space]
+    assert len(words) == 4
+    assert sum(1 for w in run.words if w.space) == 3
+    assert all(w.width > 0 for w in words)
+
+
+def test_zeroadvance_marks_are_drawn_not_overpainted():
+    """``ٹرانزیکشن`` carries zero-advance marks; they must keep a position."""
+    from app.services import urdu_text as U
+    glyphs = U.shape_glyphs('ٹرانزیکشن')
+    assert any(adv == 0 for _gid, adv, _dx, _dy in glyphs)
+    assert any(dx or dy for _gid, _adv, dx, dy in glyphs)
+
+
+def test_table_row_with_colspan_stays_within_the_page():
+    """A ``colspan`` row used to add phantom columns to the PDF table."""
+    from app.services.pdf_layout import layout, build_story
+    from app.services.pdf_fallback import _parse_document
+    html = (
+        '<html><body><table>'
+        '<tr><th>A</th><th>B</th><th>C</th><th>D</th></tr>'
+        '<tr><td>1</td><td>2</td><td>3</td><td>4</td></tr>'
+        '<tr><td colspan="3">Total</td><td>4</td></tr>'
+        '</table></body></html>'
+    )
+    root, css = _parse_document(html)
+    story = build_story(layout(root, css), 'Helvetica', 'Helvetica-Bold',
+                        'Helvetica', 362)
+    tables = [item for item in story if type(item).__name__ == 'Table']
+    table = max(tables, key=lambda t: t._ncols)
+    assert table._ncols == 4
+    assert len(table._colWidths) == 4
+    assert sum(table._colWidths) <= 362.5
+
+
+def test_nowrap_css_rule_survives_pseudo_class_selector():
+    """``.tbl td:first-child { white-space: nowrap }`` must reach the cells."""
+    from app.services.pdf_layout import layout
+    from app.services.pdf_fallback import _parse_document
+    html = (
+        '<html><head><style>'
+        '.tbl td:first-child { white-space: nowrap; }'
+        '</style></head><body><table class="tbl">'
+        '<tr><td>MB NO.7001</td><td>x</td></tr>'
+        '</table></body></html>'
+    )
+    root, css = _parse_document(html)
+    blocks = layout(root, css)
+    cell = blocks[0].rows[0][0]
+    assert cell['style'].get('nowrap') is True
+
+
+def test_long_urdu_paragraph_splits_instead_of_overflowing():
+    """A flowable that cannot fit must split; raising ``LayoutError`` used to
+    abort the whole document build."""
+    from app.services import urdu_text as U
+    para = U.UrduParagraph(_urdu_spans(('یہ ایک طویل اردو عبارت ہے ' * 40, True)),
+                           align='right')
+    para.wrap(200)
+    head_and_tail = para.split(200, para.leading * 2)
+    assert len(head_and_tail) == 2
+    head, tail = head_and_tail
+    assert len(head._lines) == 2
+    assert len(head._lines) + len(tail._lines) == len(para._lines)

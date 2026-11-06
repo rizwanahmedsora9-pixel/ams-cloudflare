@@ -270,6 +270,8 @@ async function generateMaterialAutoCode() {
             <div class="modal-body">
                 <label class="text-white fw-bold mb-2 small text-uppercase">Brand Name</label>
                 <input type="text" name="material_name" value="{{ m.name }}" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" required>
+                <label class="text-white fw-bold mb-2 small text-uppercase">Urdu Name <span class="text-white-50">(bill)</span></label>
+                <input type="text" name="material_name_ur" value="{{ m.name_ur or '' }}" dir="rtl" lang="ur" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" placeholder="مثلاً او پی سی سیمنٹ">
                 <label class="text-white fw-bold mb-2 small text-uppercase">Category</label>
                 <select name="category_id" class="form-select bg-dark text-white border-secondary mb-3">
                     {% for cat in categories %}
@@ -303,6 +305,8 @@ async function generateMaterialAutoCode() {
             <div class="modal-body">
                 <label class="text-white fw-bold mb-2 small text-uppercase">Brand Name</label>
                 <input type="text" name="material_name" id="addMaterialName" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" placeholder="e.g. Lucky Cement or FT-KOHAT" required>
+                <label class="text-white fw-bold mb-2 small text-uppercase">Urdu Name <span class="text-white-50">(printed on the Urdu bill)</span></label>
+                <input type="text" name="material_name_ur" dir="rtl" lang="ur" class="form-control bg-dark text-white border-secondary fs-5 py-2 mb-3" placeholder="مثلاً لکی سیمنٹ">
                 <label class="text-white fw-bold mb-2 small text-uppercase">Category</label>
                 <select name="category_id" id="addMaterialCategoryId" class="form-select bg-dark text-white border-secondary mb-3">
                     {% for cat in categories %}
