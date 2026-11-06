@@ -70,6 +70,7 @@ def edit_client(id):
 
         c.name = new_name
         c.code = new_code
+        c.name_ur = (request.form.get('name_ur') or '').strip()
         c.phone = request.form.get('phone', '')
         c.address = request.form.get('address', '')
         c.category = category_name

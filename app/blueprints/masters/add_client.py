@@ -29,6 +29,7 @@ def add_client():
 
     new_c = Client(name=name,
                    code=code,
+                   name_ur=(request.form.get('name_ur') or '').strip(),
                    phone=request.form.get('phone', ''),
                    address=request.form.get('address', ''),
                    category=category,

@@ -493,10 +493,10 @@ def get_or_create_delivery_person(name_input, phone=None):
     conn.execute(
         text(
             "INSERT OR IGNORE INTO delivery_person "
-            "(name, phone, is_active, opening_balance, opening_balance_date, created_at) "
-            "VALUES (:n, :p, 1, 0, :now, :now)"
+            "(name, name_ur, phone, is_active, opening_balance, opening_balance_date, created_at) "
+            "VALUES (:n, :nu, :p, 1, 0, :now, :now)"
         ),
-        {'n': name, 'p': phone_value or None, 'now': now},
+        {'n': name, 'nu': name_ur_value or None, 'p': phone_value or None, 'now': now},
     )
     row = conn.execute(
         text("SELECT id FROM delivery_person WHERE lower(trim(name)) = :n LIMIT 1"),
@@ -511,6 +511,8 @@ def get_or_create_delivery_person(name_input, phone=None):
         existing.is_active = True
     if phone_value:
         existing.phone = phone_value
+    if name_ur_value:
+        existing.name_ur = name_ur_value
     return existing
 
 

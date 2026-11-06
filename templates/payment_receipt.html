@@ -226,7 +226,11 @@
         <div class="rcpt-parties">
             <div>
                 <div class="rcpt-party-label">{{ 'Received From'|bill_label(bill_lang) }}</div>
+                {% if bill_lang == 'ur' and client_name_ur %}
+                <div class="rcpt-party-name">{{ client_name_ur|bill_label(bill_lang) }}</div>
+                {% else %}
                 <div class="rcpt-party-name">{{ bill.client_name }}</div>
+                {% endif %}
                 {% if client and client.code %}
                 <div class="rcpt-party-sub">{{ 'Code:'|bill_label(bill_lang) }} {{ client.code }}</div>
                 {% endif %}
