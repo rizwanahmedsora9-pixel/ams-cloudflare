@@ -235,6 +235,9 @@ def download_supplier_payment(payment_id):
         if pdf_response:
             return pdf_response
 
+    if action == 'print':
+        rendered = _bilingual_print_html(rendered)
+
     response = make_response(rendered)
     response.headers['Content-Disposition'] = f'{disposition}; filename={_download_filename("SUPPLIERPAYMENT", "html")}'
     response.headers['Content-Type'] = 'text/html; charset=utf-8'

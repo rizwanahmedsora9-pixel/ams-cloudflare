@@ -33,6 +33,9 @@ def download_client_clearance(id):
         pdf_response = _try_render_weasy_pdf(rendered, filename, disposition='attachment')
         if pdf_response:
             return pdf_response
+    else:
+        # Browser printing gets the same Urdu layer as the generated PDF.
+        rendered = _bilingual_print_html(rendered)
     response = make_response(rendered)
     response.headers['Content-Disposition'] = (
         f"{'inline' if request.args.get('action') == 'print' else 'attachment'}; "

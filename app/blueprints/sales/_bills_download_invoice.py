@@ -348,6 +348,10 @@ def download_invoice(bill_no):
         if pdf_response:
             return pdf_response
 
+    if action == 'print':
+        # Browser printing needs the Urdu layer and @font-face as well.
+        rendered = _bilingual_print_html(rendered)
+
     response = make_response(rendered)
     fallback_name = _download_filename(section, 'html')
     response.headers['Content-Disposition'] = f'{disposition}; filename={fallback_name}'
