@@ -24,10 +24,55 @@ def test_open_khata_style_words_are_never_spelled_out_letter_by_letter():
     assert urdu_name('PAID') == 'پیڈ'
 
 
-def test_capitalised_person_names_read_as_words():
-    """ALL-CAPS names with a normal vowel pattern are words, not initialisms."""
-    assert urdu_name('ALI') == 'الی'
-    assert urdu_name('ASIF') == 'اسیف'
+def test_titles_and_honorifics():
+    """چوہدری مرزا صاحب -- "CH. MIRZA SB" must read the way clients say it.
+
+    ``SB`` is the local written short form of صاحب and ``CH.`` of چوہدری;
+    both expand to the full Urdu honorific instead of being spelled out.
+    """
+    assert urdu_name('CH.') == 'چوہدری.'
+    assert urdu_name('CHAUDHRY') == 'چوہدری'
+    assert urdu_name('CH MIRZA SB') == 'چوہدری مرزا صاحب'
+    assert urdu_name('CH. ALI SB') == 'چوہدری. علی صاحب'
+    assert urdu_name('MIRZA SAHIB') == 'مرزا صاحب'
+    assert urdu_name('MALIK KHAN') == 'ملک خان'
+    assert urdu_name('SB') == 'صاحب'
+
+
+def test_gujrat_places_and_villages():
+    """District towns and villages keep their real Urdu spellings."""
+    assert urdu_name('GUJRAT') == 'گجرات'
+    assert urdu_name('KHARIAN') == 'کھاریاں'
+    assert urdu_name('LALAMUSA') == 'لالہ موسیٰ'
+    assert urdu_name('LALA MUSA') == 'لالہ موسیٰ'
+    assert urdu_name('JALALPUR JATTAN') == 'جلالپور جٹاں'
+    assert urdu_name('SARAI ALAMGIR') == 'سرائے عالم گیر'
+    assert urdu_name('JALAL PUR SOBTIAN') == 'جلال پور سوہتیاں'
+    assert urdu_name('DINGA') == 'ڈنگہ'
+    assert urdu_name('KUNJAH') == 'کنجاہ'
+    assert urdu_name('TANDA') == 'ٹنڈہ'
+    assert urdu_name('BHAGWAL') == 'بھگوال'
+
+
+def test_common_boys_names():
+    assert urdu_name('ASIF') == 'آصف'
+    assert urdu_name('ALI') == 'علی'
+    assert urdu_name('USMAN') == 'عثمان'
+    assert urdu_name('IMRAN') == 'عمران'
+    assert urdu_name('BILAL') == 'بلال'
+    assert urdu_name('HAMZA') == 'حمزہ'
+    assert urdu_name('HASSAN') == 'حسن'
+    assert urdu_name('HUSSAIN') == 'حسین'
+    assert urdu_name('YOUNIS') == 'یونس'
+    assert urdu_name('TEST DRIVER') == 'ٹیسٹ ڈریور'
+
+
+def test_gujrat_clans():
+    assert urdu_name('WARRAICH') == 'وڑائچ'
+    assert urdu_name('GONDAL') == 'گوندل'
+    assert urdu_name('TARAR') == 'ترار'
+    assert urdu_name('CHEEMA') == 'چیمہ'
+    assert urdu_name('GUJJAR') == 'گوجر'
 
 
 def test_true_initialisms_are_still_spelled_out():

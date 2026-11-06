@@ -2,6 +2,21 @@
 
 Transliteration is inherently ambiguous; a catalogue's explicit Urdu name is
 always preferable. Preserve punctuation, numbers and non-Latin text unchanged.
+
+The word list below is tuned for how clients and drivers around Gujrat
+(Pakistan) are actually written on bills, so "CH. MIRZA SB" reads
+چوہدری مرزا صاحب instead of spelled-out letters:
+
+* honorifics first (Chaudhry/``CH.``, Mirza, Malik, Khan, Raja, ... and
+  ``SB`` -- the local short form of صاحب),
+* common boys' names with their proper Urdu spellings (Asif → آصف, not آسیف),
+* clans/surnames of the Gujrat region (Warraich, Gondal, Tarar, ...),
+* villages and towns of Gujrat district and its neighbours (Kharian,
+  Lalamusa, Jalalpur Jattan, Sarai Alamgir, Dinga, Kunjah, ...),
+* walk-in / ledger vocabulary ("OPEN KHATA", "CASH", ...).
+
+Anything not catalogued still falls through to the letter transliterator,
+which stays deliberately conservative.
 """
 import re
 
@@ -9,7 +24,68 @@ import re
 # walk-in name typed in capitals ("OPEN", "OPEN KHATA", "CASH") is read as the
 # word itself and never spelled out letter-by-letter like an initialism.
 _WORDS = {
-    # Walk-in / ledger vocabulary seen in client and driver names.
+    # ---- Honorifics / titles ("SB" is the local short form of صاحب) ----
+    'ch': 'چوہدری', 'chaudhry': 'چوہدری', 'chaudhary': 'چوہدری',
+    'choudhry': 'چوہدری', 'chaudri': 'چوہدری',
+    'mirza': 'مرزا', 'malik': 'ملک', 'khan': 'خان', 'raja': 'راجہ',
+    'mian': 'میاں', 'rao': 'راؤ', 'sheikh': 'شیخ', 'syed': 'سید',
+    'sayed': 'سید', 'haji': 'حاجی', 'nawab': 'نواب', 'sardar': 'سردار',
+    'hafiz': 'حافظ', 'sahib': 'صاحب', 'sb': 'صاحب',
+    # ---- Common boys' names (proper Urdu spellings) ----
+    'adnan': 'عدنان', 'aamir': 'عامر', 'amir': 'عامر', 'ajmal': 'اجمل',
+    'akhtar': 'اختر', 'akram': 'اخرم', 'ali': 'علی', 'amjad': 'امجد',
+    'anwar': 'انور', 'arif': 'عارف', 'arshad': 'ارشد', 'asghar': 'اصغر',
+    'ashraf': 'اشرف', 'asif': 'آصف', 'aslam': 'اسلم', 'atif': 'عاطف',
+    'awais': 'اویس', 'azam': 'اعظم', 'azhar': 'اظہر', 'babar': 'بابر',
+    'bilal': 'بلال', 'dawood': 'داؤد', 'fahad': 'فہد', 'faiz': 'فیض',
+    'faisal': 'فیصل', 'fayyaz': 'فیاض', 'ghulam': 'غلام', 'gulzar': 'گلزار',
+    'hamid': 'حامد', 'hamed': 'حامد', 'hameed': 'حمید', 'hamza': 'حمزہ',
+    'haroon': 'ہارون', 'hasan': 'حسن', 'hassan': 'حسن', 'husain': 'حسین',
+    'hussain': 'حسین', 'ibrahim': 'ابراہیم', 'idrees': 'ادریس',
+    'iftikhar': 'افتخار', 'ilyas': 'الیاس', 'imran': 'عمران',
+    'iqbal': 'اقبال', 'ismail': 'اسماعیل', 'javed': 'جاوید',
+    'junaid': 'جنید', 'kamran': 'کامران', 'kashif': 'کاشف',
+    'mahmood': 'محمود', 'majeed': 'مجید', 'masood': 'مسعود',
+    'mudassir': 'مدثر', 'mudasir': 'مدثر', 'muhammad': 'محمد',
+    'mohammad': 'محمد', 'mohmad': 'محمد', 'mushtaq': 'مشتاق',
+    'mustafa': 'مصطفیٰ', 'naeem': 'نعیم', 'naseem': 'نسیم', 'nasir': 'ناصر',
+    'naveed': 'نوید', 'nawaz': 'نواز', 'noman': 'نعمان', 'omar': 'عمر',
+    'osama': 'اسامہ', 'parvez': 'پرویز', 'pervez': 'پرویز', 'qaiser': 'قیصر',
+    'rashid': 'راشد', 'rasool': 'رسول', 'riaz': 'ریاض', 'saad': 'سعد',
+    'sabir': 'صابر', 'saeed': 'سعید', 'sajjad': 'سجاد', 'salman': 'سلمان',
+    'saqib': 'صاقب', 'shabbir': 'شبیر', 'shafiq': 'شفیق', 'shahid': 'شاہد',
+    'shahzad': 'شہزاد', 'sharjeel': 'شرجیل', 'shoaib': 'شعیب',
+    'sohail': 'سہیل', 'sulaiman': 'سلیمان', 'suleman': 'سلیمان',
+    'tahir': 'طاہر', 'talha': 'طلحہ', 'tanveer': 'تنویر', 'tanvir': 'تنویر',
+    'tariq': 'طارق', 'umair': 'عمیر', 'umar': 'عمر', 'usama': 'اسامہ',
+    'usman': 'عثمان', 'waqas': 'وقاص', 'waseem': 'وسیم', 'wasim': 'وسیم',
+    'yaqoob': 'یعقوب', 'yasin': 'یاسین', 'younis': 'یونس', 'yousaf': 'یوسف',
+    'yousuf': 'یوسف', 'yusuf': 'یوسف', 'zafar': 'ظفر', 'zahid': 'زاہد',
+    'zeeshan': 'ذیشان',
+    # ---- Clans / surnames of the Gujrat region ----
+    'awan': 'اعوان', 'bhatti': 'بھٹی', 'butt': 'بٹ', 'chadhar': 'چدھڑ',
+    'cheema': 'چیمہ', 'gujjar': 'گوجر', 'hanjra': 'ہنجڑہ', 'jatt': 'جٹ',
+    'gondal': 'گوندل', 'khokhar': 'کھوکھر', 'rajput': 'راجپوت',
+    'sandhu': 'سندھو', 'sial': 'سیال', 'tarar': 'ترار', 'virk': 'ورک',
+    'warraich': 'وڑائچ', 'waraich': 'وڑائچ',
+    # ---- Villages / towns: Gujrat district and neighbours ----
+    'gujrat': 'گجرات', 'jalalpur': 'جلالپور', 'jalal': 'جلال', 'pur': 'پور',
+    'jattan': 'جٹاں', 'kharian': 'کھاریاں', 'lalamusa': 'لالہ موسیٰ',
+    'lala': 'لالہ', 'musa': 'موسیٰ', 'dinga': 'ڈنگہ', 'kunjah': 'کنجاہ',
+    'sarai': 'سرائے', 'alamgir': 'عالم گیر', 'tanda': 'ٹنڈہ', 'kotla': 'کوٹلہ',
+    'bhagwal': 'بھگوال', 'kakrali': 'ککڑالی', 'mangowal': 'منگووال',
+    'shadiwal': 'شادیوال', 'kalaskey': 'کلسکے', 'kalaske': 'کلسکے',
+    'bhalot': 'بھلوٹ', 'langrial': 'لنگریال', 'karnana': 'کرنانہ',
+    'dhoria': 'ڈھوریہ', 'sobtian': 'سوہتیاں', 'sohtian': 'سوہتیاں',
+    'kot': 'کوٹ', 'pind': 'پنڈ', 'chak': 'چک', 'mohallah': 'محلہ',
+    'muhallah': 'محلہ', 'nagar': 'نگر', 'cantt': 'کینٹ',
+    # ---- Nearby cities / country ----
+    'islam': 'اسلام', 'abad': 'آباد', 'wazir': 'وزیر', 'phalia': 'پھالیہ',
+    'jhelum': 'جہلم', 'sialkot': 'سیالکوٹ', 'gujranwala': 'گوجرانوالہ',
+    'rawalpindi': 'راولپنڈی', 'lahore': 'لاہور', 'mandi': 'منڈی',
+    'bahauddin': 'بہاؤالدین', 'mirpur': 'میرپور', 'bhimber': 'بھمبر',
+    'pakistan': 'پاکستان',
+    # ---- Walk-in / ledger vocabulary seen in client and driver names ----
     'open': 'اوپن', 'khata': 'کھاتہ', 'cash': 'کیش', 'paid': 'پیڈ',
     'sale': 'سیل', 'credit': 'کریڈٹ', 'advance': 'ایڈوانس', 'rent': 'رینٹ',
     'return': 'ریٹرن', 'due': 'ڈیو', 'general': 'جنرل', 'customer': 'کسٹمر',
@@ -18,11 +94,11 @@ _WORDS = {
     'company': 'کمپنی', 'bank': 'بینک', 'account': 'اکاؤنٹ',
     'booking': 'بکنگ', 'delivery': 'ڈیلیوری', 'payment': 'پیمنٹ',
     'cement': 'سیمنٹ', 'goods': 'گڈز', 'material': 'میٹیریل',
+    'driver': 'ڈریور', 'conductor': 'کنڈکٹر',
     # Short all-caps-friendly words (single vowel), so they keep word reading.
     'work': 'ورک', 'home': 'ہوم', 'food': 'فوڈ', 'room': 'روم', 'good': 'گڈ',
     'sons': 'سنز', 'bros': 'بروز', 'mill': 'مل', 'star': 'اسٹار', 'test': 'ٹیسٹ',
-    # Known names / brands.
-    'hamid': 'حامد', 'hamed': 'حامد', 'faisal': 'فیصل',
+    # Known brands / abbreviations kept from the first catalogue.
     'dg': 'ڈی جی',
 }
 _LETTERS = {
