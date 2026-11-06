@@ -6,7 +6,7 @@ receipt.  These tests pin the new contract:
 * ``/view_bill`` shows separate English/Urdu PDF + Print buttons.
 * ``/download_invoice`` defaults to English and accepts ``lang=ur`` aliases.
 * The English document contains no Urdu layer/font.
-* The Urdu document translates fixed bill furniture, keeps user data verbatim,
+* The Urdu document translates fixed bill furniture and names, preserves other data,
   and still embeds the bundled Jameel Noori font.
 * Non-bill exports keep the legacy mixed bilingual behaviour.
 """
@@ -303,3 +303,31 @@ def test_non_bill_exports_keep_legacy_bilingual_layer(app):
     assert b"Jameel-Noori" in pdf.get_data()
     assert "<!--ams-bilingual-v1-->" in printed
     assert B.LABELS["Bill No"] in printed
+
+
+def test_urdu_bill_and_receipt_names_use_saved_spellings(client, app, bill_data):
+    from models.parties import DeliveryPerson
+    with app.app_context():
+        person = Client.query.get(bill_data['client'])
+        material = Material.query.get(bill_data['mat'])
+        person.name_ur = 'فیصل'
+        material.name_ur = 'ڈی جی سیمنٹ'
+        driver = DeliveryPerson.query.filter_by(name='TEST DRIVER').first()
+        if driver is None:
+            driver = DeliveryPerson(name='TEST DRIVER')
+            db.session.add(driver)
+        driver.name_ur = 'حامد'
+        db.session.commit()
+
+    sale_url = f"/download_invoice/MB NO.9101?src=direct_sale&src_id={bill_data['sale_id']}&action=print"
+    ur = _receipt_block(client.get(sale_url + '&lang=ur').get_data(as_text=True))
+    assert 'فیصل' in ur
+    assert 'حامد' in ur
+    assert 'ڈی جی سیمنٹ' in ur
+    en = _receipt_block(client.get(sale_url).get_data(as_text=True))
+    assert bill_data['client_name'] in en
+    assert bill_data['material_name'] in en
+    assert 'فیصل' not in en
+
+    payment_url = f"/download_invoice/MB NO.9102?src=payment&src_id={bill_data['payment_id']}&action=print&lang=ur"
+    assert 'فیصل' in _receipt_block(client.get(payment_url).get_data(as_text=True))

@@ -1,5 +1,6 @@
 """bills — split from sales.py."""
 from ._common import *  # noqa
+from app.services.urdu_names import urdu_name
 
 def _material_urdu_names():
     """``{english material name (casefolded): urdu name}`` for printed bills.
@@ -35,13 +36,14 @@ def _with_urdu_item_names(items, lang):
     rows = []
     names = _material_urdu_names() if lang == 'ur' else {}
     for item in items or []:
-        name = _field(item, 'name', 'product_name', 'material_name', 'material',
+        name = _field(item, 'name', 'product_name', 'material_name', 'material', 'mat_name',
                       default='')
         urdu = ''
         if lang == 'ur':
             urdu = str(_field(item, 'name_ur', default='') or '').strip()
             if not urdu:
                 urdu = names.get(str(name).strip().casefold(), '')
+            urdu = urdu_name(name, urdu)
         rows.append({
             'name': name,
             'name_ur': urdu,
@@ -360,10 +362,8 @@ def download_invoice(bill_no):
         lang = 'ur'
     else:
         lang = 'en'
-    # The Urdu receipt prints the material's Urdu name where one is recorded.
+    # Prefer saved Urdu names; otherwise use a best-effort transliteration.
     items = _with_urdu_item_names(items, lang)
-    # ...and the client's Urdu name (``Client.name_ur``) where one is recorded;
-    # without one the bill keeps the English name so it is never left blank.
     client_name_ur = ''
     driver_name_ur = ''
     if lang == 'ur':
@@ -374,7 +374,17 @@ def download_invoice(bill_no):
             driver = DeliveryPerson.query.filter(
                 func.lower(func.trim(DeliveryPerson.name)) == driver_name.lower()
             ).first()
-            driver_name_ur = (getattr(driver, 'name_ur', None) or '').strip()
+            driver_name_ur = urdu_name(driver_name, getattr(driver, 'name_ur', None))
+        client_name = getattr(bill_obj, 'client_name', None) or getattr(client, 'name', '')
+        client_name_ur = urdu_name(client_name, client_name_ur)
+        if delivery_people:
+            translated_people = []
+            for name in delivery_people:
+                driver = DeliveryPerson.query.filter(
+                    func.lower(func.trim(DeliveryPerson.name)) == name.strip().lower()
+                ).first()
+                translated_people.append(urdu_name(name, getattr(driver, 'name_ur', None)))
+            delivery_people = translated_people
     tx_code, tx_label, tx_note = _resolve_transaction_type(bill_type, bill_obj, entry_hint_id=entry_hint_id)
     if lang == 'ur':
         from app.services.bilingual import urdu_tx_label, urdu_tx_note

@@ -438,7 +438,7 @@
             <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Account No.'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.account_no }}</span></div>
             {% endif %}
             {% if delivery_people is defined and delivery_people %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ ('Delivery Persons' if delivery_people|length > 1 else 'Delivery Person')|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ ", ".join(delivery_people) }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ ('Delivery Persons' if delivery_people|length > 1 else 'Delivery Person')|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ ", ".join(delivery_people)|bill_label(bill_lang) }}</span></div>
             {% elif bill.driver_name is defined and bill.driver_name %}
             <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Delivery Person'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{% if bill_lang == 'ur' and driver_name_ur %}{{ driver_name_ur|bill_label(bill_lang) }}{% else %}{{ bill.driver_name }}{% endif %}</span></div>
             {% endif %}
