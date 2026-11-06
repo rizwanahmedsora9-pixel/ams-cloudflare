@@ -50,6 +50,11 @@ def _iter_rule_blocks(text):
 _INHERITED = {
     'color', 'font-size', 'font-weight', 'font-style', 'font-family',
     'text-align', 'line-height', 'letter-spacing', 'text-transform', 'direction',
+    # ``white-space`` is inherited in CSS.  The receipt's date block relies on
+    # it (``.rcpt-header-right { white-space: nowrap }``) to hold
+    # ``06 نومبر 2026 03:55 شام`` on one line; without the inheritance the
+    # date broke in two and the pieces stacked on top of each other.
+    'white-space',
 }
 
 _DEFAULT_FONT_SIZE = 8.2      # pt used by the old fallback for body text
@@ -474,7 +479,7 @@ def resolve(css: Css, node, inherited=None) -> dict:
     display = (decls.get('display') or '').lower()
     base['display'] = display
     base['flex'] = display in ('flex', 'inline-flex')
-    base['nowrap'] = (decls.get('white-space') or '').lower() == 'nowrap'
+    base['nowrap'] = (base.get('white-space') or '').lower() == 'nowrap'
 
     flex_dir = (decls.get('flex-direction') or '').lower()
     base['column'] = flex_dir.startswith('column')
@@ -907,6 +912,9 @@ def _paragraph(segments, style, body_font, bold_font, available=None):
             color=seg_colour,
             bold=seg_bold,
             nowrap=bool(seg_style.get('nowrap')),
+            # ``<span class="ur" dir="rtl">`` is the document's own statement
+            # that this run reads right to left; the line it starts must too.
+            rtl=bool(seg_style.get('rtl')),
         ))
     leading = None
     if any(s.urdu for s in spans):
@@ -918,7 +926,21 @@ def _paragraph(segments, style, body_font, bold_font, available=None):
         align=align,
         color=colour,
         style=style,
+        bidi_rtl=_block_is_rtl(style),
     )
+
+
+def _block_is_rtl(style) -> bool:
+    """Base direction of the block that owns a paragraph.
+
+    ``style`` is the resolved style of the element the paragraph came from -
+    a ``<div dir="rtl">`` wrapper, a table cell inside an RTL table, or a
+    ``.rcpt-wrapper[dir="rtl"]`` document.  An Urdu *label* always sits inside
+    one of those, and inheriting the direction from it is what keeps a bare
+    figure (``25,000``, ``0300-1234567``) from being read as left-to-right
+    text inside a right-to-left receipt.
+    """
+    return bool(style.get('rtl'))
 
 
 def _segments_for_line(line: Line):
@@ -1039,14 +1061,25 @@ def _rule(width, style, colors):
 def _render_table(block, body_font, bold_font, urdu_font, usable_width,
                   colors, Paragraph, Table, TableStyle):
     ncols = max(sum(c['colspan'] for c in row) for row in block.rows)
-    col_widths = _column_widths(block, ncols, usable_width, body_font,
-                                bold_font, urdu_font)
-    rows = block.rows
     if block.rtl:
         # An RTL table mirrors its columns: the first cell of the markup lands
         # in the right-most column.  ``colspan`` cells keep their span, and
-        # every ``ALIGN`` column index is mirrored at the end.
-        rows = [_mirror_row(row, ncols) for row in rows]
+        # every ``ALIGN`` column index is mirrored with them.
+        rows = [_mirror_row(row, ncols) for row in block.rows]
+    else:
+        rows = block.rows
+    # Measure the columns *after* mirroring.  Measuring the logical order and
+    # then mirroring the cells gave the first physical column the width the
+    # last logical cell needed: the amount column swallowed half the sheet and
+    # the item name wrapped to four lines ("LANG / TEST C / EMENT").
+    # Nastaleeq letters reach well past their advance width, so two adjacent
+    # Urdu headings (``مقدار`` next to ``ریٹ``) looked glued together even
+    # though their boxes did not overlap.  An Urdu table therefore reserves a
+    # little more padding; a Latin table keeps exactly what it always had.
+    cell_pad = 4.0 if _table_has_urdu(rows) else 2.5
+    col_widths, shrink = _column_widths(rows, ncols, usable_width, body_font,
+                                        bold_font, urdu_font, pad=cell_pad * 2)
+    block.render_scale = shrink
     data, styles = [], []
     for r, row in enumerate(rows):
         out = []
@@ -1139,8 +1172,10 @@ def _render_table(block, body_font, bold_font, urdu_font, usable_width,
     table.setStyle(TableStyle([
         ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#8b8f96')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 2.5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 2.5),
+        # The padding the column maths reserved, so a Nastaleeq heading that
+        # reaches past its advance width still has air around it.
+        ('LEFTPADDING', (0, 0), (-1, -1), cell_pad),
+        ('RIGHTPADDING', (0, 0), (-1, -1), cell_pad),
         ('TOPPADDING', (0, 0), (-1, -1), 2),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
     ] + styles))
@@ -1172,22 +1207,39 @@ def _strip_markup(markup: str) -> str:
     return re.sub(r'<[^>]+>', '', markup or '')
 
 
-def _column_widths(block, ncols, usable_width, body_font, bold_font=None,
-                   urdu_font=None):
+def _table_has_urdu(rows) -> bool:
+    """True when any cell of *rows* carries Urdu text."""
+    for row in rows:
+        for cell in row:
+            if cell is None:
+                continue
+            if any(is_urdu for _t, _s, is_urdu in _segments_for_cell(cell)):
+                return True
+    return False
+
+
+def _column_widths(rows, ncols, usable_width, body_font, bold_font=None,
+                   urdu_font=None, pad=5.5):
     """Column widths from the longest unbreakable token in each column.
 
-    Text that cannot wrap (dates, bill numbers, amounts) sets a hard minimum;
-    the remaining space is shared in proportion to how much each column wants
-    to say, so a wide description column still gets the room it needs.
+    *rows* are the cells in *physical* (left to right) order, so a mirrored
+    RTL table is measured on the columns it will actually print.  Text that
+    cannot wrap (dates, bill numbers, amounts) sets a hard minimum; the
+    remaining space is shared in proportion to how much each column wants to
+    say, so a wide description column still gets the room it needs.
     """
-    from reportlab.pdfbase import pdfmetrics
     from app.services import urdu_text as U
 
     wants = [1.0] * ncols
     minimums = [1.0] * ncols
-    for row in block.rows:
+    for row in rows:
         index = 0
         for cell in row:
+            if cell is None:
+                # A column covered by a mirrored ``colspan``: it carries no
+                # text of its own.
+                index += 1
+                continue
             if index >= ncols:
                 break
             style = cell['style']
@@ -1219,7 +1271,6 @@ def _column_widths(block, ncols, usable_width, body_font, bold_font=None,
     # Cell padding is constant: it must stay out of the shrink calculation, or
     # the scaled type still does not fit the scaled column and figures wrap
     # mid-number ("600,000.0" / "0").
-    pad = 5.5
     padding = pad * ncols
     room = max(usable_width - padding, 1.0)
     total_min = sum(minimums) or 1.0
@@ -1227,16 +1278,16 @@ def _column_widths(block, ncols, usable_width, body_font, bold_font=None,
         # The table needs more room than the sheet has (very dense ledgers on
         # A5).  Shrink the type and flag the block so the renderer scales the
         # flowables to match instead of letting figures wrap.
-        block.render_scale = room / total_min
-        return [m * block.render_scale + pad for m in minimums]
+        return [m * (room / total_min) + pad for m in minimums], \
+            room / total_min
 
     spare = room - total_min
     extra_wanted = [max(0.0, w - m) for w, m in zip(wants, minimums)]
     total_extra = sum(extra_wanted)
     if total_extra <= 0:
-        return [m + spare * (m / total_min) + pad for m in minimums]
-    return [m + spare * (e / total_extra) + pad
-            for m, e in zip(minimums, extra_wanted)]
+        return ([m + spare * (m / total_min) + pad for m in minimums], 1.0)
+    return ([m + spare * (e / total_extra) + pad
+             for m, e in zip(minimums, extra_wanted)], 1.0)
 
 
 def _segments_width(segments, face, size, urdu_font):

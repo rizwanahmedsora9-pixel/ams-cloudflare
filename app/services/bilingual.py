@@ -1222,8 +1222,29 @@ def _urdu_css() -> str:
         '.rcpt-wrapper[dir="rtl"] .rcpt-detail-val,'
         '.rcpt-wrapper[dir="rtl"] .rcpt-doc-no,'
         '.rcpt-wrapper[dir="rtl"] .rcpt-doc-date,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-party-sub,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-co-phone,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-amount-val,'
         '.rcpt-wrapper[dir="rtl"] td.text-end {'
         '  direction: ltr; unicode-bidi: embed;'
+        '}'
+        # A row that pairs an Urdu label with a figure (``کل بقایا`` / ``25,000``)
+        # puts the label on the right and the figure on the left: the same
+        # order the left-to-right document shows.  ``row-reverse`` in an RTL
+        # wrapper makes that explicit, so the figures never sit left of their
+        # own label and the amounts stay in their column.
+        '.rcpt-wrapper[dir="rtl"] .rcpt-detail-row,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-summary-row,'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-total-row {'
+        '  flex-direction: row-reverse;'
+        '}'
+        # A phone number is a run of digits and '+', '-', '|' - all neutral in
+        # bidi - so inside right-to-left text the two numbers of
+        # ``+92331-... | +92340-...`` swap and the '+' jumps to the end.  The
+        # isolate keeps the number itself left to right wherever it appears.
+        '.rcpt-wrapper[dir="rtl"] [dir="ltr"],'
+        '.rcpt-wrapper[dir="rtl"] .rcpt-ltr {'
+        '  direction: ltr; unicode-bidi: isolate;'
         '}'
         '</style>'
     )
