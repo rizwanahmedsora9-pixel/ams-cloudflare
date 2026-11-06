@@ -12,6 +12,7 @@ receipt.  These tests pin the new contract:
 """
 from __future__ import annotations
 
+from datetime import datetime
 import io
 import re
 
@@ -154,6 +155,22 @@ def test_apply_urdu_is_rtl_font_only_and_idempotent():
     assert "MB-123" in out
     assert "Cash delivery after Jun" in out
     assert "<!--ams-bilingual-v1-->" not in out
+
+
+def test_urdu_bill_date_uses_period_time_day_month_year_order():
+    """Urdu receipt dates read صبح/شام, time, date, month, then year."""
+    evening = str(B.bill_date(datetime(2026, 11, 6, 17, 3), "ur"))
+    morning = str(B.bill_date(datetime(2026, 1, 2, 5, 3), "urdu"))
+
+    # Dropping markup shows the exact order users read on the receipt.  Each
+    # number is an LTR isolate so the PDF fallback cannot swap time and day.
+    assert re.sub(r"<[^>]+>", "", evening) == "شام 05:03 06 نومبر 2026"
+    assert re.sub(r"<[^>]+>", "", morning) == "صبح 05:03 02 جنوری 2026"
+    assert evening.count('<bdi dir="ltr">') == 3
+    assert "AM" not in morning and "PM" not in evening
+
+    # English bills retain their established date format.
+    assert B.bill_date(datetime(2026, 11, 6, 17, 3), "en") == "06 Nov 2026  05:03 PM"
 
 
 def test_view_bill_has_separate_language_buttons(client, bill_data):

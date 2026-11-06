@@ -2,8 +2,8 @@
 
 These pin the three defects users report on an Urdu bill:
 
-* the date still read ``06 نومبر 2026 05:31`` with the figures reordered, and
-  the pieces of the line touching each other;
+* the Urdu receipt date must read ``شام 05:31 06 نومبر 2026`` with the
+  figures in the requested order and the pieces of the line not touching;
 * a phone number / account number / amount sat on the wrong side or in the
   middle of the sheet, because every figure line was treated as right-to-left;
 * ``مینول بل:`` and ``MB NO.9102`` (and ``06`` / ``نومبر``) collided because
@@ -87,17 +87,23 @@ def test_amount_line_keeps_figure_left_of_the_urdu_label():
 # figures keep their logical order inside an Urdu date
 # ---------------------------------------------------------------------------
 
-def test_date_line_is_an_urdu_line():
-    """``06 نومبر 2026 04:15 شام`` starts at the right edge of the sheet."""
-    para = _para(_latin('06 '), _urdu('نومبر'), _latin(' 2026 04:15 '),
-                 _urdu('شام'))
+def test_date_line_uses_the_requested_urdu_reading_order():
+    """``شام 04:15 06 نومبر 2026`` starts at the right edge of the sheet."""
+    para = _para(_urdu('شام '), _latin('04:15 '), _latin('06 '),
+                 _urdu('نومبر '), _latin('2026'))
     assert para._line_flags == [True]
+    # The renderer's physical left-to-right placement reverses the RTL groups.
+    # Reading from the right edge gives: شام → time → day → month → year.
+    assert [(flag, text.strip()) for flag, text in _runs(para)] == [
+        (False, '2026'), (True, 'نومبر'), (False, '06'),
+        (False, '04:15'), (True, 'شام'),
+    ]
 
 
 def test_date_breaks_into_whole_words_never_fragments():
     """Wrapped, the date must split between runs - the words stay whole."""
-    para = _para(_latin('06 '), _urdu('نومبر'), _latin(' 2026 04:15 '),
-                 _urdu('شام'), width=44)
+    para = _para(_urdu('شام '), _latin('04:15 '), _latin('06 '),
+                 _urdu('نومبر '), _latin('2026'), width=44)
     assert len(para._lines) > 1
     pieces = ' '.join(
         text for index in range(len(para._lines))

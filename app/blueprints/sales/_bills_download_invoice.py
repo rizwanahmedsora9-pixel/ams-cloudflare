@@ -365,8 +365,16 @@ def download_invoice(bill_no):
     # ...and the client's Urdu name (``Client.name_ur``) where one is recorded;
     # without one the bill keeps the English name so it is never left blank.
     client_name_ur = ''
-    if lang == 'ur' and client is not None:
-        client_name_ur = (getattr(client, 'name_ur', None) or '').strip()
+    driver_name_ur = ''
+    if lang == 'ur':
+        if client is not None:
+            client_name_ur = (getattr(client, 'name_ur', None) or '').strip()
+        driver_name = (getattr(bill_obj, 'driver_name', None) or '').strip()
+        if driver_name:
+            driver = DeliveryPerson.query.filter(
+                func.lower(func.trim(DeliveryPerson.name)) == driver_name.lower()
+            ).first()
+            driver_name_ur = (getattr(driver, 'name_ur', None) or '').strip()
     tx_code, tx_label, tx_note = _resolve_transaction_type(bill_type, bill_obj, entry_hint_id=entry_hint_id)
     if lang == 'ur':
         from app.services.bilingual import urdu_tx_label, urdu_tx_note
@@ -402,6 +410,7 @@ def download_invoice(bill_no):
         transaction_type_note=tx_note,
         direct_sale_rent_reconciliation=direct_sale_rent_reconciliation,
         delivery_people=delivery_people,
+        client_name_ur=client_name_ur,
         driver_name_ur=driver_name_ur,
         pk_now=pk_now,
         auto_print=(action == 'print'),

@@ -461,17 +461,20 @@ def get_supplier_by_input(input_str):
     return Supplier.query.filter(func.lower(Supplier.name) == input_str.lower()).first()
 
 
-def get_or_create_delivery_person(name_input, phone=None):
+def get_or_create_delivery_person(name_input, phone=None, name_ur=None):
     name = (name_input or '').strip()
     if not name:
         return None
     phone_value = (phone or '').strip()
+    name_ur_value = (name_ur or '').strip()
     existing = DeliveryPerson.query.filter(func.lower(func.trim(DeliveryPerson.name)) == name.lower()).first()
     if existing:
         if not existing.is_active:
             existing.is_active = True
         if phone_value:
             existing.phone = phone_value
+        if name_ur_value:
+            existing.name_ur = name_ur_value
         return existing
     # DeliveryPerson.name is globally unique in current schema.
     # Under tenant-scoped ORM filters, a name that exists in another tenant can be invisible here.
