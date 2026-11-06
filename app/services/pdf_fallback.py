@@ -306,7 +306,8 @@ def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
         # headers, summary boxes, receipt footers and table geometry survive.
         try:
             root, css = _parse_document(html)
-            blocks = layout(root, css)
+            urdu_primary = '<!--ams-urdu-v1-->' in (html or '')
+            blocks = layout(root, css, urdu_primary=urdu_primary)
             story = build_story(blocks, body_font, bold_font, _URDU_FONT,
                                 usable_width)
         except Exception:

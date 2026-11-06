@@ -1,8 +1,11 @@
-"""Tests for dual-language (English + Urdu / Jameel Noori) PDF exports.
+"""Tests for the legacy dual-language (English + Urdu / Jameel Noori) layer.
 
-Every PDF the app saves must carry both languages in the same document:
-English labels get an Urdu translation rendered in the bundled Jameel Noori
-Nastaleeq font.  Both rendering paths are covered - the WeasyPrint HTML path
+Non-bill exports (ledgers, statements, reports) still carry both languages in
+the same document: English labels get an Urdu translation rendered in the
+bundled Jameel Noori Nastaleeq font.  Bills and receipts are intentionally
+single-language now; see ``tests/test_bill_language_versions.py``.
+
+Both rendering paths are covered - the WeasyPrint HTML path
 (``bilingual.apply_bilingual`` injection) and the ReportLab fallback /
 direct supplier-statement path (shaped Urdu in the registered TTF).
 """

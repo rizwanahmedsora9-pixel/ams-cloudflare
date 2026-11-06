@@ -111,7 +111,7 @@ def _ext_from_name(name, fallback='dat'):
     return ext or fallback
 
 
-def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'):
+def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment', lang=None):
     """
     Render PDF with WeasyPrint only when available.
     On first failure, disable future attempts to avoid repeated noisy warnings.
@@ -120,18 +120,25 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
     such as pango on shared hosts) the request is NOT downgraded to HTML: a
     genuine PDF is produced by the ReportLab fallback instead, so a download
     that asked for a PDF always receives one.
+
+    ``lang`` selects the document language for bills/receipts:
+      * ``'en'`` — English only (no Urdu layer is injected);
+      * ``'ur'`` — a single-language Urdu document (labels replaced, RTL);
+      * ``None`` — legacy mixed English+Urdu layer, kept for non-bill exports.
     """
 
     safe_name = _safe_download_name(download_name, default='document.pdf')
-    # Dual-language mode: every saved PDF carries English + Urdu (Jameel Noori)
-    # in the same document.  The Urdu spans are shaped by Pango on the
-    # WeasyPrint path and by arabic_reshaper/python-bidi on the ReportLab
-    # fallback path, so both renderers produce the bilingual layout.
     try:
-        from app.services.bilingual import apply_bilingual
-        rendered_html = apply_bilingual(rendered_html)
+        if lang == 'ur':
+            from app.services.bilingual import apply_urdu
+            rendered_html = apply_urdu(rendered_html)
+        elif lang == 'en':
+            pass  # English-only bill: never inject the mixed Urdu layer.
+        else:
+            from app.services.bilingual import apply_bilingual
+            rendered_html = apply_bilingual(rendered_html)
     except Exception:
-        logging.getLogger(__name__).exception('Bilingual PDF injection failed; rendering English-only.')
+        logging.getLogger(__name__).exception('PDF language layer failed; rendering English-only.')
     try:
         if state.WEASYPRINT_MODULE is None:
             # WeasyPrint prints dependency warnings to stderr on import; silence them here.
@@ -210,20 +217,25 @@ def _render_reportlab_pdf(rendered_html, safe_name, disposition):
 
 
 
-def _bilingual_print_html(rendered_html):
-    """Return *rendered_html* with the Urdu layer, for browser printing.
+def _bilingual_print_html(rendered_html, lang=None):
+    """Return *rendered_html* with the right language layer for browser printing.
 
     ``action=print`` endpoints hand the page back to the browser instead of a
-    generated PDF.  Without this the user printed an English-only document
-    while the downloaded PDF was bilingual - the same template looked
-    different depending on which button was pressed.
+    generated PDF.  ``lang='ur'`` produces a single-language Urdu sheet,
+    ``lang='en'`` leaves the English sheet untouched, and ``None`` keeps the
+    legacy mixed English+Urdu layer used by non-bill documents.
     """
     try:
+        if lang == 'ur':
+            from app.services.bilingual import apply_urdu
+            return apply_urdu(rendered_html)
+        if lang == 'en':
+            return rendered_html
         from app.services.bilingual import apply_bilingual
         return apply_bilingual(rendered_html)
     except Exception:
         logging.getLogger(__name__).exception(
-            'Bilingual print injection failed; serving English-only HTML.')
+            'Print language layer failed; serving English-only HTML.')
         return rendered_html
 
 

@@ -7,13 +7,19 @@
 {{ "{:,.2f}".format((v|default(0, true)|float)).rstrip('0').rstrip('.') }}
 {%- endmacro %}
 {% set pdf_bill_no = (bill.manual_bill_no or bill.auto_bill_no or '') %}
-{% set pdf_download_url = url_for('download_invoice',
-    bill_no=pdf_bill_no,
-    src=request.args.get('src'),
-    src_id=request.args.get('src_id'),
-    client_code=request.args.get('client_code'),
-    client_name=request.args.get('client_name')
-) %}
+{% set bill_lang = bill_lang|default('en') %}
+{% set pdf_args = {
+    'bill_no': pdf_bill_no,
+    'src': request.args.get('src'),
+    'src_id': request.args.get('src_id'),
+    'client_code': request.args.get('client_code'),
+    'client_name': request.args.get('client_name'),
+    'entry_id': request.args.get('entry_id')
+} %}
+{% set pdf_download_url = url_for('download_invoice', lang='en', **pdf_args) %}
+{% set pdf_print_url = url_for('download_invoice', action='print', lang='en', **pdf_args) %}
+{% set pdf_download_url_ur = url_for('download_invoice', lang='ur', **pdf_args) %}
+{% set pdf_print_url_ur = url_for('download_invoice', action='print', lang='ur', **pdf_args) %}
 {% set co_name    = (settings.company_name    if settings and settings.company_name    else 'FAZAL BUILDING MATERIALS') %}
 {% set co_address = (settings.company_address if settings and settings.company_address else 'JALAL PUR SOBTIAN GUJRAT') %}
 {% set co_phone   = (settings.company_phone   if settings and settings.company_phone   else '+92331-0000993 | +92340-3872722') %}
@@ -160,11 +166,28 @@
 
 <!-- Screen toolbar -->
 <div class="card shadow-sm mx-auto border-0 d-print-none" style="max-width:600px; background:#fff;">
-    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Receipt: {{ bill.manual_bill_no or bill.auto_bill_no or '---' }}</h5>
-        <a href="{{ pdf_download_url }}" class="btn btn-warning btn-sm fw-bold text-dark">
-            <i class="bi bi-file-earmark-pdf"></i> Download PDF
-        </a>
+    <div class="card-header bg-dark text-white">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0">Receipt: {{ bill.manual_bill_no or bill.auto_bill_no or '---' }}</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <div class="btn-group btn-group-sm" role="group" aria-label="English receipt">
+                    <a href="{{ pdf_download_url }}" class="btn btn-warning fw-bold text-dark" title="Download the English receipt as PDF">
+                        <i class="bi bi-file-earmark-pdf"></i> English PDF
+                    </a>
+                    <a href="{{ pdf_print_url }}" class="btn btn-outline-warning fw-bold" title="Print the English receipt">
+                        <i class="bi bi-printer"></i> English Print
+                    </a>
+                </div>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Urdu receipt">
+                    <a href="{{ pdf_download_url_ur }}" class="btn btn-info fw-bold text-dark" title="Download the Urdu receipt as PDF">
+                        <i class="bi bi-file-earmark-pdf"></i> Urdu PDF
+                    </a>
+                    <a href="{{ pdf_print_url_ur }}" class="btn btn-outline-info fw-bold" title="Print the Urdu receipt">
+                        <i class="bi bi-printer"></i> Urdu Print
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -179,20 +202,20 @@
             <div class="rcpt-co-phone">{{ co_phone }}</div>
         </div>
         <div class="rcpt-header-right">
-            <div class="rcpt-doc-type">RECEIPT</div>
+            <div class="rcpt-doc-type">{{ 'RECEIPT'|bill_label(bill_lang) }}</div>
             {% if transaction_type_label %}
-            <div class="rcpt-tx-badge">{{ transaction_type_label }}</div>
+            <div class="rcpt-tx-badge">{{ transaction_type_label|bill_label(bill_lang) }}</div>
             {% endif %}
             {% if bill.auto_bill_no is defined and bill.auto_bill_no %}
             <div class="rcpt-doc-no">{{ bill.auto_bill_no }}</div>
             {% endif %}
             {% if bill.manual_bill_no is defined and bill.manual_bill_no %}
-            <div style="font-size:11px; font-weight:700; margin-top:2px;">MB: {{ bill.manual_bill_no }}</div>
+            <div style="font-size:11px; font-weight:700; margin-top:2px;">{{ 'MB:'|bill_label(bill_lang) }} {{ bill.manual_bill_no }}</div>
             {% endif %}
             {% if not (bill.auto_bill_no is defined and bill.auto_bill_no) and not (bill.manual_bill_no is defined and bill.manual_bill_no) %}
             <div class="rcpt-doc-no">---</div>
             {% endif %}
-            <div class="rcpt-doc-date">{{ bill.date_posted.strftime('%d %b %Y  %I:%M %p') if bill.date_posted else pk_now().strftime('%d %b %Y  %I:%M %p') }}</div>
+            <div class="rcpt-doc-date">{{ (bill.date_posted if bill.date_posted else pk_now())|bill_date(bill_lang) }}</div>
         </div>
     </div>
 
@@ -202,10 +225,10 @@
         <!-- Parties + Amount Hero -->
         <div class="rcpt-parties">
             <div>
-                <div class="rcpt-party-label">Received From</div>
+                <div class="rcpt-party-label">{{ 'Received From'|bill_label(bill_lang) }}</div>
                 <div class="rcpt-party-name">{{ bill.client_name }}</div>
                 {% if client and client.code %}
-                <div class="rcpt-party-sub">Code: {{ client.code }}</div>
+                <div class="rcpt-party-sub">{{ 'Code:'|bill_label(bill_lang) }} {{ client.code }}</div>
                 {% endif %}
                 {% if client and client.address %}
                 <div class="rcpt-party-sub">{{ client.address }}</div>
@@ -215,50 +238,50 @@
                 {% endif %}
             </div>
             <div class="rcpt-amount-hero">
-                <div class="rcpt-amount-label">Amount Received</div>
+                <div class="rcpt-amount-label">{{ 'Amount Received'|bill_label(bill_lang) }}</div>
                 <div class="rcpt-amount-val">{{ fmt_num(safe_bill_amount) }}</div>
             </div>
         </div>
 
         <!-- Payment Details -->
-        <div class="rcpt-section-title">Payment Details</div>
+        <div class="rcpt-section-title">{{ 'Payment Details'|bill_label(bill_lang) }}</div>
         <div class="rcpt-detail-box">
             {% if bill.method %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Method</span><span class="rcpt-detail-val">{{ bill.method }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Method'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.method|bill_label(bill_lang) }}</span></div>
             {% endif %}
             {% if bill.bank_name %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Bank</span><span class="rcpt-detail-val">{{ bill.bank_name }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Bank'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.bank_name }}</span></div>
             {% endif %}
             {% if bill.account_name %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Account Name</span><span class="rcpt-detail-val">{{ bill.account_name }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Account Name'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.account_name }}</span></div>
             {% endif %}
             {% if bill.account_no %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Account No.</span><span class="rcpt-detail-val">{{ bill.account_no }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Account No.'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.account_no }}</span></div>
             {% endif %}
             {% if bill.note %}
             <div class="rcpt-detail-row" style="flex-direction:column; gap:2px;">
-                <span class="rcpt-detail-label">Notes</span>
+                <span class="rcpt-detail-label">{{ 'Notes'|bill_label(bill_lang) }}</span>
                 <span style="font-weight:700;">{{ bill.note }}</span>
             </div>
             {% endif %}
         </div>
 
         <!-- Balance Summary -->
-        <div class="rcpt-section-title">Balance Summary</div>
+        <div class="rcpt-section-title">{{ 'Balance Summary'|bill_label(bill_lang) }}</div>
         {% set safe_paid_now = safe_bill_amount %}
         {% set safe_remaining = (safe_previous_balance - safe_paid_now) %}
         <table class="rcpt-table">
             <tbody>
                 <tr>
-                    <td>Previous Balance</td>
+                    <td>{{ 'Previous Balance'|bill_label(bill_lang) }}</td>
                     <td class="text-end">{{ fmt_num(safe_previous_balance) }}</td>
                 </tr>
                 <tr>
-                    <td>Paid Now</td>
+                    <td>{{ 'Paid Now'|bill_label(bill_lang) }}</td>
                     <td class="text-end">{{ fmt_num(safe_paid_now) }}</td>
                 </tr>
                 <tr>
-                    <td>Remaining Balance</td>
+                    <td>{{ 'Remaining Balance'|bill_label(bill_lang) }}</td>
                     <td class="text-end">{{ fmt_num(safe_remaining) }}</td>
                 </tr>
             </tbody>
@@ -270,16 +293,16 @@
     <div class="rcpt-footer">
         <div class="rcpt-sig-row">
             <div class="rcpt-sig-block">
-                <div class="rcpt-sig-label">Receiver / Authorized Sign</div>
-                <div class="rcpt-sig-sub">(Sign Here)</div>
+                <div class="rcpt-sig-label">{{ 'Receiver / Authorized Sign'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-sig-sub">{{ '(Sign Here)'|bill_label(bill_lang) }}</div>
             </div>
             <div class="rcpt-sig-block right-align">
-                <div class="rcpt-sig-label">Company Stamp</div>
-                <div class="rcpt-sig-sub">(Stamp Here)</div>
+                <div class="rcpt-sig-label">{{ 'Company Stamp'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-sig-sub">{{ '(Stamp Here)'|bill_label(bill_lang) }}</div>
             </div>
         </div>
         <div class="rcpt-credits">
-            Thank you for your business! &nbsp;&bull;&nbsp; Software by AMS SYSTEM FOR EASE
+            {{ 'Thank you for your business!'|bill_label(bill_lang) }} &nbsp;&bull;&nbsp; {{ 'Software by AMS SYSTEM FOR EASE'|bill_label(bill_lang) }}
         </div>
     </div>
 
@@ -288,7 +311,14 @@
 <!-- Screen bottom toolbar -->
 <div class="text-center mt-3 mb-4 d-print-none">
     <a href="javascript:history.back()" class="btn btn-dark fw-bold me-2">Go Back</a>
-    <a href="{{ pdf_download_url }}" class="btn btn-warning fw-bold text-dark"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+    <div class="btn-group mt-2 mt-sm-0 me-2" role="group" aria-label="English receipt">
+        <a href="{{ pdf_download_url }}" class="btn btn-warning fw-bold text-dark"><i class="bi bi-file-earmark-pdf me-1"></i>English PDF</a>
+        <a href="{{ pdf_print_url }}" class="btn btn-outline-warning fw-bold"><i class="bi bi-printer me-1"></i>English Print</a>
+    </div>
+    <div class="btn-group mt-2 mt-sm-0" role="group" aria-label="Urdu receipt">
+        <a href="{{ pdf_download_url_ur }}" class="btn btn-info fw-bold text-dark"><i class="bi bi-file-earmark-pdf me-1"></i>Urdu PDF</a>
+        <a href="{{ pdf_print_url_ur }}" class="btn btn-outline-info fw-bold"><i class="bi bi-printer me-1"></i>Urdu Print</a>
+    </div>
 </div>
 
 {% if auto_print %}

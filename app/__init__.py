@@ -92,6 +92,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     if str(cookie_samesite).lower() == "none" and not cookie_secure:
         cookie_samesite = "Lax"
 
+    # Single-language bill filters (English / Urdu). Registered before the
+    # template warm-up so receipts can render either language without mixing.
+    from app.services.bilingual import bill_date, bill_label
+    app.jinja_env.filters.setdefault('bill_label', bill_label)
+    app.jinja_env.filters.setdefault('bill_date', bill_date)
+
     app.config.update(
         SECRET_KEY=secret,
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{db_path}",

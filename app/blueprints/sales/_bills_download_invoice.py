@@ -304,7 +304,17 @@ def download_invoice(bill_no):
 
     action = (request.args.get('action') or 'download').lower()
     disposition = 'inline' if action in ['print', 'view'] else 'attachment'
+    # Bills are single-language documents: ?lang=en (default) or ?lang=ur.
+    lang = (request.args.get('lang') or 'en').strip().lower()
+    if lang in ('ur', 'urdu', 'urd'):
+        lang = 'ur'
+    else:
+        lang = 'en'
     tx_code, tx_label, tx_note = _resolve_transaction_type(bill_type, bill_obj, entry_hint_id=entry_hint_id)
+    if lang == 'ur':
+        from app.services.bilingual import urdu_tx_label, urdu_tx_note
+        tx_label = urdu_tx_label(tx_code, tx_label)
+        tx_note = urdu_tx_note(tx_note)
     section_map = {
         'Booking': 'BOOKING',
         'Payment': 'PAYMENT',
@@ -336,24 +346,34 @@ def download_invoice(bill_no):
         direct_sale_rent_reconciliation=direct_sale_rent_reconciliation,
         delivery_people=delivery_people,
         pk_now=pk_now,
-        auto_print=(action == 'print')
+        auto_print=(action == 'print'),
+        bill_lang=lang
     )
+
+    # Keep the two language downloads distinguishable on disk.  The suffix is
+    # added after _download_filename() because that helper strips hyphens from
+    # the section name.
+    def _lang_name(ext):
+        base = _download_filename(section, ext)
+        stem, _, suffix = base.rpartition('.')
+        return f"{stem}-{'UR' if lang == 'ur' else 'EN'}.{suffix}"
 
     if action != 'print':
         pdf_response = _try_render_weasy_pdf(
             rendered,
-            _download_filename(section, 'pdf'),
-            disposition=disposition
+            _lang_name('pdf'),
+            disposition=disposition,
+            lang=lang
         )
         if pdf_response:
             return pdf_response
 
     if action == 'print':
-        # Browser printing needs the Urdu layer and @font-face as well.
-        rendered = _bilingual_print_html(rendered)
+        # Browser printing gets the same single-language layer as the PDF.
+        rendered = _bilingual_print_html(rendered, lang=lang)
 
     response = make_response(rendered)
-    fallback_name = _download_filename(section, 'html')
+    fallback_name = _lang_name('html')
     response.headers['Content-Disposition'] = f'{disposition}; filename={fallback_name}'
     response.headers['Content-Type'] = 'text/html; charset=utf-8'
     return response
