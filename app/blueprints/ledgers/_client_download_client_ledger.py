@@ -56,6 +56,12 @@ def download_client_ledger(id):
             pdf_error=True
         )
 
+    if action == 'print':
+        # The browser print/save-as-PDF path must carry the Urdu layer too,
+        # otherwise the printed sheet is English-only while the downloaded
+        # PDF is bilingual.
+        rendered = _bilingual_print_html(rendered)
+
     response = make_response(rendered)
     fallback_name = _download_filename('CLIENTLEDGER', 'html')
     response.headers['Content-Disposition'] = f'{disposition}; filename={fallback_name}'

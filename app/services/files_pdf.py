@@ -210,6 +210,23 @@ def _render_reportlab_pdf(rendered_html, safe_name, disposition):
 
 
 
+def _bilingual_print_html(rendered_html):
+    """Return *rendered_html* with the Urdu layer, for browser printing.
+
+    ``action=print`` endpoints hand the page back to the browser instead of a
+    generated PDF.  Without this the user printed an English-only document
+    while the downloaded PDF was bilingual - the same template looked
+    different depending on which button was pressed.
+    """
+    try:
+        from app.services.bilingual import apply_bilingual
+        return apply_bilingual(rendered_html)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            'Bilingual print injection failed; serving English-only HTML.')
+        return rendered_html
+
+
 def _disable_response_cache(response):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'

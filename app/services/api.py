@@ -110,6 +110,7 @@ from app.services.drawer import (  # noqa: F401
     _drawer_upsert_category,
 )
 from app.services.files_pdf import (  # noqa: F401
+    _bilingual_print_html,
     _disable_response_cache,
     _download_filename,
     _download_stamp,
@@ -464,6 +465,7 @@ __all__ = [
     '_drawer_parse_date',
     '_drawer_unified_rows',
     '_drawer_upsert_category',
+    '_bilingual_print_html',
     '_disable_response_cache',
     '_download_filename',
     '_download_stamp',

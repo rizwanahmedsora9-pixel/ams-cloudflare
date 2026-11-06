@@ -19,6 +19,7 @@ Two rendering paths are covered:
 """
 from __future__ import annotations
 
+import html as html_lib
 import os
 import re
 
@@ -43,10 +44,64 @@ _PUA_BASE = 0xF0000
 _urdu_font_registered = False
 _hb_face = None
 _hb_font = None
+_no_hb = False           # set once uharfbuzz is known to be missing
+_font_em = 2048.0        # units-per-em of the bundled face
+_font_line_ratio = 1.40  # (ascent + |descent|) / upem, for Paragraph leading
+
+# Nastaleeq has far more width per character than a Latin face.  A label set
+# next to its English original at the same nominal size therefore measures
+# roughly ``URDU_WIDTH_FACTOR`` times wider, so the ReportLab paths render it
+# proportionally smaller.  Measured empirically against Jameel Noori.
+URDU_WIDTH_FACTOR = 2.6
 
 
 def urdu_font_available() -> bool:
     return os.path.exists(JAMEEL_NOORI_TTF)
+
+
+def _font_metrics() -> None:
+    """Load the real ascent/descent from the bundled font (best effort).
+
+    ReportLab's TTFont reports ascent/descent as *fractions* of the em for
+    fonts whose OS/2 table claims more than one em of line height, which made
+    every Nastaleeq paragraph ``leading`` crush the glyphs onto each other.
+    The values are read straight from ``hhea`` inside the shaped-font cache
+    builder instead, so the shapes below are correct on every install.
+    """
+    global _font_em, _font_line_ratio
+    try:
+        from fontTools.ttLib import TTFont
+        tt = TTFont(JAMEEL_NOORI_TTF, lazy=True)
+        em = float(tt['head'].unitsPerEm) or 2048.0
+        hhea = tt['hhea']
+        _font_em = em
+        _font_line_ratio = (hhea.ascent - hhea.descent) / em
+        tt.close()
+    except Exception:
+        pass
+
+
+def urdu_line_factor(font_size: float) -> float:
+    """``leading`` for a Nastaleeq run at *font_size* with no clipped marks."""
+    _font_metrics()
+    return max(font_size * _font_line_ratio, font_size * 1.25)
+
+
+# Nastaleeq sits low on the baseline and its x-height is small, so a
+# translation set at exactly the Latin point size reads as an illegible
+# squiggle.  Slightly larger keeps it legible without dominating the line.
+URDU_SIZE_FACTOR = 1.08
+
+
+def urdu_size_for_html(font_size: float) -> float:
+    """ReportLab ``<font size>`` value used for an Urdu run.
+
+    ``<font size="N">`` in ReportLab takes an absolute point size, so the
+    Latin size is scaled by :data:`URDU_SIZE_FACTOR` and clamped to a floor
+    that is still readable in a printed A5 document.
+    """
+    size = max(float(font_size or 0) * URDU_SIZE_FACTOR, 5.4)
+    return round(size, 2)
 
 
 def _font_cache_dir() -> str:
@@ -116,10 +171,10 @@ def register_urdu_font() -> str | None:
 
 def _hb():
     """Lazily built HarfBuzz face/font for the bundled Jameel font."""
-    global _hb_face, _hb_font
+    global _hb_face, _hb_font, _no_hb
     if _hb_font is not None:
         return _hb_font
-    if not urdu_font_available():
+    if _no_hb or not urdu_font_available():
         return None
     try:
         import uharfbuzz as hb
@@ -129,39 +184,391 @@ def _hb():
         _hb_font = hb.Font(_hb_face)
         return _hb_font
     except Exception:
+        _no_hb = True
         return None
 
 
-def shape_urdu(text: str) -> str:
-    """Shape Arabic-script text for ReportLab.
-
-    HarfBuzz applies the font's own GSUB rules and returns glyph ids in
-    visual order (RTL buffers come out left-to-right); each glyph id is
-    mapped to a private-use codepoint (U+F0000+gid) that the cached shaped
-    font resolves through its added cmap.  Falls back to
-    arabic_reshaper/python-bidi, then to the raw text.
-    """
-    if not text:
-        return text
+def _hb_shape(text: str):
+    """HarfBuzz shape of *text*, or ``None`` when uharfbuzz is unavailable."""
     font = _hb()
-    if font is not None:
-        try:
-            import uharfbuzz as hb
-            buf = hb.Buffer()
-            buf.add_str(text)
-            buf.direction = 'rtl'
-            buf.script = 'Arab'
-            buf.language = 'ur'
-            hb.shape(font, buf, {})
-            return ''.join(chr(_PUA_BASE + info.codepoint) for info in buf.glyph_infos)
-        except Exception:
-            pass
+    if font is None:
+        return None
+    try:
+        import uharfbuzz as hb
+        buf = hb.Buffer()
+        buf.add_str(text)
+        buf.direction = 'rtl'
+        buf.script = 'Arab'
+        buf.language = 'ur'
+        hb.shape(font, buf, {})
+        return ''.join(chr(_PUA_BASE + info.codepoint) for info in buf.glyph_infos)
+    except Exception:
+        return None
+
+
+# --- fontTools fallback shaping -------------------------------------------
+# Some hosts cannot install uharfbuzz (no wheel for the interpreter/ARM
+# build).  The old code then handed arabic_reshaper's Presentation-Forms
+# output to ReportLab, but the bundled Jameel Noori face has *no* glyphs for
+# those codepoints - the Urdu silently vanished from the PDF.  The path below
+# applies the font's own GSUB rules with fontTools instead and maps the result
+# through the same private-use cmap the HarfBuzz path uses, so both engines
+# produce identical glyph ids.
+
+_FALLBACK_FONT = None
+
+
+def _gsub_lookups_for_lang(tt, script_tag='arab', lang_tag='URD '):
+    """Lookup indices to apply for Urdu, in the order the font declares them."""
+    gsub = tt['GSUB'].table
+    scripts = {r.ScriptTag: r.Script for r in gsub.ScriptList.ScriptRecord}
+    script = scripts.get(script_tag)
+    if script is None:
+        return []
+    langsys = None
+    for rec in (getattr(script, 'LangSysRecord', None) or []):
+        if rec.LangSysTag == lang_tag:
+            langsys = rec.LangSys
+            break
+    if langsys is None:
+        langsys = script.DefaultLangSys
+    if langsys is None:
+        return []
+    features = {i: fr for i, fr in enumerate(gsub.FeatureList.FeatureRecord)}
+    # OpenType applies the Arabic shaping features in this fixed order - the
+    # feature *list* order inside the font is arbitrary (this face stores
+    # fina before init), so it must not be relied on.
+    wanted = ('ccmp', 'isol', 'fina', 'fin2', 'fin3', 'medi', 'med2',
+              'init', 'rlig', 'rclt', 'calt')
+    used, indices = set(), []
+    active = {features[fi].FeatureTag: features[fi].Feature
+              for fi in (langsys.FeatureIndex or [])
+              if fi in features}
+    for tag in wanted:
+        feature = active.get(tag)
+        if feature is None:
+            continue
+        for idx in (feature.LookupListIndex or []):
+            if idx not in used:
+                used.add(idx)
+                indices.append(idx)
+    return indices
+
+
+def _fallback_font():
+    """Lazily loaded shaping tables: (TTFont, glyph order map, features)."""
+    global _FALLBACK_FONT
+    if _FALLBACK_FONT is not None:
+        return _FALLBACK_FONT or None
+    if not urdu_font_available():
+        _FALLBACK_FONT = False
+        return None
+    try:
+        from fontTools.ttLib import TTFont
+        tt = TTFont(JAMEEL_NOORI_TTF)
+        gid = {name: i for i, name in enumerate(tt.getGlyphOrder())}
+        gsub = tt['GSUB'].table
+        by_tag = {}
+        for record in gsub.FeatureList.FeatureRecord:
+            by_tag.setdefault(record.FeatureTag, []).extend(
+                record.Feature.LookupListIndex or [])
+        shapes = {}
+        for tag in ('isol', 'init', 'medi', 'fina', 'ccmp'):
+            mapping = {}
+            for idx in by_tag.get(tag, []):
+                for raw in (gsub.LookupList.Lookup[idx].SubTable or []):
+                    sub = _unwrap(raw)
+                    if getattr(sub, 'mapping', None):
+                        mapping.update(sub.mapping)
+            shapes[tag] = mapping
+        order = [i for i in by_tag.get('rlig', []) + by_tag.get('calt', [])]
+        _FALLBACK_FONT = (tt, gid, shapes, order)
+        return _FALLBACK_FONT
+    except Exception:
+        _FALLBACK_FONT = False
+        return None
+
+
+def _unwrap(sub):
+    """Resolve an Extension (lookup type 7) subtable to its real self."""
+    if type(sub).__name__ == 'ExtensionSubst':
+        return sub.ExtSubTable
+    return sub
+
+
+def _cov_has(cov, glyph):
+    glyphs = getattr(cov, 'glyphs', None) if cov is not None else None
+    return bool(glyphs) and glyph in glyphs
+
+
+def _match_ligature(sub, glyphs, i):
+    """(ligature glyph name, consumed length) for the longest match at *i*."""
+    options = (getattr(sub, 'ligatures', None) or {}).get(glyphs[i])
+    if not options:
+        return None
+    best = None
+    for lig in options:
+        comps = list(getattr(lig, 'Component', None) or [])
+        span = len(comps) + 1
+        if i + span > len(glyphs):
+            continue
+        if span > 1 and glyphs[i + 1:i + span] != comps:
+            continue
+        if best is None or span > best[1]:
+            best = (lig.LigGlyph, span)
+    return best
+
+
+def _chain_matches(sub, glyphs, i):
+    """True when the chaining-context rule at *i* applies."""
+    back_covs = getattr(sub, 'BacktrackCoverage', None) or []
+    back_counts = getattr(sub, 'Backtrack', None) or []
+    pos = 0
+    for k, cov in enumerate(back_covs):
+        count = back_counts[k] if k < len(back_counts) else 1
+        for _ in range(max(1, count)):
+            pos += 1
+            if i - pos < 0 or not _cov_has(cov, glyphs[i - pos]):
+                return False
+    in_covs = getattr(sub, 'InputCoverage', None) or []
+    if not in_covs or not _cov_has(in_covs[0], glyphs[i]):
+        return False
+    in_counts = getattr(sub, 'Input', None) or []
+    pos = 0
+    for k, cov in enumerate(in_covs[1:]):
+        count = in_counts[k + 1] if k + 1 < len(in_counts) else 1
+        for _ in range(max(1, count)):
+            pos += 1
+            if i + pos >= len(glyphs) or not _cov_has(cov, glyphs[i + pos]):
+                return False
+    look_covs = getattr(sub, 'LookAheadCoverage', None) or []
+    look_counts = getattr(sub, 'LookAhead', None) or []
+    pos = len(in_covs)
+    offset = 0
+    for k, cov in enumerate(look_covs):
+        count = look_counts[k] if k < len(look_counts) else 1
+        for _ in range(max(1, count)):
+            offset += 1
+            if i + pos + offset - 1 >= len(glyphs):
+                return False
+            if not _cov_has(cov, glyphs[i + pos + offset - 1]):
+                return False
+    return True
+
+
+def _run_lookup(tt, lookup_index, glyphs, position):
+    """Apply one nested lookup at *position*; returns the new glyph list."""
+    lookups = tt['GSUB'].table.LookupList.Lookup
+    if lookup_index >= len(lookups) or position >= len(glyphs):
+        return glyphs
+    for raw in (lookups[lookup_index].SubTable or []):
+        sub = _unwrap(raw)
+        kind = type(sub).__name__
+        if kind == 'SingleSubst':
+            mapping = getattr(sub, 'mapping', None) or {}
+            if glyphs[position] in mapping:
+                glyphs[position] = mapping[glyphs[position]]
+            return glyphs
+        if kind == 'LigatureSubst':
+            match = _match_ligature(sub, glyphs, position)
+            if match:
+                lig, span = match
+                glyphs[position:position + span] = [lig]
+                return glyphs
+        if kind == 'MultipleSubst':
+            seq = (getattr(sub, 'mapping', None) or {}).get(glyphs[position])
+            if seq:
+                glyphs[position:position + 1] = list(seq)
+                return glyphs
+    return glyphs
+
+
+def _apply_subtable_at(tt, subtables, glyphs, i):
+    """Try each subtable at position *i*; True when one applied."""
+    for sub in subtables:
+        kind = type(sub).__name__
+        if kind == 'SingleSubst':
+            mapping = getattr(sub, 'mapping', None) or {}
+            if glyphs[i] in mapping:
+                glyphs[i] = mapping[glyphs[i]]
+                return True
+        elif kind == 'LigatureSubst':
+            match = _match_ligature(sub, glyphs, i)
+            if match:
+                lig, span = match
+                glyphs[i:i + span] = [lig]
+                return True
+        elif kind == 'MultipleSubst':
+            seq = (getattr(sub, 'mapping', None) or {}).get(glyphs[i])
+            if seq:
+                glyphs[i:i + 1] = list(seq)
+                return True
+        elif kind == 'ChainContextSubst':
+            if not _chain_matches(sub, glyphs, i):
+                continue
+            for rec in (sub.SubstLookupRecord or []):
+                if rec.SequenceIndex == 0:
+                    _run_lookup(tt, rec.LookupListIndex, glyphs, i)
+            return True
+    return False
+
+
+def _apply_gsub(tt, glyphs, lookup_indices):
+    """Apply GSUB lookups over a glyph-name list.
+
+    A single lookup can hold subtables of different types (this face mixes
+    SingleSubst and ChainContextSubst), so dispatch happens per subtable.
+    """
+    lookups = tt['GSUB'].table.LookupList.Lookup
+    for idx in lookup_indices:
+        if idx >= len(lookups):
+            continue
+        subtables = [_unwrap(raw) for raw in (lookups[idx].SubTable or [])]
+        i = 0
+        while i < len(glyphs):
+            _apply_subtable_at(tt, subtables, glyphs, i)
+            i += 1
+    return glyphs
+
+
+# --- Arabic joining analysis ---------------------------------------------
+
+def _is_transparent(ch):
+    """Combining marks / join controls that must not break a joining run."""
+    import unicodedata
+    return unicodedata.category(ch) == 'Mn' or ch in '\u200c\u200d'
+
+
+def _joining_forms(chars, cmap, shapes):
+    """Per-character OpenType form (isol/init/medi/fina) for an Arabic run.
+
+    Joining behaviour is read from the font itself: a character can connect to
+    the *left* only when it has an initial or medial form, and to the *right*
+    only when it has a final or medial form.  Deriving it that way keeps
+    right-joining letters (ا د ر و ...) correct without a hard-coded list.
+    """
+    def glyph(ch):
+        return cmap.get(ord(ch))
+
+    def links_next(ch):
+        g = glyph(ch)
+        return g is not None and (g in shapes['init'] or g in shapes['medi'])
+
+    def links_prev(ch):
+        g = glyph(ch)
+        return g is not None and (g in shapes['fina'] or g in shapes['medi'])
+
+    forms, n = [], len(chars)
+    for i, ch in enumerate(chars):
+        if _is_transparent(ch):
+            forms.append('ccmp')
+            continue
+        if glyph(ch) is None:
+            forms.append(None)
+            continue
+        left = i - 1
+        while left >= 0 and _is_transparent(chars[left]):
+            left -= 1
+        joined_left = (left >= 0 and links_next(chars[left])
+                       and links_prev(ch))
+        right = i + 1
+        while right < n and _is_transparent(chars[right]):
+            right += 1
+        joined_right = (right < n and links_prev(chars[right])
+                        and links_next(ch))
+        if joined_left and joined_right:
+            forms.append('medi')
+        elif joined_left:
+            forms.append('fina')
+        elif joined_right:
+            forms.append('init')
+        else:
+            forms.append('isol')
+    return forms
+
+
+def _shape_with_fonttools(text: str):
+    """Fallback shaper: returns PUA glyph ids in visual order, or ``None``.
+
+    Mirrors what a shaping engine does, using only fontTools:
+
+    1. ``ccmp`` - character composition (spaces, marks, ZWJ handling)
+    2. ``isol`` / ``init`` / ``medi`` / ``fina`` - cursive joining forms,
+       chosen by the joining analysis in :func:`_joining_forms`
+    3. ``rlig`` + ``calt`` - required and contextual ligatures
+    4. reverse the logical run, because ReportLab draws left-to-right
+
+    HarfBuzz produces more refined ligature choices (it can look further ahead
+    than this simplified walker), so it stays the preferred engine; this path
+    guarantees Urdu is still *legible* where the uharfbuzz wheel is missing.
+    """
+    loaded = _fallback_font()
+    if not loaded:
+        return None
+    tt, gid, shapes, order = loaded
+    try:
+        cmap = tt.getBestCmap()
+        chars = list(text)
+        glyphs = []
+        for ch, form in zip(chars, _joining_forms(chars, cmap, shapes)):
+            name = cmap.get(ord(ch))
+            if name is None or form is None:
+                continue
+            name = shapes['ccmp'].get(name, name)
+            if form != 'ccmp':
+                name = shapes[form].get(name, name)
+            glyphs.append(name)
+        if not glyphs:
+            return None
+        glyphs = _apply_gsub(tt, glyphs, order)
+        out = []
+        for name in reversed(glyphs):
+            g = gid.get(name)
+            if g is not None:
+                out.append(chr(_PUA_BASE + g))
+        return ''.join(out) or None
+    except Exception:
+        return None
+
+
+def _arabic_reshaper_shape(text: str):
+    """Last resort: Presentation-Forms text (needs a font that has them)."""
     try:
         import arabic_reshaper
         from bidi.algorithm import get_display
         return get_display(arabic_reshaper.reshape(text))
     except Exception:
+        return None
+
+
+def shape_urdu(text: str) -> str:
+    """Shape Arabic-script text so ReportLab draws correct Nastaleeq glyphs.
+
+    Order of preference:
+
+    1. **HarfBuzz** (``uharfbuzz``) — full OpenType shaping by the font's own
+       GSUB rules; each glyph id becomes the private-use codepoint
+       ``U+F0000+gid`` that the shaped-font cmap resolves.
+    2. **fontTools GSUB walker** — the same rules applied in pure Python, for
+       hosts where the ``uharfbuzz`` wheel does not exist.  Without this the
+       previous code fell to arabic_reshaper, whose Presentation-Forms output
+       this Nastaleeq face has *no glyphs for*, so the Urdu disappeared.
+    3. **arabic_reshaper + python-bidi** — retained only for alphabets whose
+       face genuinely carries Presentation-Forms glyphs.
+    4. Raw text, if nothing else is available.
+    """
+    if not text:
         return text
+    shaped = _hb_shape(text)
+    if shaped is not None:
+        return shaped
+    shaped = _shape_with_fonttools(text)
+    if shaped is not None:
+        return shaped
+    shaped = _arabic_reshaper_shape(text)
+    if shaped is not None:
+        return shaped
+    return text
 
 
 # --------------------------------------------------------------------------
@@ -388,6 +795,70 @@ LABELS = {
     'Transfers': _TRANSFERS,
     'Next Day Opening': 'اگلے دن کا افتتاح',
     'Download PDF': 'PDF ' + _DOWNLOAD,
+    # --- receipt / statement furniture ---------------------------------
+    # These labels were previously left untranslated, so a "bilingual" PDF
+    # still showed English-only headings such as "Current Bill Total:".
+    '(Sign Here)': '(یہاں دستخط کریں)',
+    '(Stamp Here)': '(یہاں مہر لگائیں)',
+    'Account No.': 'اکاؤنٹ نمبر',
+    'Account Statement For': 'اکاؤنٹ اسٹیٹمنٹ برائے',
+    'Actual Purchase Cost & Payments': 'اصل ' + _PURCHASE + ' ' + _COST + ' اور ادائیگیاں',
+    'Additional Charges Paid / Remaining': 'اضافی ' + _CHARGES + ' ' + _ADA_SHUDA + ' / بقایا',
+    'Advance with us': 'ہمارے پاس پیشگی',
+    'Audit row': 'آڈٹ سطر',
+    'Average Actual Cost / Unit': 'اوسط اصل ' + _COST + ' فی یونٹ',
+    'Bill Pending:': 'بقایا بل:',
+    'Bill value': 'بل کی رقم',
+    'Cleared': 'کلیئر',
+    'Clearance Statement': 'کلیئرنس اسٹیٹمنٹ',
+    'Client Full History': 'گاہک کی ' + '\u0645\u06a9\u0645\u0644 ' + '\u06c1\u0633\u0679\u0631\u06cc',
+    'Client Ledger': 'گاہک لیجر',
+    'Complete Receipts Section': 'مکمل رسیدوں کا حصہ',
+    'Code': 'کوڈ',
+    'Current Bill Total:': 'موجودہ بل کا کل:',
+    'Delivery Persons': 'ڈلیوری پرسنز',
+    'Discount': 'رعایت',
+    'EXTERNAL LINK': 'بیرونی لنک',
+    'Financial Ledger': 'مالی لیجر',
+    'GOODS RECEIVED': 'موصول شدہ مال',
+    'Generated': 'بنایا گیا',
+    'Generated By': 'بنانے والا',
+    'MATERIAL RETURN': 'میٹیریل واپسی',
+    'MB': 'مینول بل',
+    'No active pending/paid bill rows found.': 'کوئی فعال زیر التوا یا ' + _ADA_SHUDA + ' بل نہیں ملا۔',
+    'No financial transaction records found.': 'کوئی مالی ٹرانزیکشن ' + _RECORDS + ' نہیں ملا۔',
+    'No financial transactions found.': 'کوئی مالی ٹرانزیکشن نہیں ملا۔',
+    'Outstanding': 'بقایا',
+    'Outstanding Balance': 'بقایا رقم',
+    'Recent financial activity': 'حالیہ مالی سرگرمی',
+    'No material transaction records found.': 'کوئی میٹیریل ٹرانزیکشن ' + _RECORDS + ' نہیں ملا۔',
+    'No printable receipts found for this client.': 'اس گاہک کے لیے کوئی قابلِ پرنٹ رسید نہیں ملی۔',
+    'No transactions found.': 'کوئی ٹرانزیکشن نہیں ملا۔',
+    'No unpaid bills.': 'کوئی غیر ' + _ADA_SHUDA + ' بل نہیں۔',
+    'Note:': 'نوٹ:',
+    'Opening Balance': 'ابتدائی بقایا',
+    'Original': 'اصل',
+    'Outstanding': 'بقایا',
+    'Paid Amount:': 'ادا شدہ رقم:',
+    'Payment Obligations & History': 'ادائیگی کی ذمہ داریاں اور تاریخ',
+    'Please pay': 'براہِ کرم ادائیگی کریں',
+    'Please settle the outstanding amount to clear this account.':
+        'اس اکاؤنٹ کو کلیئر کرنے کے لیے براہِ کرم بقایا رقم ادا کریں۔',
+    'Prev. Stock': 'پچھلا ' + _STOCK,
+    'Previous Balance Pending:': 'پچھلا بقایا:',
+    'Previous Balance:': 'پچھلا بقایا:',
+    'Receipt:': 'رسید:',
+    'Recent financial activity': 'حالیہ مالی کارروائی',
+    'Supplier Invoice #': 'سپلائر ' + '\u0627\u0646\u0648\u0627\u0626\u0633' + ' نمبر',
+    'Supplier Ledger': 'سپلائر لیجر',
+    'Total (Previous + Current):': 'کل (پچھلا + موجودہ):',
+    'Total Due (Carry Forward):': 'کل واجب الادا (آگے منتقل):',
+    'Total Outstanding Balance:': 'کل بقایا رقم:',
+    'UPLOADED PHOTO': 'اپ لوڈ شدہ تصویر',
+    'Unpaid bills': 'غیر ' + _ADA_SHUDA + ' بل',
+    'View Full Size': 'پوری تصویر دیکھیں',
+    'via': 'بذریعہ',
+
     'Go Back': 'واپس جائیں',
     'Print': 'پرنٹ',
     'Save': 'محفوظ ' + _KIYA_GAYA,
@@ -399,7 +870,8 @@ LABELS = {
 # punctuation and a small whitelist of Latin document tokens).  This makes it
 # impossible for a stray non-Urdu token to leak into a generated PDF.
 _ALLOWED_LATIN = ('GRN', 'PDF', 'FIFO', 'AMS', 'ID', 'IN', 'OUT')
-_BAD_CHARS = re.compile(r'[^\u0600-\u06FF\uFB50-\uFEFF0-9 \u060C\u061B\u061F/()#.,+\-]')
+_BAD_CHARS = re.compile(
+    r'[^\u0600-\u06FF\uFB50-\uFEFF0-9 \u060C\u061B\u061F/()#.,+\-:;%]')
 
 
 def _is_clean_urdu(value: str) -> bool:
@@ -413,7 +885,24 @@ def _is_clean_urdu(value: str) -> bool:
 
 LABELS = {en: ur for en, ur in LABELS.items() if _is_clean_urdu(ur)}
 
+# Templates render "Code:" / "Bill Pending:" with the colon in the markup while
+# the dictionary stores the bare label.  Dropping the colon from the keys means
+# the longest-match alternation can never pick a colon variant that hits no
+# entry, so the specific translation wins.  The values lose the same colon:
+# the punctuation already comes from the template, so keeping it here printed
+# "Current Bill Total: موجودہ بل کا کل::".
+LABELS = {(en.rstrip(':').strip() or en): ur.rstrip(':').strip() or ur
+          for en, ur in LABELS.items()}
+# Templates are scanned as *rendered* HTML, where "&" appears as "&amp;".  The
+# dictionary is keyed on the plain character, so unescape any entity left in a
+# label name (``Actual Purchase Cost &amp; Payments``) before matching.
+LABELS = {(html_lib.unescape(en)): ur for en, ur in LABELS.items()}
+LABELS = dict(sorted(LABELS.items(), key=lambda kv: len(kv[0]), reverse=True))
+
+# Alternation order must put the longest label first, otherwise "Total" would
+# win over "Total Due" and "Amount" over "Paid Amount:".
 _LABEL_ITEMS = sorted(LABELS.items(), key=lambda kv: len(kv[0]), reverse=True)
+_LABEL_NAMES = [en for en, _ in _LABEL_ITEMS]
 
 _MARKER = '<!--ams-bilingual-v1-->'
 
@@ -426,8 +915,19 @@ _TAG_RE = re.compile(r'(<[^>]+>)')
 # colon - free text such as notes, party or material names is never touched.
 _LABEL_PATTERN = re.compile(
     r'(?<![A-Za-z0-9])('
-    + '|'.join(re.escape(en) for en, _ in _LABEL_ITEMS)
-    + r')(?![A-Za-z0-9])(?=\s*:?\s*$|\s*:)'
+    # longest first, so "Total Due" is preferred over "Total" and "Paid
+    # Amount:" over "Amount".  ``re`` alternation is first-match-wins.
+    # ``&`` is written as ``&amp;`` inside rendered HTML, so allow either form
+    # for any ampersand inside a label.
+    + '|'.join(re.escape(en).replace(r'\&', '(?:&|&amp;)')
+               for en in sorted(_LABEL_NAMES, key=len, reverse=True))
+    # A label ends at a tag/entity/end of text, or is followed by a colon.
+    # A colon is an unambiguous label terminator in these templates
+    # ("Outstanding: Rs 350,000.00"), so text may follow it; without the colon
+    # only a number/dash may follow ("Amount 12"), which keeps free text such
+    # as "Booking: OPC CEMENT" from being mistaken for a label.  The colon
+    # branch is listed FIRST so "<strong>Client:</strong>" still matches.
+    + r')(?![A-Za-z0-9])(?=\s*(?::\s*(?:\S|$)|\s*(?:$|&|<|[0-9-])))'
 )
 
 
@@ -440,7 +940,18 @@ def _translate_text_segment(segment: str) -> str:
 
     def _sub(match):
         en = match.group(1)
-        ur = LABELS[en]
+        plain = html_lib.unescape(en)          # "&amp;" -> "&"
+        ur = LABELS.get(plain)
+        if ur is None:
+            # "Code:" / "Bill Pending:" are the same label as "Code" once the
+            # trailing colon (rendered by the template) is stripped.
+            ur = LABELS.get(plain.rstrip(':').strip())
+        if ur is None:
+            return en
+        # Template already prints the colon ("Current Bill Total:"), and the
+        # Urdu label carries its own — keep one, not two.
+        if en.rstrip().endswith(':') and ur.endswith(':'):
+            ur = ur[:-1].rstrip()
         return en + '<span class="ur" lang="ur" dir="rtl">' + ur + '</span>'
 
     return _LABEL_PATTERN.sub(_sub, segment)

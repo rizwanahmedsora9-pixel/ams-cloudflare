@@ -28,6 +28,12 @@ import re
 from html import unescape
 from html.parser import HTMLParser
 
+from app.services.pdf_layout import (
+    Css, Node, Line, RowBlock, TableBlock, _apply_case, _build_table,
+    _escape, _has_block_children, _inline_text, _is_blockish, build_story,
+    layout, resolve,
+)
+
 log = logging.getLogger(__name__)
 
 # Same geometry the WeasyPrint path forces: 14.8cm x 21cm with 1cm margins.
@@ -50,7 +56,8 @@ _INLINE_SEP_TAGS = {'br', 'hr'}
 # the ReportLab path and the WeasyPrint print-media path agree.
 _SKIP_CLASS_TOKENS = {
     'sidebar', 'sidebar-overlay', 'mobile-header', 'modal', 'modal-backdrop',
-    'loading-overlay', 'd-print-none', 'toast-container', 'offcanvas',
+    'loading-overlay', 'd-print-none', 'no-print', 'toast-container',
+    'offcanvas',
 }
 _SKIP_ID_TOKENS = {
     'sidebar', 'sidebarOverlay', 'loadingOverlay',
@@ -102,246 +109,155 @@ def _clean(text):
 
 
 class _HtmlToFlowables(HTMLParser):
-    """Collects headings, paragraphs and tables from rendered HTML."""
+    """Builds a DOM tree while recording the embedded stylesheets."""
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
-        self.blocks = []          # list of ('text', str, style) | ('table', rows)
-        self._skipping = False    # inside a subtree excluded from the PDF
-        self._skip_depth = 0      # nesting depth remaining inside that subtree
-        self._buf = []            # current inline text buffer
-        self._style = 'body'
-        self._class_stack = []    # class tokens of open inline elements (for .ur)
-        self._urdu_depth = 0      # >0 while inside a .ur span
-        self._urdu_buf = None     # raw Urdu text collected for a block-level span
-        self._in_table = False
-        self._rows = []
-        self._row = None
-        self._cell = None
-        self._cell_colspan = 1
-        self._cell_header = False
-
-    # -- buffer handling -------------------------------------------------
-    def _flush(self, style=None):
-        text = _clean(' '.join(self._buf))
-        self._buf = []
-        if text:
-            self.blocks.append(('text', text, style or self._style))
+        self.root = Node('html')
+        self._stack = [self.root]
+        self._skip_depth = 0
+        self._sheets = []
 
     # -- parser events ---------------------------------------------------
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
-        if self._skipping:
-            # Inside a skipped subtree: only count elements that will emit an
-            # end tag, otherwise the counter can never return to zero.
+        ad = {k.replace('-', '_') if k == 'class' else k: v for k, v in attrs}
+        ad['class'] = dict(attrs).get('class', '')
+        if self._skip_depth:
             if tag not in _VOID_TAGS:
                 self._skip_depth += 1
             return
-        if tag in _SKIP_CONTENT_TAGS or _is_chrome(attrs):
-            self._skipping = True
+        if tag in _SKIP_CONTENT_TAGS and tag != 'style':
             self._skip_depth = 1
             return
-
-        ad = dict(attrs)
-        classes = set((ad.get('class') or '').split())
-        self._class_stack.append(classes)
-        if 'ur' in classes:
-            if self._urdu_depth == 0 and self._cell is None:
-                # Block-level Urdu run: close the English line first so the
-                # translation prints as its own right-aligned line beneath it
-                # (inline Nastaleeq metrics would distort the English line).
-                self._flush()
-                self._urdu_buf = []
-            self._urdu_depth += 1
-        if tag in _HEADING_TAGS:
-            self._flush()
-            self._style = tag
-        elif tag == 'table':
-            self._flush()
-            self._in_table = True
-            self._rows = []
-        elif tag == 'tr':
-            self._row = []
-        elif tag in ('td', 'th'):
-            self._cell = []
-            self._cell_header = (tag == 'th')
-            try:
-                self._cell_colspan = max(1, int(ad.get('colspan') or 1))
-            except (TypeError, ValueError):
-                self._cell_colspan = 1
-        elif tag in _INLINE_SEP_TAGS:
-            self._flush()
+        if _is_chrome(attrs):
+            self._skip_depth = 1
+            return
+        node = Node(tag, ad, self._stack[-1])
+        self._stack[-1].append(node)
+        if tag in ('style', 'script', 'noscript', 'head'):
+            self._skip_depth = 1
+            self._stack.append(node)
+            return
+        if tag not in _VOID_TAGS:
+            self._stack.append(node)
 
     def handle_startendtag(self, tag, attrs):
-        # Self-closing form (<img/>, <br/>): no separate end tag will arrive.
-        tag = tag.lower()
-        if self._skipping:
-            return
-        if tag in _SKIP_CONTENT_TAGS or _is_chrome(attrs):
-            return
         self.handle_starttag(tag, attrs)
-        self.handle_endtag(tag)
+        if tag.lower() not in _VOID_TAGS:
+            self.handle_endtag(tag)
 
     def handle_endtag(self, tag):
         tag = tag.lower()
-        if self._skipping:
+        if self._skip_depth:
             self._skip_depth -= 1
-            if self._skip_depth <= 0:
-                self._skipping = False
-                self._skip_depth = 0
+            if self._stack and self._stack[-1].tag in _SKIP_CONTENT_TAGS | {'head'}:
+                if self._skip_depth == 0:
+                    self._stack.pop()
             return
-
-        popped = self._class_stack.pop() if self._class_stack else set()
-        if 'ur' in popped:
-            self._urdu_depth = max(0, self._urdu_depth - 1)
-            if self._urdu_depth == 0 and self._cell is None and self._urdu_buf is not None:
-                text = _clean(' '.join(self._urdu_buf))
-                self._urdu_buf = None
-                if text:
-                    from app.services.bilingual import shape_urdu
-                    self.blocks.append(('text', shape_urdu(text), 'urdu'))
-        if tag in ('td', 'th') and self._row is not None:
-            text = _clean(' '.join(self._cell or []))
-            self._cell = None
-            self._row.append((text, self._cell_colspan, self._cell_header))
-        elif tag == 'tr' and self._row is not None:
-            if any(c[0] for c in self._row):
-                self._rows.append(self._row)
-            self._row = None
-        elif tag == 'table':
-            self._in_table = False
-            if self._rows:
-                self.blocks.append(('table', self._rows))
-            self._rows = []
-        elif tag in _HEADING_TAGS:
-            self._flush(style=tag)
-            self._style = 'body'
-        elif tag in _BLOCK_TAGS:
-            self._flush()
+        if len(self._stack) <= 1:
+            return
+        # pop to the matching open element
+        for i in range(len(self._stack) - 1, 0, -1):
+            if self._stack[i].tag == tag:
+                del self._stack[i:]
+                return
 
     def handle_data(self, data):
-        if self._skipping:
+        if self._skip_depth:
+            node = self._stack[-1]
+            if node.tag == 'style':
+                self._sheets.append(data)
             return
-        if self._urdu_depth > 0:
-            if self._cell is not None:
-                # Inside a table cell keep the Urdu inline (small, Jameel font).
-                self._cell.append(_shape_urdu_run(data))
-            elif self._urdu_buf is not None:
-                self._urdu_buf.append(data)
-            return
-        if self._cell is not None:
-            self._cell.append(data)
-        else:
-            self._buf.append(data)
+        # Text is kept in document order alongside the element children, so
+        # ``<strong>Client:</strong> NAME`` stays "Client: NAME" instead of
+        # collapsing into the parent's own text buffer.
+        if data:
+            self._stack[-1].append_text(data)
 
     def close(self):
-        self._flush()
-        if self._urdu_buf is not None:
-            text = _clean(' '.join(self._urdu_buf))
-            self._urdu_buf = None
-            if text:
-                from app.services.bilingual import shape_urdu
-                self.blocks.append(('text', shape_urdu(text), 'urdu'))
         super().close()
 
 
-def _parse_html(html):
+def _parse_document(html):
     parser = _HtmlToFlowables()
     try:
         parser.feed(html or '')
         parser.close()
     except Exception:
-        log.exception('HTML parsing for PDF fallback was interrupted')
-    return parser.blocks
+        log.exception('HTML parsing for the PDF fallback was interrupted')
+    css = Css()
+    for sheet in parser._sheets:
+        css.add_sheet(sheet)
+    return parser.root, css
+
+
+def _parse_html(html):
+    """Legacy view of the parse: ``[('text', str, style) | ('table', rows)]``.
+
+    Kept for the existing tests and any external callers; the renderer itself
+    uses :func:`_parse_document` and keeps the full layout.
+    """
+    root, css = _parse_document(html)
+    blocks = []
+    _walk_legacy(root, css, resolve(css, root), blocks)
+    return blocks
+
+
+def _walk_legacy(node, css, style, out):
+    if 'ur' in node.classes:
+        return
+    if node.tag == 'table':
+        table = _build_table(node, css, style)
+        if table is not None:
+            out.append(('table', [[(c['text'], c['colspan'], c['header'])
+                                   for c in row] for row in table.rows]))
+        return
+    block_children = [c for c in node.children
+                      if isinstance(c, Node) and _is_blockish(c)]
+    if block_children:
+        for child in block_children:
+            _walk_legacy(child, css, resolve(css, child, style), out)
+        return
+    text = _inline_text(node, css, style)
+    if text:
+        out.append(('text', _apply_case(text, style), 'body'))
 
 
 def _build_story(blocks, body_font, bold_font, small_size):
-    """Translate parsed blocks into ReportLab flowables."""
+    """Legacy block renderer (kept for API compatibility)."""
     from reportlab.lib import colors
-    from reportlab.lib.enums import TA_RIGHT
     from reportlab.lib.styles import ParagraphStyle
-    from reportlab.lib.units import cm
     from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
-    urdu_style = None
-    if _URDU_FONT:
-        urdu_style = ParagraphStyle(
-            'pdfUrdu', fontName=_URDU_FONT, fontSize=7.0, leading=9.6,
-            alignment=TA_RIGHT, textColor=colors.HexColor('#374151'),
-            spaceAfter=2,
-        )
-    normal = ParagraphStyle(
-        'pdfBody', fontName=body_font, fontSize=8.2, leading=10.4,
-        spaceAfter=3, wordWrap='LTR',
-    )
-    small = ParagraphStyle(
-        'pdfSmall', parent=normal, fontSize=small_size, leading=small_size + 1.6,
-        textColor=colors.HexColor('#444444'),
-    )
-    heading_styles = {
-        tag: ParagraphStyle(
-            f'pdf{tag}', fontName=bold_font, fontSize=size, leading=size + 2.4,
-            spaceBefore=6, spaceAfter=3, textColor=colors.HexColor('#111111'),
-        )
-        for tag, size in _HEADING_TAGS.items()
-    }
-    cell = ParagraphStyle(
-        'pdfCell', fontName=body_font, fontSize=7.4, leading=9.0, wordWrap='LTR',
-    )
-    cell_bold = ParagraphStyle('pdfCellBold', parent=cell, fontName=bold_font)
-
+    normal = ParagraphStyle('pdfBody', fontName=body_font, fontSize=small_size,
+                            leading=small_size * 1.4, spaceAfter=3,
+                            wordWrap='LTR')
     story = []
     for block in blocks:
         if block[0] == 'text':
-            _kind, payload, style = block
-            if style in heading_styles:
-                story.append(Paragraph(payload, heading_styles[style]))
-            elif style == 'urdu' and urdu_style is not None:
-                story.append(Paragraph(payload, urdu_style))
-            elif style == 'small':
-                story.append(Paragraph(payload, small))
-            else:
-                story.append(Paragraph(payload, normal))
+            story.append(Paragraph(_escape(block[1]), normal))
         else:
             rows = block[1]
             width = max((sum(c[1] for c in r) for r in rows), default=1) or 1
             data = []
             for r in rows:
                 out = []
-                for text, colspan, is_header in r:
-                    out.append(Paragraph(text, cell_bold if is_header else cell))
-                    for _ in range(colspan - 1):
-                        out.append('')
+                for text, colspan, _header in r:
+                    out.append(Paragraph(_escape(text), normal))
+                    out.extend([''] * (colspan - 1))
                 while len(out) < width:
                     out.append('')
                 data.append(out[:width])
             if not data:
                 continue
-            avail = (PAGE_WIDTH_CM - 2 * MARGIN_CM) * cm
-            try:
-                col_w = [avail / width] * width
-                tbl = Table(data, colWidths=col_w, repeatRows=1 if _looks_tabled(rows) else 0)
-            except Exception:
-                tbl = Table(data, repeatRows=0)
+            tbl = Table(data, colWidths=[(PAGE_WIDTH_CM - 2 * MARGIN_CM) * 28.35 / width] * width)
             tbl.setStyle(TableStyle([
                 ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#9aa0a6')),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#eceff1')),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('TOPPADDING', (0, 0), (-1, -1), 2),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
             ]))
-            story.append(Spacer(1, 3))
             story.append(tbl)
-            story.append(Spacer(1, 3))
-    if not story:
-        story.append(Paragraph('No printable content.', normal))
     return story
-
-
-def _looks_tabled(rows):
-    return bool(rows) and any(c[2] for c in rows[0])
 
 
 def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
@@ -368,9 +284,8 @@ def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
         except Exception:
             _URDU_FONT = None
 
-        blocks = _parse_html(html)
         # Prefer Helvetica (always present in ReportLab); DejaVu is optional.
-        body_font, bold_font, small_size = 'Helvetica', 'Helvetica-Bold', 7.4
+        body_font, bold_font = 'Helvetica', 'Helvetica-Bold'
         try:
             from reportlab.pdfbase import pdfmetrics
             from reportlab.pdfbase.ttfonts import TTFont
@@ -385,7 +300,18 @@ def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
         except Exception:
             pass
 
-        story = _build_story(blocks, body_font, bold_font, small_size)
+        usable_width = (PAGE_WIDTH_CM - 2 * MARGIN_CM) * cm
+
+        # Layout the real DOM instead of a flattened text stream, so flex
+        # headers, summary boxes, receipt footers and table geometry survive.
+        try:
+            root, css = _parse_document(html)
+            blocks = layout(root, css)
+            story = build_story(blocks, body_font, bold_font, _URDU_FONT,
+                                usable_width)
+        except Exception:
+            log.exception('Structured PDF layout failed; using flat text.')
+            story = _build_story(_parse_html(html), body_font, bold_font, 7.4)
 
         buf = io.BytesIO()
         pagesize = (PAGE_WIDTH_CM * cm, PAGE_HEIGHT_CM * cm)
