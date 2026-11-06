@@ -5,9 +5,25 @@ always preferable. Preserve punctuation, numbers and non-Latin text unchanged.
 """
 import re
 
+# Whole words are matched case-insensitively *before* every other rule, so a
+# walk-in name typed in capitals ("OPEN", "OPEN KHATA", "CASH") is read as the
+# word itself and never spelled out letter-by-letter like an initialism.
 _WORDS = {
+    # Walk-in / ledger vocabulary seen in client and driver names.
+    'open': 'اوپن', 'khata': 'کھاتہ', 'cash': 'کیش', 'paid': 'پیڈ',
+    'sale': 'سیل', 'credit': 'کریڈٹ', 'advance': 'ایڈوانس', 'rent': 'رینٹ',
+    'return': 'ریٹرن', 'due': 'ڈیو', 'general': 'جنرل', 'customer': 'کسٹمر',
+    'walking': 'واکنگ', 'site': 'سائٹ', 'shop': 'شاپ', 'store': 'اسٹور',
+    'market': 'مارکیٹ', 'trader': 'ٹریڈر', 'traders': 'ٹریڈرز',
+    'company': 'کمپنی', 'bank': 'بینک', 'account': 'اکاؤنٹ',
+    'booking': 'بکنگ', 'delivery': 'ڈیلیوری', 'payment': 'پیمنٹ',
+    'cement': 'سیمنٹ', 'goods': 'گڈز', 'material': 'میٹیریل',
+    # Short all-caps-friendly words (single vowel), so they keep word reading.
+    'work': 'ورک', 'home': 'ہوم', 'food': 'فوڈ', 'room': 'روم', 'good': 'گڈ',
+    'sons': 'سنز', 'bros': 'بروز', 'mill': 'مل', 'star': 'اسٹار', 'test': 'ٹیسٹ',
+    # Known names / brands.
     'hamid': 'حامد', 'hamed': 'حامد', 'faisal': 'فیصل',
-    'cement': 'سیمنٹ', 'dg': 'ڈی جی',
+    'dg': 'ڈی جی',
 }
 _LETTERS = {
     'a': 'ا', 'b': 'ب', 'c': 'ک', 'd': 'د', 'e': 'ی', 'f': 'ف',
@@ -19,6 +35,23 @@ _LETTERS = {
 _PAIRS = {'sh': 'ش', 'ch': 'چ', 'kh': 'خ', 'gh': 'غ', 'ph': 'ف',
           'th': 'تھ', 'dh': 'دھ', 'bh': 'بھ', 'aa': 'ا', 'ee': 'ی',
           'oo': 'و', 'ai': 'ی', 'ay': 'ے', 'ou': 'او'}
+
+_VOWELS = set('aeiou')
+
+
+def _looks_like_initialism(text: str) -> bool:
+    """A short ALL-CAPS token that reads as letter names, not as a word.
+
+    True initialisms in this trade (``DG``, ``OPC``, ``GRN``, ``HBL``, ``NBP``)
+    carry at most one vowel letter.  Words people simply type in capitals --
+    ``OPEN``, ``ALI``, ``ASIF`` -- keep their vowel pattern and fall through to
+    the word transliterator (or the dictionary above), so the Urdu bill never
+    spells them out as "o p e n".
+    """
+    if not (text.isupper() and 1 < len(text) <= 4):
+        return False
+    lowered = text.lower()
+    return sum(1 for ch in lowered if ch in _VOWELS) <= 1
 
 
 def urdu_name(name, preferred=None):
@@ -34,7 +67,7 @@ def urdu_name(name, preferred=None):
         if text in _WORDS:
             return _WORDS[text]
         # Initialisms are read as letter names rather than a single word.
-        if original.isupper() and 1 < len(original) <= 4:
+        if _looks_like_initialism(original):
             letters = {'a': 'اے', 'b': 'بی', 'c': 'سی', 'd': 'ڈی', 'e': 'ای',
                        'f': 'ایف', 'g': 'جی', 'h': 'ایچ', 'i': 'آئی', 'j': 'جے',
                        'k': 'کے', 'l': 'ایل', 'm': 'ایم', 'n': 'این', 'o': 'او',

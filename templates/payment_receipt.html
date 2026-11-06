@@ -42,26 +42,29 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    flex-wrap: wrap;          /* narrow screens: the document block drops below the company block instead of running off the edge */
     padding: 14px 20px 10px;
     border-bottom: 3px solid #000;
     gap: 12px;
 }
-.rcpt-co-name  { font-size:22px; font-weight:900; letter-spacing:-0.5px; line-height:1.1; text-transform:uppercase; }
+.rcpt-header-left { min-width: 0; }
+.rcpt-co-name  { font-size:22px; font-weight:900; letter-spacing:-0.5px; line-height:1.1; text-transform:uppercase; overflow-wrap:anywhere; }
 .rcpt-co-sub   { font-size:11px; font-weight:600; margin-top:3px; color:#333 !important; }
 .rcpt-co-phone { font-size:11px; font-weight:700; margin-top:2px; }
-.rcpt-header-right { text-align:right; white-space:nowrap; }
+.rcpt-header-right { text-align:right; max-width:100%; }
 .rcpt-doc-type {
     display:inline-block; font-size:16px; font-weight:900;
     text-transform:uppercase; letter-spacing:2px;
     border:2.5px solid #000; padding:4px 12px;
+    max-width:100%; box-sizing:border-box;
 }
 .rcpt-tx-badge {
     display:inline-block; font-size:10px; font-weight:700;
     border:1px solid #000; padding:2px 7px; margin-top:4px;
-    white-space:normal; max-width:200px; text-align:center;
+    white-space:normal; max-width:100%; text-align:center;
 }
-.rcpt-doc-no   { font-size:14px; font-weight:900; margin-top:5px; }
-.rcpt-doc-date { font-size:10px; font-weight:600; margin-top:2px; color:#444 !important; }
+.rcpt-doc-no   { font-size:14px; font-weight:900; margin-top:5px; white-space:nowrap; }
+.rcpt-doc-date { font-size:10px; font-weight:600; margin-top:2px; color:#444 !important; white-space:nowrap; }
 
 /* ---- BODY ---- */
 .rcpt-body { padding: 10px 20px 6px; }
@@ -106,6 +109,30 @@
 .rcpt-credits   {
     text-align:center; font-size:9.5px; font-weight:700; color:#333 !important;
     border-top:1px dashed #aaa; padding-top:5px; margin-top:6px;
+}
+
+/* ============================================================
+   SMALL SCREENS – keep the receipt header inside the page
+   (screen only: the printed/PDF sheet keeps its A5 sizes)
+   ============================================================ */
+@media screen and (max-width: 575.98px) {
+    .rcpt-header {
+        padding: 10px 12px 8px;
+        gap: 8px;
+    }
+    .rcpt-co-name { font-size: 17px; }
+    .rcpt-doc-type {
+        font-size: 13px;
+        letter-spacing: 1.5px;
+        padding: 3px 9px;
+    }
+    .rcpt-tx-badge { max-width: 100%; }
+    .rcpt-body { padding: 8px 12px 6px; }
+    .rcpt-parties {
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+    .rcpt-footer { padding: 8px 12px 10px; }
 }
 
 /* ============================================================
@@ -196,7 +223,7 @@
 
     <!-- HEADER -->
     <div class="rcpt-header">
-        <div>
+        <div class="rcpt-header-left">
             <div class="rcpt-co-name">{{ co_name }}</div>
             <div class="rcpt-co-sub">{{ co_address }}</div>
             <div class="rcpt-co-phone"><bdi dir="ltr">{{ co_phone }}</bdi></div>
