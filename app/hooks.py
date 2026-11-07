@@ -376,6 +376,10 @@ def register_hooks(app):
                 services=cache_obj.get('services') or [],
                 delivery_persons=cache_obj.get('delivery_persons') or [],
                 settings=cache_obj.get('settings'),
+                # Terms & Conditions feed the Urdu print/download dialog on the
+                # bill views.  They were cached above but never handed to the
+                # templates, so that dialog listed no terms at all.
+                terms=cache_obj.get('terms') or [],
                 user_can=_user_can,
                 sidebar_nav=sidebar_nav,
                 ui_theme_preference=session.get('ui_theme')
