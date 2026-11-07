@@ -1209,10 +1209,18 @@ def _ltr_bdi(text: str):
 def bill_date(value, lang: str = 'en'):
     """Format a bill timestamp.
 
-    Urdu bills use the simple reading order requested for receipts:
-    ``صبح/شام → time → date → Urdu month → year``.  Each figure group is an
-    LTR isolate, so both the browser and the ReportLab fallback keep ``05:03``
-    and ``06`` in that order while the surrounding Urdu line remains RTL.
+    The Urdu line holds *exactly* what the English one holds, in the same
+    order - time, then AM/PM, then day, month, year - and the only thing that
+    changes is the direction it is written in.  So the sequence is stored
+    ``time → صبح/شام → day → Urdu month → year`` and the line is laid out
+    right to left: ``05:03`` sits nearest the right edge, the year nearest the
+    left, which is the mirror image of the English bill.
+
+    Every figure group is an LTR isolate, so the browser and the ReportLab
+    fallback both read ``05:03`` and ``2026`` left to right while the line
+    around them runs the other way.  The line's own direction is pinned by
+    :func:`_urdu_css` (``.rcpt-doc-date``), which is what keeps the printed
+    page, the browser print preview and the saved PDF identical.
     """
     if value is None:
         return ''
@@ -1229,8 +1237,8 @@ def bill_date(value, lang: str = 'en'):
     period = 'صبح' if getattr(value, 'hour', 0) < 12 else 'شام'
     month = _URDU_MONTHS.get(value.strftime('%b'), value.strftime('%b'))
     return Markup('{}{}{}{}{}').format(
-        _urdu_span(period + ' '),
         _ltr_bdi(value.strftime('%I:%M ')),
+        _urdu_span(period + ' '),
         _ltr_bdi(value.strftime('%d ')),
         _urdu_span(month + ' '),
         _ltr_bdi(value.strftime('%Y')),
@@ -1257,12 +1265,22 @@ def _urdu_css() -> str:
         '}'
         '.rcpt-wrapper[dir="rtl"] .rcpt-detail-val,'
         '.rcpt-wrapper[dir="rtl"] .rcpt-doc-no,'
-        '.rcpt-wrapper[dir="rtl"] .rcpt-doc-date,'
         '.rcpt-wrapper[dir="rtl"] .rcpt-party-sub,'
         '.rcpt-wrapper[dir="rtl"] .rcpt-co-phone,'
         '.rcpt-wrapper[dir="rtl"] .rcpt-amount-val,'
         '.rcpt-wrapper[dir="rtl"] td.text-end {'
         '  direction: ltr; unicode-bidi: embed;'
+        '}'
+        # The date line is the one header line that is *Urdu prose*, not a
+        # figure, so it must be written right to left: ``05:03`` nearest the
+        # right edge, then ``شام``, the day, the month, and the year nearest
+        # the left - the mirror image of the English bill.  Pinning it to
+        # ``ltr`` (as the block above used to) is what made the browser and
+        # the saved PDF lay the same line out in opposite directions.
+        # The numbers inside it stay left to right on their own, because
+        # ``[dir="ltr"]`` below isolates each figure group.
+        '.rcpt-wrapper[dir="rtl"] .rcpt-doc-date {'
+        '  direction: rtl; unicode-bidi: normal; text-align: right;'
         '}'
         # A row that pairs an Urdu label with a figure (``کل بقایا`` / ``25,000``)
         # puts the label on the right and the figure on the left: the same

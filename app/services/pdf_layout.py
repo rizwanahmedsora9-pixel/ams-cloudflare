@@ -52,7 +52,7 @@ _INHERITED = {
     'text-align', 'line-height', 'letter-spacing', 'text-transform', 'direction',
     # ``white-space`` is inherited in CSS.  The receipt's date block relies on
     # it (``.rcpt-header-right { white-space: nowrap }``) to hold
-    # ``شام 03:55 06 نومبر 2026`` on one line; without the inheritance the
+    # ``03:55 شام 06 نومبر 2026`` on one line; without the inheritance the
     # date broke in two and the pieces stacked on top of each other.
     'white-space',
 }

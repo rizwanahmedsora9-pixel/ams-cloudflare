@@ -161,20 +161,52 @@ def test_apply_urdu_is_rtl_font_only_and_idempotent():
     assert "<!--ams-bilingual-v1-->" not in out
 
 
-def test_urdu_bill_date_uses_period_time_day_month_year_order():
-    """Urdu receipt dates read صبح/شام, time, date, month, then year."""
+def test_urdu_bill_date_reads_time_period_day_month_year_right_to_left():
+    """Urdu receipt dates read time, صبح/شام, date, month, then year.
+
+    The sequence is the English one - ``05:03 PM 06 Nov 2026`` - only written
+    right to left, so the *first* thing an Urdu reader meets at the right edge
+    is the time.
+    """
     evening = str(B.bill_date(datetime(2026, 11, 6, 17, 3), "ur"))
     morning = str(B.bill_date(datetime(2026, 1, 2, 5, 3), "urdu"))
 
     # Dropping markup shows the exact order users read on the receipt.  Each
     # number is an LTR isolate so the PDF fallback cannot swap time and day.
-    assert re.sub(r"<[^>]+>", "", evening) == "شام 05:03 06 نومبر 2026"
-    assert re.sub(r"<[^>]+>", "", morning) == "صبح 05:03 02 جنوری 2026"
+    assert re.sub(r"<[^>]+>", "", evening) == "05:03 شام 06 نومبر 2026"
+    assert re.sub(r"<[^>]+>", "", morning) == "05:03 صبح 02 جنوری 2026"
     assert evening.count('<bdi dir="ltr">') == 3
     assert "AM" not in morning and "PM" not in evening
 
+    # The time is the first run of the line, which is what puts it against the
+    # right edge once the line is written right to left.
+    assert evening.index("05:03") < evening.index("شام") < evening.index("06")
+
     # English bills retain their established date format.
     assert B.bill_date(datetime(2026, 11, 6, 17, 3), "en") == "06 Nov 2026  05:03 PM"
+
+
+def test_urdu_css_writes_the_date_line_right_to_left():
+    """The date line must not be pinned left-to-right, or screen and PDF differ.
+
+    Bill numbers, phone numbers and amounts are figures and stay LTR; the date
+    is an Urdu sentence and has to be *written* RTL while its own numbers stay
+    readable LTR inside their isolates.
+    """
+    css = B._urdu_css()
+    date_rule = re.search(
+        r'\.rcpt-wrapper\[dir="rtl"\] \.rcpt-doc-date\s*{[^}]*}', css)
+    assert date_rule, "the Urdu stylesheet has no rule for .rcpt-doc-date"
+    assert "direction: rtl" in date_rule.group(0), date_rule.group(0)
+
+    # The pinned-LTR block must no longer list the date.
+    ltr_rules = re.findall(
+        r'([^{}]*?)\{\s*direction: ltr;[^}]*\}', css)
+    for selectors in ltr_rules:
+        assert ".rcpt-doc-date" not in selectors, (
+            "the date line cannot be pinned to direction: ltr: "
+            + " ".join(selectors.split())
+        )
 
 
 def test_view_bill_has_separate_language_buttons(client, bill_data):
