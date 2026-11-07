@@ -44,3 +44,7 @@ node_modules/
 
 # --- PDF inspection scratch output (generated, never committed) ---
 scratch/pdf_out/
+
+# --- Local preview database (scratch, never committed) ---
+scratch/preview.db*
+scratch/preview.health.json
