@@ -96,6 +96,92 @@ from app.services.void_rebuild import (
 
 
 # --- from ledgers_svc_rows.py ---
+def client_material_entry_filter(client):
+    """The ``Entry`` rows that belong to *client*.
+
+    The on-screen Material Ledger and the printed/PDF statement must agree, so
+    both call this instead of each writing their own ``or_`` clause.
+    """
+    client_name_norm = (client.name or '').strip().lower()
+    return or_(
+        Entry.client_code == client.code,
+        func.lower(func.trim(Entry.client)) == client_name_norm,
+    )
+
+
+def client_material_summary(client):
+    """Per-material net quantity and the grand total for *client*.
+
+    This is the exact computation the on-screen Material Ledger shows
+    (``Material | Net Qty (IN - OUT)`` plus "Net material position").  The
+    printed statement uses the same helper, so the sheet that comes out of the
+    printer or the PDF can never report a different total than the page the
+    user was looking at.
+    """
+    rows = db.session.query(
+        Entry.material,
+        func.sum(case((Entry.type == 'IN', Entry.qty), else_=-Entry.qty)).label('total'),
+    ).filter(
+        client_material_entry_filter(client),
+        Entry.is_void == False,      # noqa: E712
+        Entry.type.in_(['IN', 'OUT']),
+    ).group_by(Entry.material).all()
+    summary = {row.material: row.total for row in rows}
+    total_qty = sum(float(v or 0) for v in summary.values())
+    return summary, total_qty
+
+
+def client_movement_rows(client, limit=None):
+    """The ``Entry`` rows the Material Ledger prints — one list, one order.
+
+    This is the *screen's* own data set: the same filter, the same columns and
+    the same figures.  The on-screen Material Ledger paginates it ten rows at a
+    time; the printed sheet and the PDF ask for all of it.  Sharing the query
+    is what guarantees the sheet that comes off the printer reports exactly
+    what the page was showing.
+    """
+    query = Entry.query.filter(
+        client_material_entry_filter(client),
+        Entry.is_void == False,          # noqa: E712
+    ).order_by(Entry.date.desc(), Entry.time.desc())
+    if limit:
+        query = query.limit(limit)
+    rows = []
+    for e in query.all():
+        material = e.material or ''
+        display = material
+        if e.booked_material and e.material and e.booked_material != e.material:
+            display = format_alt_material_label(e.booked_material, e.material)
+        rows.append({
+            'date': e.date or '',
+            'time': e.time or '',
+            'material': material,
+            'material_display': display,
+            'type': e.type or '',
+            'qty': e.qty or 0,
+            'bill_no': e.bill_no or e.auto_bill_no or '',
+            'note': (e.note or '').strip(),
+            'client_category': e.client_category or '',
+            'source_id': e.id,
+        })
+    return rows
+
+
+def flatten_material_history(material_history_grouped):
+    """``{material: [rows]}`` -> one chronological list.
+
+    The statement prints a single Movement History table, so the per-material
+    grouping (which only exists to compute running balances) is unwrapped here
+    and re-sorted oldest-first — the order a ledger prints in.
+    """
+    rows = []
+    for items in (material_history_grouped or {}).values():
+        rows.extend(items or [])
+    rows.sort(key=lambda r: (r.get('date_sort') or datetime.min,
+                             str(r.get('bill_no') or '')))
+    return rows
+
+
 def _build_client_ledger_rows(client):
     client_name_norm = (client.name or '').strip().lower()
 
@@ -525,6 +611,11 @@ def _build_client_ledger_rows(client):
                         date_sort = None
             material_history.append({
                 'date': b.date_posted.strftime('%Y-%m-%d') if b.date_posted else (created_at[:10] if created_at else ''),
+                # ``time``/``qty`` mirror the on-screen Movement History columns
+                # (Date | Time | Material | Type | Qty ...) so the printed sheet
+                # can print the same cells as the web page.
+                'time': b.date_posted.strftime('%H:%M') if b.date_posted else '',
+                'qty': item.qty,
                 'date_sort': date_sort,
                 'material': item.material_name,
                 'material_group': item.material_name,
@@ -559,12 +650,15 @@ def _build_client_ledger_rows(client):
         row_type = 'Cancel' if d.type == 'CANCEL' else 'Dispatch'
         material_history.append({
             'date': d.date,
+            # see the booking branch: ``time``/``qty`` mirror the screen columns
+            'time': (d.time or '')[:5],
+            'qty': d.qty,
             'date_sort': date_sort,
             'material': mat_name,
             'material_group': mat_name,
             'material_display': material_display,
-            'qty_added': 0,
-            'qty_dispatched': d.qty,
+            'qty_added': d.qty if d.type == 'CANCEL' else 0,
+            'qty_dispatched': 0 if d.type == 'CANCEL' else d.qty,
             'bill_no': bill_ref,
             'nimbus_no': d.nimbus_no or 'Booking Cancel',
             'type': row_type,

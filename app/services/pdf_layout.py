@@ -1158,6 +1158,14 @@ def _render_table(block, body_font, bold_font, urdu_font, usable_width,
     # BILL # column ended up narrower than ``MB NO.7001`` and wrapped it, and
     # how the table grew past the printable area.
     col_widths = [float(w) for w in list(col_widths[:ncols])]
+    # Safety net: no table may exceed the sheet.  Templates that print edge to
+    # edge (``@page { margin: 0 }``) leave no room at all, so a single
+    # mis-measured Nastaleeq run would push the last column off the paper and a
+    # printer would clip it.  Scaling the columns down keeps every column
+    # proportional and every figure on the sheet.
+    _total = sum(col_widths)
+    if _total > usable_width > 0:
+        col_widths = [w * (usable_width / _total) for w in col_widths]
     table = Table(data, colWidths=col_widths, repeatRows=1, hAlign='LEFT')
     table._argW = list(col_widths)
     table._ncols = ncols

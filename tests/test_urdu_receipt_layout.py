@@ -304,13 +304,49 @@ def text_band_list(bands):
     return [band for band in bands if (band[1] - band[0]) > 5]
 
 
+def _template_page_css(template_name):
+    """The ``@page`` rule a print template declares, straight from the file.
+
+    Read from the template rather than restated here, so the guard band below
+    can never drift away from the geometry the browser actually prints.
+    """
+    import os
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'templates', template_name)
+    with open(path, encoding='utf-8') as fh:
+        return fh.read()
+
+
 def test_receipt_ink_stays_inside_the_printable_area(urdu_receipt_pdf):
+    """No glyph may be drawn outside the sheet.
+
+    The guard band used to be a flat 20pt, which silently encoded one page
+    geometry.  The exporter now honours the template's own ``@page`` rule —
+    bills and receipts declare ``margin: 0`` and print edge to edge exactly as
+    the browser does — so the band is derived from that rule instead.
+    """
+    from app.services.files_pdf import page_margins_cm
+
     bands, rect = _ink_rows(urdu_receipt_pdf)
     assert bands
+    margin_x, margin_y = page_margins_cm(_template_page_css('view_bill.html'))
+    left_edge = margin_x * 72.0 / 2.54
+    right_edge = rect.width - margin_x * 72.0 / 2.54
+    top_edge = margin_y * 72.0 / 2.54
+    bottom_edge = rect.height - margin_y * 72.0 / 2.54
+    # Nastaleeq glyphs overhang their advance width by a pixel or two; one
+    # point of tolerance keeps anti-aliasing from failing the build.
+    tolerance = 1.0
     for top, bottom, left, right in bands:
-        assert left >= 20.0, f'ink starts left of the margin at y={top:.0f}'
-        assert right <= rect.width - 20.0, (
+        assert left >= left_edge - tolerance, (
+            f'ink starts left of the margin at y={top:.0f}')
+        assert right <= right_edge + tolerance, (
             f'ink runs past the right margin at y={top:.0f}')
+        assert top >= top_edge - tolerance, (
+            f'ink starts above the top margin at y={top:.0f}')
+        assert bottom <= bottom_edge + tolerance, (
+            f'ink runs below the bottom margin at y={bottom:.0f}')
 
 
 def test_receipt_right_edge_is_used_by_the_urdu_column(urdu_receipt_pdf):

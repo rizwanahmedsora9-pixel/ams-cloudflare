@@ -37,7 +37,11 @@ def download_full_client_history(id):
     )
 
     filename = f"CLIENT_HISTORY_{re.sub(r'[^A-Za-z0-9]+', '_', client.code or str(client.id)).strip('_') or client.id}.pdf"
-    pdf_response = _try_render_weasy_pdf(rendered, filename, disposition='attachment')
+    pdf_response = _try_render_weasy_pdf(
+        rendered, filename, disposition='attachment',
+        lang=resolve_export_lang(), urdu_labels=True,
+        doc_title=f'Client History - {client.name}',
+    )
     if pdf_response:
         return pdf_response
 

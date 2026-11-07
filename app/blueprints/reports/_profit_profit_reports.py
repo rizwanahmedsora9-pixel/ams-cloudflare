@@ -183,7 +183,11 @@ def profit_report_pdf():
     })
     rendered = render_template("profit_report_pdf.html", **context)
     stamp = f"{report['start_date_str'] or 'all'}-{report['end_date_str'] or 'today'}"
-    response = _try_render_weasy_pdf(rendered, f"profit-loss-{stamp}.pdf")
+    response = _try_render_weasy_pdf(
+        rendered, f"profit-loss-{stamp}.pdf",
+        lang=resolve_export_lang(), urdu_labels=True,
+        doc_title=f"Profit & Loss {stamp}",
+    )
     if response is None:
         abort(500, "PDF generation failed")
     return response

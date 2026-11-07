@@ -117,6 +117,7 @@ from app.services.files_pdf import (  # noqa: F401
     _ext_from_name,
     _safe_download_name,
     _try_render_weasy_pdf,
+    resolve_export_lang,
     save_photo,
 )
 from app.services.financial_ledgers import (  # noqa: F401
@@ -192,6 +193,10 @@ from app.services.health import (  # noqa: F401
 )
 from app.services.ledgers import (  # noqa: F401
     _build_client_ledger_rows,
+    client_material_entry_filter,
+    client_material_summary,
+    client_movement_rows,
+    flatten_material_history,
     _build_supplier_ledger_rows,
     _client_all_active_bills,
     _client_bill_snapshot_context,
@@ -472,6 +477,7 @@ __all__ = [
     '_ext_from_name',
     '_safe_download_name',
     '_try_render_weasy_pdf',
+    'resolve_export_lang',
     'save_photo',
     'build_client_financial_ledger',
     'build_current_payables',
@@ -532,6 +538,10 @@ __all__ = [
     '_rebuild_health_snapshot',
     '_write_health_snapshot',
     '_build_client_ledger_rows',
+    'client_material_entry_filter',
+    'client_material_summary',
+    'client_movement_rows',
+    'flatten_material_history',
     '_build_supplier_ledger_rows',
     '_client_all_active_bills',
     '_client_bill_snapshot_context',

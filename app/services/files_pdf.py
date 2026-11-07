@@ -111,7 +111,57 @@ def _ext_from_name(name, fallback='dat'):
     return ext or fallback
 
 
-def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment', lang=None):
+def resolve_export_lang(default='en'):
+    """Read the requested document language off the query string.
+
+    Every export accepts ``?lang=en`` (the default) or ``?lang=ur``.  Urdu is
+    always a *separate* document — see :func:`_language_layer` for why the two
+    languages are never mixed in one export any more.
+    """
+    try:
+        raw = (request.args.get('lang') or '').strip().lower()
+    except Exception:      # outside a request context (tests, CLI)
+        return default
+    if raw in ('ur', 'urdu', 'اردو'):
+        return 'ur'
+    if raw in ('en', 'eng', 'english'):
+        return 'en'
+    return default
+
+
+def _language_layer(rendered_html, lang, urdu_labels=False):
+    """Apply the language layer for one export.
+
+    A document is now **either** English **or** Urdu — never both at once.
+
+    The old mixed layer appended a Nastaleeq translation beside every Latin
+    label.  That reads acceptably in a browser, but the pure-Python ReportLab
+    fallback used on hosts without WeasyPrint draws the two scripts on one
+    baseline inside one paragraph, so every header and summary line turned into
+    overlapping, unreadable text.  Splitting the languages fixes the exported
+    PDF *and* gives bilingual staff a clean Urdu copy on demand.
+
+    ``urdu_labels=True`` selects the label-replacing Urdu layer (ledgers,
+    statements and reports, whose templates have no Urdu branch of their own).
+    Bills keep ``False``: they render their own Urdu labels through
+    ``bill_lang`` and only need the font plus the RTL direction.
+    """
+    if not rendered_html:
+        return rendered_html
+    if lang == 'ur':
+        try:
+            from app.services.bilingual import apply_urdu, apply_urdu_labels
+            return (apply_urdu_labels(rendered_html) if urdu_labels
+                    else apply_urdu(rendered_html))
+        except Exception:
+            logging.getLogger(__name__).exception(
+                'Urdu PDF layer failed; rendering English-only.')
+            return rendered_html
+    return rendered_html      # English: the template is already English.
+
+
+def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment',
+                          lang=None, urdu_labels=False, doc_title=None):
     """
     Render PDF with WeasyPrint only when available.
     On first failure, disable future attempts to avoid repeated noisy warnings.
@@ -121,24 +171,18 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
     genuine PDF is produced by the ReportLab fallback instead, so a download
     that asked for a PDF always receives one.
 
-    ``lang`` selects the document language for bills/receipts:
-      * ``'en'`` — English only (no Urdu layer is injected);
-      * ``'ur'`` — a single-language Urdu document (labels replaced, RTL);
-      * ``None`` — legacy mixed English+Urdu layer, kept for non-bill exports.
+    ``lang`` selects the document language:
+      * ``'en'`` (or ``None``) — English only, no Urdu layer is injected;
+      * ``'ur'`` — a single-language Urdu document (labels replaced, RTL).
+
+    ``doc_title`` is the human-readable title used for the PDF metadata and the
+    running page footer.  It defaults to the download name with the timestamp
+    stripped, so the footer never prints ``CLIENTLEDGER-06-11-2026_08-21PM.pdf``.
     """
 
     safe_name = _safe_download_name(download_name, default='document.pdf')
-    try:
-        if lang == 'ur':
-            from app.services.bilingual import apply_urdu
-            rendered_html = apply_urdu(rendered_html)
-        elif lang == 'en':
-            pass  # English-only bill: never inject the mixed Urdu layer.
-        else:
-            from app.services.bilingual import apply_bilingual
-            rendered_html = apply_bilingual(rendered_html)
-    except Exception:
-        logging.getLogger(__name__).exception('PDF language layer failed; rendering English-only.')
+    rendered_html = _language_layer(rendered_html, lang, urdu_labels=urdu_labels)
+    html_for_pdf = _with_pdf_page_css(rendered_html)
     try:
         if state.WEASYPRINT_MODULE is None:
             # WeasyPrint prints dependency warnings to stderr on import; silence them here.
@@ -146,15 +190,8 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
                 state.WEASYPRINT_MODULE = importlib.import_module('flask_weasyprint')
         # If a previous attempt already confirmed WeasyPrint is unavailable, bail early.
         if state.WEASYPRINT_MODULE is False:
-            return _render_reportlab_pdf(rendered_html, safe_name, disposition)
-        # Enforce consistent PDF paper format across all exports.
-        # Required layout: width 14.8cm, height 21cm with 1cm margins on all sides.
-        forced_page_css = (
-            "<style>"
-            "@page { size: 14.8cm 21cm; margin: 1cm; }"
-            "</style>"
-        )
-        html_for_pdf = f"{forced_page_css}{rendered_html}"
+            return _render_reportlab_pdf(rendered_html, safe_name, disposition,
+                                         doc_title=doc_title, html=html_for_pdf)
         # Render with the *print* media type so the app's own ``@media print``
         # rules apply.  Those rules hide the sidebar, modals, loading overlay
         # and anything marked ``d-print-none``; without this the exported
@@ -193,10 +230,131 @@ def _try_render_weasy_pdf(rendered_html, download_name, disposition='attachment'
             logging.getLogger(__name__).exception(
                 'WeasyPrint PDF generation failed; using the ReportLab PDF fallback.'
             )
-    return _render_reportlab_pdf(rendered_html, safe_name, disposition)
+    return _render_reportlab_pdf(rendered_html, safe_name, disposition,
+                                 doc_title=doc_title,
+                                 html=_with_pdf_page_css(rendered_html))
 
 
-def _render_reportlab_pdf(rendered_html, safe_name, disposition):
+# ---------------------------------------------------------------------------
+# One paper geometry for every export path
+# ---------------------------------------------------------------------------
+# A browser printing the sheet, WeasyPrint and the pure-Python ReportLab
+# fallback must all end up on the same page, otherwise "print" and "download
+# PDF" visibly disagree.  A5 portrait (14.8cm x 21cm) with 10mm top/bottom and
+# 8mm left/right margins is that single geometry; :mod:`app.services.pdf_fallback`
+# uses the same numbers.
+PDF_PAGE_WIDTH_CM = 14.8
+PDF_PAGE_HEIGHT_CM = 21.0
+PDF_MARGIN_X_CM = 0.8
+PDF_MARGIN_Y_CM = 1.0
+
+# Only a fallback for templates that declare no ``@page`` of their own.
+PDF_PAGE_CSS = (
+    "<style id=\"ams-pdf-page\">"
+    "@page { size: A5 portrait; margin: 10mm 8mm; }"
+    "</style>"
+)
+
+_PAGE_RULE_RE = re.compile(r'@page[^{]*\{([^}]*)\}', re.I)
+_MARGIN_RE = re.compile(r'(?:^|;)\s*margin\s*:\s*([^;}]+)', re.I)
+_LENGTH_RE = re.compile(r'(-?[\d.]+)\s*(cm|mm|in|pt|px)?')
+
+_UNITS_TO_CM = {
+    'cm': 1.0,
+    'mm': 0.1,
+    'in': 2.54,
+    'pt': 2.54 / 72.0,
+    'px': 2.54 / 96.0,
+    '': 2.54 / 96.0,          # bare numbers are treated as px
+}
+
+
+def _lengths_to_cm(value):
+    """``"10mm 8mm"`` / ``"1cm"`` / ``"0"`` -> list of centimetres."""
+    out = []
+    for number, unit in _LENGTH_RE.findall(value or ''):
+        try:
+            out.append(float(number) * _UNITS_TO_CM[(unit or '').lower()])
+        except (TypeError, ValueError, KeyError):
+            continue
+    return out
+
+
+def page_margins_cm(html):
+    """The page margins the *template* asks the browser printer to use.
+
+    Bills and receipts print edge to edge (``@page { margin: 0 }``) and put
+    their own padding inside the wrapper, while statements ask for ``10mm 8mm``.
+    Forcing one geometry on every PDF is what made the download look unlike the
+    sheet the browser prints, so the export now reads the template's own rule
+    and reproduces it.
+    """
+    html = html or ''
+    declared = None
+    for body in _PAGE_RULE_RE.findall(html):
+        match = _MARGIN_RE.search(body)
+        if match:
+            declared = match.group(1)
+    if declared is None:
+        return PDF_MARGIN_X_CM, PDF_MARGIN_Y_CM
+    values = _lengths_to_cm(declared)
+    if not values:
+        return 0.0, 0.0
+    if len(values) == 1:
+        return values[0], values[0]
+    if len(values) == 2:                       # vertical horizontal
+        return values[1], values[0]
+    if len(values) == 3:                       # top horizontal bottom
+        return values[1], (values[0] + values[2]) / 2.0
+    return values[1], (values[0] + values[2]) / 2.0   # top right bottom left
+
+
+def _with_pdf_page_css(html):
+    """Return *html* with a ``@page`` size rule, honouring the template's margins.
+
+    Every print template already declares ``@page`` inside ``@media print``;
+    the browser applies it and so does WeasyPrint under ``media_type='print'``.
+    Only the paper *size* is pinned here (A5 portrait) and only when the
+    template declares no rule at all, so the PDF never overrides margins the
+    on-screen print preview would have used.
+    """
+    html = html or ''
+    if _PAGE_RULE_RE.search(html):
+        return html
+    lowered = html.lower()
+    cut = lowered.rfind('</head>')
+    if cut != -1:
+        return html[:cut] + PDF_PAGE_CSS + html[cut:]
+    return PDF_PAGE_CSS + html
+
+
+def _human_doc_title(doc_title, safe_name):
+    """A title worth printing in the page footer.
+
+    Download names carry a timestamp (``CLIENTLEDGER-06-11-2026_08-21PM.pdf``)
+    which is useful as a filename and useless — and noisy — as a document
+    footer.  Prefer the caller's title and tidy a fallback from the filename.
+    """
+    title = (doc_title or '').strip()
+    if title:
+        return title
+    stem = re.sub(r'\.pdf$', '', safe_name or '', flags=re.I)
+    # Drop the trailing "_DD-MM-YYYY_HH-MMPM" stamp and turn it into words.
+    stem = re.sub(r'[_-]?\d{2}-\d{2}-\d{4}[_-]?\d{2}-\d{2}(?:[ap]m)?$', '',
+                  stem, flags=re.I)
+    stem = re.sub(r'[._-]+', ' ', stem).strip()
+    # "CLIENTLEDGER" -> "Client Ledger" for the known all-caps section codes.
+    words, out = stem.split(' '), []
+    for word in words:
+        if word.isupper() and len(word) > 4 and ' ' not in word:
+            out.append(word.title())
+        else:
+            out.append(word)
+    return ' '.join(out) or 'AMS Document'
+
+
+def _render_reportlab_pdf(rendered_html, safe_name, disposition, doc_title=None,
+                          html=None):
     """Build a real PDF with ReportLab; return a response, or None if impossible."""
     try:
         from app.services.pdf_fallback import render_html_to_pdf
@@ -204,7 +362,10 @@ def _render_reportlab_pdf(rendered_html, safe_name, disposition):
         logging.getLogger(__name__).exception('PDF fallback module is not importable.')
         return None
 
-    data = render_html_to_pdf(rendered_html, download_name=safe_name, title=safe_name)
+    title = _human_doc_title(doc_title, safe_name)
+    margin_x, margin_y = page_margins_cm(html if html is not None else rendered_html)
+    data = render_html_to_pdf(rendered_html, download_name=safe_name, title=title,
+                              margin_x_cm=margin_x, margin_y_cm=margin_y)
     if not data:
         return None
 
@@ -217,22 +378,20 @@ def _render_reportlab_pdf(rendered_html, safe_name, disposition):
 
 
 
-def _bilingual_print_html(rendered_html, lang=None):
+def _bilingual_print_html(rendered_html, lang=None, urdu_labels=False):
     """Return *rendered_html* with the right language layer for browser printing.
 
     ``action=print`` endpoints hand the page back to the browser instead of a
-    generated PDF.  ``lang='ur'`` produces a single-language Urdu sheet,
-    ``lang='en'`` leaves the English sheet untouched, and ``None`` keeps the
-    legacy mixed English+Urdu layer used by non-bill documents.
+    generated PDF.  ``lang='ur'`` produces a single-language Urdu sheet and
+    anything else leaves the English sheet untouched.
+
+    This mirrors :func:`_language_layer` exactly, so the sheet the browser
+    prints and the PDF the server downloads are the same document in the same
+    language — previously the print view got the mixed layer and the PDF got a
+    mangled version of it.
     """
     try:
-        if lang == 'ur':
-            from app.services.bilingual import apply_urdu
-            return apply_urdu(rendered_html)
-        if lang == 'en':
-            return rendered_html
-        from app.services.bilingual import apply_bilingual
-        return apply_bilingual(rendered_html)
+        return _language_layer(rendered_html, lang, urdu_labels=urdu_labels)
     except Exception:
         logging.getLogger(__name__).exception(
             'Print language layer failed; serving English-only HTML.')

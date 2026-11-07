@@ -23,6 +23,9 @@
         <a href="{{ url_for('download_client_ledger', id=client.id) }}" class="btn btn-warning btn-sm fw-bold text-dark">
             <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF
         </a>
+        <a href="{{ url_for('download_client_ledger', id=client.id, lang='ur') }}" class="btn btn-outline-warning btn-sm fw-bold">
+            <i class="bi bi-file-earmark-pdf me-1"></i> Urdu PDF
+        </a>
         <a href="{{ url_for('download_client_ledger', id=client.id, action='print') }}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-printer me-1"></i> Print
         </a>

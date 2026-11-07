@@ -212,6 +212,7 @@ def download_supplier_payment(payment_id):
 
     action = (request.args.get('action') or 'download').lower()
     disposition = 'inline' if action == 'print' else 'attachment'
+    lang = resolve_export_lang()
 
     rendered = render_template(
         'view_bill.html',
@@ -224,19 +225,22 @@ def download_supplier_payment(payment_id):
         recent_deliveries=[],
         material_ledger_recent=[],
         material_stock_summary=[],
-        auto_print=(action == 'print')
+        auto_print=(action == 'print'),
+        bill_lang=lang,
     )
     if action == 'download':
         pdf_response = _try_render_weasy_pdf(
             rendered,
             _download_filename('SUPPLIERPAYMENT', 'pdf'),
-            disposition=disposition
+            disposition=disposition,
+            lang=lang,
+            doc_title=f'Supplier Payment - {supplier_name}',
         )
         if pdf_response:
             return pdf_response
 
     if action == 'print':
-        rendered = _bilingual_print_html(rendered)
+        rendered = _bilingual_print_html(rendered, lang=lang)
 
     response = make_response(rendered)
     response.headers['Content-Disposition'] = f'{disposition}; filename={_download_filename("SUPPLIERPAYMENT", "html")}'

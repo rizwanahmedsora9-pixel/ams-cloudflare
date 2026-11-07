@@ -13,6 +13,7 @@ def download_client_clearance(id):
         total_balance,
         _material_history_grouped
     ) = _build_client_ledger_rows(client)
+    lang = resolve_export_lang()
     unpaid = [b for b in pending_bills if not b.is_paid and not b.is_void and float(b.amount or 0) > 0]
     generated_at = pk_now()
     settings_obj = Settings.query.first()
@@ -30,12 +31,16 @@ def download_client_clearance(id):
     )
     filename = f"CLEARANCE_{re.sub(r'[^A-Za-z0-9]+', '_', client.code or str(client.id)).strip('_') or client.id}.pdf"
     if request.args.get('action') != 'print':
-        pdf_response = _try_render_weasy_pdf(rendered, filename, disposition='attachment')
+        pdf_response = _try_render_weasy_pdf(
+            rendered, filename, disposition='attachment',
+            lang=lang, urdu_labels=True,
+            doc_title=f'Client Clearance - {client.name}',
+        )
         if pdf_response:
             return pdf_response
     else:
         # Browser printing gets the same Urdu layer as the generated PDF.
-        rendered = _bilingual_print_html(rendered)
+        rendered = _bilingual_print_html(rendered, lang=lang, urdu_labels=True)
     response = make_response(rendered)
     response.headers['Content-Disposition'] = (
         f"{'inline' if request.args.get('action') == 'print' else 'attachment'}; "

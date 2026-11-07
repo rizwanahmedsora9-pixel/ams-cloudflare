@@ -911,7 +911,11 @@ def cash_flow():
 
     if export_pdf == '1':
         rendered = render_template('cash_flow.html', pdf_mode=True, **common)
-        pdf_resp = _try_render_weasy_pdf(rendered, f'cash_flow_{from_date}_{to_date}.pdf')
+        pdf_resp = _try_render_weasy_pdf(
+            rendered, f'cash_flow_{from_date}_{to_date}.pdf',
+            lang=resolve_export_lang(), urdu_labels=True,
+            doc_title=f'Cash Flow {from_date} to {to_date}',
+        )
         if pdf_resp:
             return pdf_resp
         return Response(rendered, content_type='text/html')

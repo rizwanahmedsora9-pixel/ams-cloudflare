@@ -942,8 +942,14 @@ _LABEL_PATTERN = re.compile(
 )
 
 
-def _translate_text_segment(segment: str) -> str:
-    """Replace known English labels inside a plain-text HTML segment."""
+def _translate_text_segment(segment: str, replace: bool = False) -> str:
+    """Replace known English labels inside a plain-text HTML segment.
+
+    ``replace=False`` (the legacy behaviour) appends the Urdu translation in a
+    ``<span class="ur">`` *after* the English label.  ``replace=True`` swaps the
+    English label for the Urdu one, which is what a single-language Urdu
+    document needs.
+    """
     if not segment or 'class="ur"' in segment:
         return segment
     if not _LABEL_ITEMS:
@@ -963,13 +969,23 @@ def _translate_text_segment(segment: str) -> str:
         # Urdu label carries its own — keep one, not two.
         if en.rstrip().endswith(':') and ur.endswith(':'):
             ur = ur[:-1].rstrip()
+        if replace:
+            # Keep whatever punctuation the template rendered after the label
+            # (usually a colon) so "Total Due:" stays "ٹوٹل ڈیو:".
+            tail = en[len(en.rstrip()):]
+            return ('<span class="ur" lang="ur" dir="rtl">' + ur + '</span>'
+                    + tail)
         return en + '<span class="ur" lang="ur" dir="rtl">' + ur + '</span>'
 
     return _LABEL_PATTERN.sub(_sub, segment)
 
 
-def inject_urdu_labels(html: str) -> str:
-    """Insert Urdu ``<span class="ur">`` translations next to English labels.
+def inject_urdu_labels(html: str, replace: bool = False) -> str:
+    """Insert Urdu ``<span class="ur">`` translations for English labels.
+
+    ``replace=False`` appends the translation beside the English label
+    (the legacy mixed English+Urdu sheet).  ``replace=True`` substitutes it,
+    producing a single-language Urdu document.
 
     Only text nodes are touched — tag markup, ``<style>``/``<script>``
     contents and existing Urdu spans are left alone, and the operation is
@@ -995,7 +1011,7 @@ def inject_urdu_labels(html: str) -> str:
             if in_skip_content:
                 result.append(part)
             else:
-                result.append(_translate_text_segment(part))
+                result.append(_translate_text_segment(part, replace=replace))
     return _MARKER + ''.join(result)
 
 
@@ -1271,12 +1287,24 @@ def _urdu_css() -> str:
 
 
 def _set_receipt_rtl(html: str) -> str:
-    """Add ``dir="rtl" lang="ur"`` to the receipt wrapper when missing."""
+    """Add ``dir="rtl" lang="ur"`` to the document wrapper when missing.
+
+    Bills and receipts wrap their content in ``.rcpt-wrapper``; ledgers do too.
+    Templates that use a different wrapper fall back to ``<body>`` so the whole
+    Urdu document still reads right-to-left.
+    """
     pattern = re.compile(r'(<div\b[^>]*class="[^"]*\brcpt-wrapper\b[^"]*")', re.I)
     match = pattern.search(html)
-    if not match or re.search(r'\bdir\s*=', match.group(1), re.I):
+    if match and not re.search(r'\bdir\s*=', match.group(1), re.I):
+        return pattern.sub(lambda m: m.group(1) + ' dir="rtl" lang="ur"',
+                           html, count=1)
+    if match:
         return html
-    return pattern.sub(lambda m: m.group(1) + ' dir="rtl" lang="ur"', html, count=1)
+    body = re.search(r'<body\b[^>]*>', html, re.I)
+    if body and not re.search(r'\bdir\s*=', body.group(0), re.I):
+        return (html[:body.end() - 1] + ' dir="rtl" lang="ur"'
+                + html[body.end() - 1:])
+    return html
 
 
 def apply_urdu(html: str) -> str:
@@ -1291,3 +1319,57 @@ def apply_urdu(html: str) -> str:
     if _URDU_MARKER in html or _MARKER in html:
         return html
     return _urdu_css() + _URDU_MARKER + _set_receipt_rtl(html)
+
+
+# --------------------------------------------------------------------------
+# Single-language Urdu for *non-bill* documents (ledgers, statements, reports)
+# --------------------------------------------------------------------------
+# Bills get their Urdu labels from the template itself (``bill_lang``), so
+# :func:`apply_urdu` only has to add the font and the RTL direction.  Ledgers
+# and statements are plain English templates with no Urdu branch, so for those
+# the labels are swapped here instead: :func:`apply_urdu_labels` runs the same
+# dictionary in *replace* mode and then applies the RTL sheet.
+#
+# This is what makes it possible to offer two clean downloads — English or Urdu —
+# instead of one mixed sheet.  The mixed layer (:func:`apply_bilingual`) is no
+# longer used for exports: appending Nastaleeq beside every Latin label made
+# the pure-Python PDF fallback unreadable, because the two scripts were drawn
+# on the same baseline inside the same paragraph.
+
+def urdu_only_css() -> str:
+    """``@font-face`` + ``.ur`` rules for a *label-replaced* Urdu document.
+
+    Same as :func:`bilingual_css` but without the ``" / "`` separator, which
+    only makes sense when the Urdu sits next to its English original.
+    """
+    file_url = 'file://' + JAMEEL_NOORI_TTF.replace(os.sep, '/')
+    return (
+        '<style id="ams-urdu-css">'
+        '@font-face {'
+        f'  font-family: "{URDU_FONT_FAMILY}";'
+        '  src: url("/static/fonts/JameelNooriNastaleeq.ttf") format("truetype"),'
+        f'       url("{file_url}") format("truetype");'
+        '  font-weight: normal; font-style: normal;'
+        '}'
+        '.ur {'
+        f'  font-family: "{URDU_FONT_FAMILY}", "Noto Nastaliq Urdu", serif;'
+        '  direction: rtl; unicode-bidi: embed;'
+        '}'
+        '</style>'
+    )
+
+
+def apply_urdu_labels(html: str) -> str:
+    """Return *html* as a single-language Urdu document.
+
+    English labels are *replaced* by their Urdu translation (never appended),
+    the Jameel Noori font is attached and the document is switched to RTL.
+    Numbers, dates, bill numbers, party names and notes are left untouched —
+    only known labels are translated.  Idempotent.
+    """
+    if not html:
+        return html
+    if _URDU_MARKER in html:
+        return html
+    body = inject_urdu_labels(html, replace=True)
+    return urdu_only_css() + _urdu_css() + _URDU_MARKER + _set_receipt_rtl(body)

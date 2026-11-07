@@ -8,7 +8,7 @@ receipt.  These tests pin the new contract:
 * The English document contains no Urdu layer/font.
 * The Urdu document translates fixed bill furniture and names, preserves other data,
   and still embeds the bundled Jameel Noori font.
-* Non-bill exports keep the legacy mixed bilingual behaviour.
+* Non-bill exports are plain English; ``?lang=ur`` gives a separate Urdu copy.
 """
 from __future__ import annotations
 
@@ -21,7 +21,11 @@ from pypdf import PdfReader
 
 from app import db
 from app.services import bilingual as B
-from app.services.files_pdf import _bilingual_print_html, _try_render_weasy_pdf
+from app.services.files_pdf import (
+    _bilingual_print_html,
+    _try_render_weasy_pdf,
+    resolve_export_lang,
+)
 from models.cash import Account
 from models.catalog import Material
 from models.parties import Client
@@ -293,16 +297,49 @@ def test_default_and_unknown_lang_are_english(client, bill_data):
         assert 'class="ur"' not in _receipt_block(html)
 
 
-def test_non_bill_exports_keep_legacy_bilingual_layer(app):
+def test_non_bill_exports_are_english_until_urdu_is_asked_for(app):
+    """Ledgers/statements ship plain English; Urdu is a separate document.
+
+    These exports used to append a Nastaleeq translation beside every English
+    label.  The pure-Python PDF fallback (the only engine on hosts without
+    pango/cairo) drew both scripts on one baseline inside one paragraph, so
+    every header and summary line came out as overlapping mush.  A document is
+    now one language or the other.
+    """
     html = "<div><h2>CLIENT LEDGER</h2><p>Bill No: BK-1</p></div>"
     with app.test_request_context():
         pdf = _try_render_weasy_pdf(html, "ledger.pdf")
         printed = _bilingual_print_html(html)
     assert pdf is not None
     assert pdf.get_data().startswith(b"%PDF-")
-    assert b"Jameel-Noori" in pdf.get_data()
-    assert "<!--ams-bilingual-v1-->" in printed
-    assert B.LABELS["Bill No"] in printed
+    # English: no Urdu font, no Urdu label beside the English one.
+    assert b"Jameel-Noori" not in pdf.get_data()
+    assert "<!--ams-bilingual-v1-->" not in printed
+    assert B.LABELS["Bill No"] not in printed
+    assert "Bill No" in printed
+
+    with app.test_request_context():
+        ur_pdf = _try_render_weasy_pdf(html, "ledger.pdf", lang='ur',
+                                       urdu_labels=True)
+        ur_printed = _bilingual_print_html(html, lang='ur', urdu_labels=True)
+    assert ur_pdf is not None
+    assert ur_pdf.get_data().startswith(b"%PDF-")
+    # Urdu: the font is embedded, the label is *replaced*, never appended.
+    assert b"Jameel-Noori" in ur_pdf.get_data()
+    assert B.LABELS["Bill No"] in ur_printed
+    assert "Bill No:" not in ur_printed
+    assert 'dir="rtl"' in ur_printed
+
+
+def test_export_language_comes_from_the_query_string(app):
+    with app.test_request_context('/x'):
+        assert resolve_export_lang() == 'en'
+    with app.test_request_context('/x?lang=ur'):
+        assert resolve_export_lang() == 'ur'
+    with app.test_request_context('/x?lang=urdu'):
+        assert resolve_export_lang() == 'ur'
+    with app.test_request_context('/x?lang=fr'):
+        assert resolve_export_lang() == 'en'
 
 
 def test_urdu_bill_and_receipt_names_use_saved_spellings(client, app, bill_data):
