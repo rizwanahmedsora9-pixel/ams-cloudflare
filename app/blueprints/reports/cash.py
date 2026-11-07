@@ -1183,7 +1183,16 @@ def daily_reconciliation():
 @bp.route('/daily_reconciliation/differences', methods=['GET', 'POST'])
 @login_required
 def daily_reconciliation_differences():
-    """Reporting-only discrepancy snapshots, with independent card pagination."""
+    """Reporting-only discrepancy snapshots, with independent card pagination.
+
+    Filters (all optional, combined with AND so the report can be narrowed
+    down by hand): a date range — typed in or via ``preset`` — Less/Excess
+    (``kind``), ``status``, ``account_id``, ``recorded_by``, ``source``, an
+    absolute difference range (``amount_min``/``amount_max``), free text
+    (``q``) and ``sort``.  Totals and the per-account summary always describe
+    the filtered set, not just the visible page.  ``export_csv=1`` downloads
+    every filtered row.  Nothing here writes to the difference history.
+    """
     from models import CashDayDifference
 
     if request.method == 'POST':
@@ -1197,8 +1206,29 @@ def daily_reconciliation_differences():
             flash('Unable to import saved differences. Please try again.', 'danger')
         return redirect(url_for('daily_reconciliation_differences'))
 
-    from_date = (request.args.get('from_date') or '').strip()
-    to_date = (request.args.get('to_date') or '').strip()
+    args = request.args
+    today = pk_today()
+
+    # --- Date range: an explicit preset wins over typed dates so a
+    # bookmarked ?preset=last_30 stays relative; the page switches the
+    # preset back to "custom" as soon as a date is edited by hand.
+    preset = (args.get('preset') or '').strip().lower()
+    if preset == 'today':
+        from_date = to_date = today.isoformat()
+    elif preset == 'yesterday':
+        from_date = to_date = (today - timedelta(days=1)).isoformat()
+    elif preset == 'last_7':
+        from_date, to_date = (today - timedelta(days=6)).isoformat(), today.isoformat()
+    elif preset == 'last_30':
+        from_date, to_date = (today - timedelta(days=29)).isoformat(), today.isoformat()
+    elif preset == 'this_month':
+        from_date, to_date = today.replace(day=1).isoformat(), today.isoformat()
+    elif preset == 'all':
+        from_date = to_date = ''
+    else:
+        preset = 'custom'
+        from_date = (args.get('from_date') or '').strip()
+        to_date = (args.get('to_date') or '').strip()
     for value in (from_date, to_date):
         if value:
             try:
@@ -1208,22 +1238,247 @@ def daily_reconciliation_differences():
     if from_date and to_date and from_date > to_date:
         abort(400, 'From date must not be after to date.')
 
-    def card(kind, page_name):
-        page = max(1, request.args.get(page_name, 1, type=int) or 1)
-        q = CashDayDifference.query.filter_by(kind=kind)
+    # --- Less / Excess and the other narrowing filters.  Unknown dropdown
+    # values fall back to "all" instead of erroring; dates and amounts keep
+    # the strict behaviour this page has always had.
+    f_kind = (args.get('kind') or 'all').strip().lower()
+    if f_kind not in ('less', 'excess'):
+        f_kind = 'all'
+    f_status = (args.get('status') or 'all').strip().lower()
+    if f_status not in ('open', 'settled', 'superseded', 'cleared'):
+        f_status = 'all'
+    f_source = (args.get('source') or 'all').strip().lower()
+    if f_source not in ('live', 'imported'):
+        f_source = 'all'
+    f_account_raw = (args.get('account_id') or '').strip()
+    f_account_id = None
+    if f_account_raw:
+        try:
+            f_account_id = int(f_account_raw)
+        except ValueError:
+            abort(400, 'Invalid account filter.')
+    f_recorded_by = (args.get('recorded_by') or '').strip()
+    f_q = (args.get('q') or '').strip()
+
+    def _amount_arg(name):
+        raw = (args.get(name) or '').strip()
+        if not raw:
+            return None, ''
+        try:
+            value = float(raw.replace(',', '').replace(' ', ''))
+        except ValueError:
+            abort(400, 'Invalid amount filter.')
+        if value < 0:
+            abort(400, 'Amount filters must not be negative.')
+        return value, raw
+
+    amount_min, amount_min_raw = _amount_arg('amount_min')
+    amount_max, amount_max_raw = _amount_arg('amount_max')
+    if amount_min is not None and amount_max is not None and amount_min > amount_max:
+        abort(400, 'Minimum amount must not be greater than maximum amount.')
+
+    sort_orders = {
+        'newest': (CashDayDifference.recorded_at.desc(), CashDayDifference.id.desc()),
+        'oldest': (CashDayDifference.recorded_at.asc(), CashDayDifference.id.asc()),
+        'day_newest': (CashDayDifference.position_date.desc(),
+                       CashDayDifference.recorded_at.desc(), CashDayDifference.id.desc()),
+        'day_oldest': (CashDayDifference.position_date.asc(),
+                       CashDayDifference.recorded_at.asc(), CashDayDifference.id.asc()),
+        'largest': (func.abs(CashDayDifference.difference).desc(),
+                    CashDayDifference.recorded_at.desc(), CashDayDifference.id.desc()),
+        'smallest': (func.abs(CashDayDifference.difference).asc(),
+                     CashDayDifference.recorded_at.desc(), CashDayDifference.id.desc()),
+    }
+    sort_labels = {
+        'newest': 'newest recorded first', 'oldest': 'oldest recorded first',
+        'day_newest': 'newest day first', 'day_oldest': 'oldest day first',
+        'largest': 'largest difference first', 'smallest': 'smallest difference first',
+    }
+    f_sort = (args.get('sort') or 'newest').strip().lower()
+    if f_sort not in sort_orders:
+        f_sort = 'newest'
+
+    def filtered(kind=None):
+        q = CashDayDifference.query
+        wanted = kind or (f_kind if f_kind != 'all' else None)
+        if wanted:
+            q = q.filter(CashDayDifference.kind == wanted)
         if from_date:
             q = q.filter(CashDayDifference.position_date >= date.fromisoformat(from_date))
         if to_date:
             q = q.filter(CashDayDifference.position_date <= date.fromisoformat(to_date))
+        if f_status != 'all':
+            q = q.filter(CashDayDifference.status == f_status)
+        if f_account_id is not None:
+            q = q.filter(CashDayDifference.account_id == f_account_id)
+        if f_recorded_by:
+            q = q.filter(CashDayDifference.recorded_by.ilike(f'%{f_recorded_by}%'))
+        if f_source != 'all':
+            q = q.filter(CashDayDifference.source == f_source)
+        if amount_min is not None:
+            q = q.filter(func.abs(CashDayDifference.difference) >= amount_min)
+        if amount_max is not None:
+            q = q.filter(func.abs(CashDayDifference.difference) <= amount_max)
+        if f_q:
+            like = f'%{f_q}%'
+            q = q.filter(or_(
+                CashDayDifference.account_name.ilike(like),
+                CashDayDifference.recorded_by.ilike(like),
+                CashDayDifference.closed_by.ilike(like),
+            ))
+        return q
+
+    # Download every filtered row (both cards, current sort) for offline
+    # analysis; pagination is deliberately ignored here.
+    if args.get('export_csv') == '1':
+        buf = io.StringIO()
+        import csv
+        writer = csv.writer(buf)
+        writer.writerow(['Day', 'Account', 'Type', 'Status', 'Source', 'Recorded by',
+                         'Recorded at', 'Expected', 'Counted', 'Difference',
+                         'Closed by', 'Closed at', 'New expected', 'New counted'])
+        for item in filtered().order_by(*sort_orders[f_sort]).all():
+            writer.writerow([
+                item.position_date.isoformat() if item.position_date else '',
+                item.account_name, item.kind, item.status, item.source,
+                item.recorded_by or '',
+                item.recorded_at.strftime('%Y-%m-%d %H:%M:%S') if item.recorded_at else '',
+                f'{item.expected:.2f}', f'{item.counted:.2f}', f'{item.difference:.2f}',
+                item.closed_by or '',
+                item.closed_at.strftime('%Y-%m-%d %H:%M:%S') if item.closed_at else '',
+                '' if item.closed_expected is None else f'{item.closed_expected:.2f}',
+                '' if item.closed_counted is None else f'{item.closed_counted:.2f}',
+            ])
+        resp = make_response(buf.getvalue())
+        resp.headers['Content-Type'] = 'text/csv; charset=utf-8'
+        resp.headers['Content-Disposition'] = (
+            f'attachment; filename=differences_{from_date or "all"}_to_{to_date or "all"}.csv')
+        return resp
+
+    def card(kind, page_name):
+        page = max(1, args.get(page_name, 1, type=int) or 1)
+        q = filtered(kind)
         total = q.count()
         pages = max(1, (total + 9) // 10)
         page = min(page, pages)
-        rows = q.order_by(CashDayDifference.recorded_at.desc(), CashDayDifference.id.desc()).offset((page - 1) * 10).limit(10).all()
+        rows = q.order_by(*sort_orders[f_sort]).offset((page - 1) * 10).limit(10).all()
         return dict(rows=rows, total=total, page=page, pages=pages)
 
+    # Filtered totals across every page, plus a per-account roll-up, so the
+    # pattern (which account / which kind / still open) can be read at a
+    # glance without paging through rows.
+    agg = filtered().with_entities(
+        func.count(CashDayDifference.id),
+        func.coalesce(func.sum(case((CashDayDifference.kind == 'less', 1), else_=0)), 0),
+        func.coalesce(func.sum(case((CashDayDifference.kind == 'less',
+                                     func.abs(CashDayDifference.difference)), else_=0)), 0),
+        func.coalesce(func.sum(case((CashDayDifference.kind == 'excess', 1), else_=0)), 0),
+        func.coalesce(func.sum(case((CashDayDifference.kind == 'excess',
+                                     func.abs(CashDayDifference.difference)), else_=0)), 0),
+        func.coalesce(func.sum(CashDayDifference.difference), 0),
+        func.coalesce(func.sum(case((CashDayDifference.status == 'open', 1), else_=0)), 0),
+        func.coalesce(func.sum(case((CashDayDifference.status == 'open',
+                                     func.abs(CashDayDifference.difference)), else_=0)), 0),
+    ).one()
+    summary = dict(
+        total=agg[0] or 0,
+        less_count=int(agg[1] or 0), less_total=float(agg[2] or 0),
+        excess_count=int(agg[3] or 0), excess_total=float(agg[4] or 0),
+        net=float(agg[5] or 0),
+        open_count=int(agg[6] or 0), open_total=float(agg[7] or 0),
+    )
+    account_summary = [
+        dict(account_id=row[0], account_name=row[1], total=int(row[2] or 0),
+             less_count=int(row[3] or 0), less_total=float(row[4] or 0),
+             excess_count=int(row[5] or 0), excess_total=float(row[6] or 0),
+             net=float(row[7] or 0), open_count=int(row[8] or 0))
+        for row in filtered().with_entities(
+            CashDayDifference.account_id, CashDayDifference.account_name,
+            func.count(CashDayDifference.id),
+            func.coalesce(func.sum(case((CashDayDifference.kind == 'less', 1), else_=0)), 0),
+            func.coalesce(func.sum(case((CashDayDifference.kind == 'less',
+                                         func.abs(CashDayDifference.difference)), else_=0)), 0),
+            func.coalesce(func.sum(case((CashDayDifference.kind == 'excess', 1), else_=0)), 0),
+            func.coalesce(func.sum(case((CashDayDifference.kind == 'excess',
+                                         func.abs(CashDayDifference.difference)), else_=0)), 0),
+            func.coalesce(func.sum(CashDayDifference.difference), 0),
+            func.coalesce(func.sum(case((CashDayDifference.status == 'open', 1), else_=0)), 0),
+        ).group_by(CashDayDifference.account_id, CashDayDifference.account_name)
+         .order_by(func.sum(func.abs(CashDayDifference.difference)).desc(),
+                   CashDayDifference.account_name.asc()).all()
+    ]
+
+    # Dropdown choices come from the recorded history itself (before
+    # filtering, so a choice never disappears while it is selected).
+    account_options = [
+        dict(id=row[0], name=row[1]) for row in db.session.query(
+            CashDayDifference.account_id, CashDayDifference.account_name)
+        .distinct().order_by(CashDayDifference.account_name.asc()).all()
+    ]
+    # Carried by pagination / CSV links so paging never drops a filter.
+    filter_args = {}
+    if preset != 'custom':
+        filter_args['preset'] = preset
+    if from_date:
+        filter_args['from_date'] = from_date
+    if to_date:
+        filter_args['to_date'] = to_date
+    if f_kind != 'all':
+        filter_args['kind'] = f_kind
+    if f_status != 'all':
+        filter_args['status'] = f_status
+    if f_account_id is not None:
+        filter_args['account_id'] = f_account_id
+    if f_recorded_by:
+        filter_args['recorded_by'] = f_recorded_by
+    if f_source != 'all':
+        filter_args['source'] = f_source
+    if amount_min_raw:
+        filter_args['amount_min'] = amount_min_raw
+    if amount_max_raw:
+        filter_args['amount_max'] = amount_max_raw
+    if f_q:
+        filter_args['q'] = f_q
+    if f_sort != 'newest':
+        filter_args['sort'] = f_sort
+
+    for row in account_summary:
+        row['filter_url'] = url_for('daily_reconciliation_differences',
+                                     **{**filter_args, 'account_id': row['account_id']})
+
+    account_label = next((o['name'] for o in account_options if o['id'] == f_account_id), '')
+    active_labels = []
+    if from_date or to_date:
+        active_labels.append(f"Dates: {from_date or '…'} to {to_date or '…'}")
+    if f_kind != 'all':
+        active_labels.append('Less only' if f_kind == 'less' else 'Excess only')
+    if f_status != 'all':
+        active_labels.append(f'Status: {f_status}')
+    if f_account_id is not None:
+        active_labels.append(f'Account: {account_label or f_account_id}')
+    if f_recorded_by:
+        active_labels.append(f'Recorded by: {f_recorded_by}')
+    if f_source != 'all':
+        active_labels.append('Imported snapshots only' if f_source == 'imported' else 'Live counts only')
+    if amount_min is not None or amount_max is not None:
+        active_labels.append(
+            f"Difference Rs. {amount_min_raw or '0'} – {amount_max_raw or 'any'}")
+    if f_q:
+        active_labels.append(f'“{f_q}”')
+
+    less_card = card('less', 'less_page')
+    excess_card = card('excess', 'excess_page')
     return render_template('daily_reconciliation_differences.html',
-        less=card('less', 'less_page'), excess=card('excess', 'excess_page'),
-        from_date=from_date, to_date=to_date)
+        less=less_card, excess=excess_card,
+        from_date=from_date, to_date=to_date, preset=preset,
+        f_kind=f_kind, f_status=f_status, f_account_id=f_account_id,
+        f_recorded_by=f_recorded_by, f_source=f_source,
+        amount_min=amount_min_raw, amount_max=amount_max_raw, f_q=f_q,
+        f_sort=f_sort, sort_label=sort_labels[f_sort],
+        show_less=f_kind in ('all', 'less'), show_excess=f_kind in ('all', 'excess'),
+        summary=summary, account_summary=account_summary,
+        account_options=account_options,
+        filter_args=filter_args, active_labels=active_labels)
 
 
 def _ft_date_preset(preset, today):
