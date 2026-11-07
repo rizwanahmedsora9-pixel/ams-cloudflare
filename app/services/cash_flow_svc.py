@@ -316,6 +316,8 @@ _CF_SECTION_BY_SOURCE = {
     'sale_delivery_person': CF_SECTION_DELIVERY_RENT,
     'accountreconciliation': CF_SECTION_RECONCILIATION,
     'account_reconciliation': CF_SECTION_RECONCILIATION,
+    'cashdaydifference': CF_SECTION_RECONCILIATION,
+    'cash_day_difference': CF_SECTION_RECONCILIATION,
     'account_receipt': CF_SECTION_ACCOUNTS,
     'account_expense': CF_SECTION_ACCOUNTS,
     'entry': CF_SECTION_ACCOUNTS,
@@ -509,12 +511,26 @@ def _cf_actor_name(actor=None):
     return _current_username()
 
 
+#: Categories that behave like money in hand.  A ``recon`` account is the
+#: app's difference-clearing bucket (see app/services/recon_counter.py): it is
+#: real and postable, but it is never a source of funds and never sits on the
+#: daily board, so it is deliberately absent from this tuple.
+MONEY_CATEGORIES = ('cash', 'bank')
+
+RECON_CATEGORY = 'recon'
+
+
 def _cf_is_money_account(account):
     if account is None:
         return False
     if getattr(account, 'is_active', True) is False:
         return False
-    return (account.category or '').lower() in ('cash', 'bank')
+    return (account.category or '').strip().lower() in MONEY_CATEGORIES
+
+
+def is_recon_account(account):
+    """True for the daily-reconciliation counter accounts."""
+    return bool(account) and (account.category or '').strip().lower() == RECON_CATEGORY
 
 
 def _cf_company_accounts(active_only=True):
@@ -1059,11 +1075,22 @@ def validate_manual_cash_flow(
     if amount <= 0:
         raise ValueError('Amount must be greater than zero.')
     account = db.session.get(Account, account_id) if account_id else None
+    if is_recon_account(account):
+        raise ValueError(
+            'This account only holds daily reconciliation differences; it cannot '
+            'be used for a manual entry. Resolve the difference from the '
+            'differences report instead.'
+        )
     if not _cf_is_money_account(account):
         raise ValueError('Select a valid company cash or bank account.')
     destination = None
     if direction == CF_DIR_TRANSFER:
         destination = db.session.get(Account, destination_account_id) if destination_account_id else None
+        if is_recon_account(destination):
+            raise ValueError(
+                'A daily reconciliation counter account cannot be a transfer '
+                'destination. Resolve the difference from the differences report.'
+            )
         if not _cf_is_money_account(destination):
             raise ValueError('Select a valid destination account.')
         if destination.id == account.id:
@@ -1597,10 +1624,21 @@ def apply_running_balance(rows, opening_balance, account_id=None):
     return running
 
 
+#: Source types written by the daily close.  Their amount is a *correction* of a
+#: count, so it is excluded from the in/out KPI totals (it stays in the running
+#: balance, which is what makes the closing tie to the account).
+RECON_SOURCE_TYPES = ('cashdaydifference', 'cash_day_difference')
+
+
+def _is_recon_row(row):
+    return (row.get('source_type') or '').strip().lower() in RECON_SOURCE_TYPES
+
+
 def summarize_cash_flow_rows(rows, account_id=None):
     active = [r for r in rows if (r.get('status') or 'active') == 'active']
-    total_in = sum(float(r.get('cash_in') or 0) for r in active)
-    total_out = sum(float(r.get('cash_out') or 0) for r in active)
+    counted = [r for r in active if not _is_recon_row(r)]
+    total_in = sum(float(r.get('cash_in') or 0) for r in counted)
+    total_out = sum(float(r.get('cash_out') or 0) for r in counted)
     transfer_in = 0.0
     transfer_out = 0.0
     for r in active:
@@ -1616,7 +1654,7 @@ def summarize_cash_flow_rows(rows, account_id=None):
             transfer_in += amt
             transfer_out += amt
     breakdown_cat, breakdown_party, breakdown_account = {}, {}, {}
-    for r in active:
+    for r in counted:
         ck = (r.get('category') or '—').strip() or '—'
         breakdown_cat.setdefault(ck, {'in': 0.0, 'out': 0.0, 'transfer': 0.0})
         breakdown_cat[ck]['in'] += float(r.get('cash_in') or 0)

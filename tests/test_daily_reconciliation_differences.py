@@ -306,3 +306,416 @@ def test_spreadsheet_replace_cannot_forge_or_erase_history(app):
         row = CashDayDifference.query.one()
         assert row.account_name == 'Drawer' and row.recorded_by == 'Real user'
         assert row.difference == -100
+
+
+# ---------------------------------------------------------------------------
+# Counter-account posting: the counted figure must reach the real account.
+#
+# A finalised day posts each difference as a paired transfer against one of two
+# counter accounts, so the board, ``Account.balance`` and ``ledger_balance()``
+# all agree and Σ balances never changes.
+# ---------------------------------------------------------------------------
+
+def _lock(client, day):
+    return client.post('/daily_reconciliation', data={
+        'action': 'lock', 'day': day.isoformat(), 'note': 'test close',
+    }, follow_redirects=True)
+
+
+def _counters():
+    from app.services import recon_counter
+    return recon_counter.counter_accounts()
+
+
+def _balance(account_id):
+    from app.services.payments_crud import ledger_balance
+    return ledger_balance(account_id)
+
+
+def test_shortage_sends_money_from_the_account_to_the_counter(app, client):
+    """FBM app 1,000 · counted 900 → FBM 900 and Counter Less 100."""
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    assert _post(client, day, aid, '900').status_code == 200
+    _lock(client, day)
+    with app.app_context():
+        less, excess = _counters()
+        assert less is not None and excess is not None
+        assert _balance(aid) == 900            # the real account now matches the drawer
+        assert _balance(less.id) == 100        # the shortage is parked, visible
+        assert _balance(excess.id) == 0
+        from models import CashDayDifference
+        row = CashDayDifference.query.one()
+        assert row.posted_status == 'posted'
+        assert row.posted_out_tx_id and row.posted_in_tx_id
+        assert row.posted_by == 'Admin' and row.posted_at is not None
+        html = client.get('/daily_reconciliation/differences').get_data(as_text=True)
+        assert 'POSTED' in html and 'Counter Less' in html
+
+
+def test_excess_sends_money_from_the_counter_to_the_account(app, client):
+    """FBM app 900 · counted 1,000 → FBM 1,000 and Counter Excess −100."""
+    with app.app_context():
+        aid = _account(balance=900).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '1000')
+    _lock(client, day)
+    with app.app_context():
+        less, excess = _counters()
+        assert _balance(aid) == 1000
+        assert _balance(excess.id) == -100     # liability-like: unknown extra cash
+        assert _balance(less.id) == 0
+
+
+def test_posting_never_changes_the_total_of_all_balances(app, client):
+    """The pair nets to zero: money is moved, never created or lost."""
+    from models import Account
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '940')
+    _lock(client, day)
+    with app.app_context():
+        total = sum(_balance(a.id) for a in Account.query.all())
+        assert round(total, 2) == 1000
+
+
+def test_locking_twice_posts_once(app, client):
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        from models import AccountTransaction
+        after_first = AccountTransaction.query.filter(
+            AccountTransaction.idempotency_key.like('daydiff:%')).count()
+        assert after_first == 2
+        balance = _balance(aid)
+    _lock(client, day)  # already locked; a second submit must not post again
+    with app.app_context():
+        from models import AccountTransaction
+        assert AccountTransaction.query.filter(
+            AccountTransaction.idempotency_key.like('daydiff:%')).count() == 2
+        assert _balance(aid) == balance
+
+
+def test_unlock_removes_the_pair_and_restores_the_ledger(app, client):
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        assert _balance(aid) == 900
+    client.post('/daily_reconciliation', data={'action': 'unlock', 'day': day.isoformat()},
+                follow_redirects=True)
+    with app.app_context():
+        from models import CashDayDifference, AccountTransaction
+        assert _balance(aid) == 1000
+        assert AccountTransaction.query.filter(
+            AccountTransaction.idempotency_key.like('daydiff:%')).count() == 0
+        row = CashDayDifference.query.one()
+        assert row.posted_status == 'reversed'
+        # ... and re-locking after a corrected count posts exactly once again.
+    _post(client, day, aid, '1000')
+    _lock(client, day)
+    with app.app_context():
+        from models import AccountTransaction
+        assert _balance(aid) == 1000
+        assert AccountTransaction.query.filter(
+            AccountTransaction.idempotency_key.like('daydiff:%')).count() == 0
+
+
+def test_uncounted_account_posts_nothing(app, client):
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _lock(client, day)  # no count typed at all
+    with app.app_context():
+        from models import AccountTransaction
+        assert AccountTransaction.query.filter(
+            AccountTransaction.idempotency_key.like('daydiff:%')).count() == 0
+        assert _balance(aid) == 1000
+
+
+def test_resolve_shortage_as_recovered_clears_the_counter(app, client):
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        from models import CashDayDifference
+        row = CashDayDifference.query.one()
+        less, _excess = _counters()
+        diff_id, less_id = row.id, less.id
+    resp = client.post(f'/daily_reconciliation/differences/{diff_id}/resolve', data={
+        'resolution_kind': 'recovered_less',
+        'resolution_note': 'cashier returned the missing cash',
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+    with app.app_context():
+        from models import CashDayDifference
+        row = CashDayDifference.query.one()
+        assert row.posted_status == 'resolved'
+        assert row.resolution_kind == 'recovered_less'
+        assert row.resolved_by == 'Admin' and row.resolved_at is not None
+        assert row.resolution_out_tx_id
+        assert _balance(less_id) == 0          # counter emptied by a real entry
+        # The recovery is a real receipt: it also restores the cash box.
+        assert _balance(aid) == 1000
+    html = client.get('/daily_reconciliation/differences').get_data(as_text=True)
+    assert 'RESOLVED' in html and 'cashier returned' not in html  # note is on the ledger
+
+
+def test_resolve_requires_a_note_and_the_right_kind(app, client):
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        from models import CashDayDifference
+        diff_id = CashDayDifference.query.one().id
+    # missing note
+    resp = client.post(f'/daily_reconciliation/differences/{diff_id}/resolve', data={
+        'resolution_kind': 'recovered_less', 'resolution_note': '',
+    }, follow_redirects=True)
+    assert b'A note is required' in resp.data
+    # wrong kind for a shortage
+    resp = client.post(f'/daily_reconciliation/differences/{diff_id}/resolve', data={
+        'resolution_kind': 'income', 'resolution_note': 'x',
+    }, follow_redirects=True)
+    assert b'recovered or written off' in resp.data
+
+
+def test_counter_accounts_never_appear_on_the_board_or_in_pickers(app, client):
+    with app.app_context():
+        from app.services.cash_flow_svc import _cf_company_accounts
+        from app.services import recon_counter
+        aid = _account(balance=1000).id
+        recon_counter.ensure_counter_accounts(commit=True)
+        less, excess = _counters()
+        board_ids = {a.id for a in _cf_company_accounts()}
+        assert less.id not in board_ids and excess.id not in board_ids
+        assert aid in board_ids
+    _login(client)
+    picks = client.get('/accounts/transfers').get_data(as_text=True)
+    assert 'Counter Less Account' not in picks
+    assert 'Counter Excess Account' not in picks
+
+
+def test_counter_accounts_cannot_be_used_for_manual_money(app, client):
+    from app.services import recon_counter
+    with app.app_context():
+        aid = _account(balance=1000).id
+        recon_counter.ensure_counter_accounts(commit=True)
+        less, _e = _counters()
+        less_id = less.id
+    _login(client)
+    # The service layer refuses it (the form does not even list the account).
+    with app.app_context():
+        from app.services.cash_flow_svc import save_manual_cash_flow_entry
+        from types import SimpleNamespace
+        try:
+            save_manual_cash_flow_entry(
+                direction='transfer', amount='10', account_id=less_id,
+                destination_account_id=aid, actor=SimpleNamespace(username='Admin'),
+            )
+        except ValueError as exc:
+            assert 'reconciliation differences' in str(exc)
+        else:  # pragma: no cover
+            raise AssertionError('a counter account must never be a source of funds')
+
+
+def test_backdating_into_a_locked_day_is_refused(app, client):
+    from app.services.payments_crud import _assert_day_open
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '1000')
+    _lock(client, day)
+    with app.app_context():
+        from datetime import datetime as _dt
+        try:
+            _assert_day_open(aid, _dt.combine(day, datetime.min.time()).replace(hour=12))
+        except ValueError as exc:
+            assert 'finalised' in str(exc)
+        else:  # pragma: no cover
+            raise AssertionError('a backdated movement into a locked day must be refused')
+
+
+def test_counter_invariants_hold_across_a_full_lifecycle(app, client):
+    """Post → resolve → new day → unlock must never break the invariants."""
+    from app.services import recon_counter
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        assert recon_counter.counter_invariants() == []
+        from models import CashDayDifference
+        diff_id = CashDayDifference.query.one().id
+    client.post(f'/daily_reconciliation/differences/{diff_id}/resolve', data={
+        'resolution_kind': 'recovered_less',
+        'resolution_note': 'cashier returned the cash',
+    }, follow_redirects=True)
+    with app.app_context():
+        assert recon_counter.counter_invariants() == []
+        less, _excess = _counters()
+        assert _balance(less.id) == 0
+    client.post('/daily_reconciliation', data={'action': 'unlock', 'day': day.isoformat()},
+                follow_redirects=True)
+    with app.app_context():
+        assert recon_counter.counter_invariants() == []
+        assert _balance(aid) == 1000
+
+
+def test_counter_accounts_hold_the_unresolved_amount(app, client):
+    from app.services import recon_counter
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        less, _excess = _counters()
+        assert _balance(less.id) == 100
+        assert recon_counter.open_difference_total() == 100
+        assert recon_counter.counter_invariants() == []
+
+
+def test_rechecking_a_finalised_day_never_recreates_its_difference(app, client):
+    """Re-checking must not resurrect a difference the posting already explains."""
+    from app.services import recon_counter
+    from utils.money import to_minor
+
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        assert _balance(aid) == 900
+
+        # A legacy/out-of-band row slips past the backdating guard.
+        db.session.add(AccountTransaction(
+            from_account_id=aid, amount=50.0, amount_minor=to_minor(50.0),
+            transaction_type='Expense', date_posted=datetime.combine(day, datetime.min.time()).replace(hour=12),
+            source_type='manual',
+        ))
+        account = db.session.get(Account, aid)
+        account.balance = 950.0
+        account.balance_minor = to_minor(950.0)
+        db.session.commit()
+        before = _balance(aid)
+
+    client.post('/daily_reconciliation', data={
+        'action': 'refresh_differences', 'day': day.isoformat(),
+    }, follow_redirects=True)
+
+    with app.app_context():
+        # Nothing moved: the day is finalised, and a difference re-derived from
+        # the ledger would duplicate the one already posted for it.
+        assert _balance(aid) == before
+        assert CashDayDifference.query.count() == 1
+        assert CashDayDifference.query.one().posted_status == 'posted'
+        assert recon_counter.counter_invariants() == []
+
+
+def test_rechecking_after_a_resolve_does_not_post_a_second_difference(app, client):
+    """The resolved amount must stay resolved — no silent re-posting."""
+    from app.services import recon_counter
+
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '900')
+    _lock(client, day)
+    with app.app_context():
+        diff_id = CashDayDifference.query.one().id
+
+    client.post(f'/daily_reconciliation/differences/{diff_id}/resolve', data={
+        'resolution_kind': 'recovered_less',
+        'resolution_note': 'cashier returned the cash',
+    }, follow_redirects=True)
+    assert client.post('/daily_reconciliation', data={
+        'action': 'refresh_differences', 'day': day.isoformat(),
+    }, follow_redirects=True).status_code == 200
+
+    with app.app_context():
+        assert _balance(aid) == 1000
+        assert CashDayDifference.query.count() == 1
+        row = CashDayDifference.query.one()
+        assert (row.status, row.posted_status) == ('settled', 'resolved')
+        less, _excess = _counters()
+        assert _balance(less.id) == 0
+        assert recon_counter.counter_invariants() == []
+
+
+def test_a_shortage_bigger_than_the_balance_is_still_posted(app, client):
+    """A count is a fact: the posting must not be refused when money already left."""
+    from app.services import recon_counter
+
+    with app.app_context():
+        aid = _account(balance=50).id
+    _login(client)
+    day = date.today()
+    _post(client, day, aid, '0')          # drawer empty, app expected 50
+    _lock(client, day)
+    with app.app_context():
+        assert _balance(aid) == 0
+        less, _excess = _counters()
+        assert _balance(less.id) == 50
+        assert recon_counter.counter_invariants() == []
+
+
+def test_locking_an_earlier_day_redates_and_reposts_later_locked_days(app, client):
+    """Days finalised out of order must not leave a later day's posting stale."""
+    from app.services import recon_counter
+
+    with app.app_context():
+        aid = _account(balance=1000).id
+    _login(client)
+    first, second = date.today() - timedelta(days=1), date.today()
+
+    # Day 2 is finalised first, at the (then correct) expected closing.
+    _post(client, second, aid, '1000')
+    _lock(client, second)
+    with app.app_context():
+        assert _balance(aid) == 1000
+        assert CashDayDifference.query.count() == 0
+
+    # Day 1 is finalised late, with a 100 shortage: the counter is credited and
+    # the ledger now closes day 1 at 900.
+    _post(client, first, aid, '900')
+    _lock(client, first)
+    with app.app_context():
+        assert _balance(aid) == 1000            # 900 + day 2's excess posting
+        day2 = [d for d in CashDayDifference.query.all()
+                if d.position_date == second]
+        # Day 2 was counted at 1,000 but now opens at 900, so its difference is
+        # an excess that must be posted — the account still ends day 2 at 1,000.
+        assert [(d.kind, d.difference, d.posted_status) for d in day2] == [('excess', 100.0, 'posted')]
+        assert recon_counter.counter_invariants() == []
+        less, excess = _counters()
+        assert (_balance(less.id), _balance(excess.id)) == (100, -100)
+        # Nothing was manufactured: the books still add up to the opening 1,000.
+        from models import Account
+        assert sum(_balance(a.id) for a in Account.query.all()) == 1000

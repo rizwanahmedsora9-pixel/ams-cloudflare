@@ -337,7 +337,8 @@ def grn():
     next_auto = peek_next_bill_no(AUTO_BILL_NAMESPACES['GRN'])
 
     accounts = Account.query.filter(
-        func.coalesce(Account.is_active, True) == True
+        func.coalesce(Account.is_active, True) == True,
+        func.lower(func.trim(Account.category)).in_(['cash', 'bank']),
     ).order_by(Account.category.asc(), Account.name.asc()).all()
 
     # Per-lot consumption for the indicator: derived read-only from GRNAllocation

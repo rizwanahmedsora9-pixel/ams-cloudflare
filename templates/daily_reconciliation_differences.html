@@ -131,6 +131,24 @@
   </section>
   {% endif %}
 
+  <div class="d-flex flex-wrap gap-2 mb-3">
+    <div class="diff-tile flex-fill">
+      <div class="diff-tile-label">Counter Less Account</div>
+      <div class="diff-tile-value text-danger">Rs. {{ '{:,.2f}'.format(counter_less.balance if counter_less else 0) }}</div>
+      <div class="small text-muted">shortages waiting to be explained</div>
+    </div>
+    <div class="diff-tile flex-fill">
+      <div class="diff-tile-label">Counter Excess Account</div>
+      <div class="diff-tile-value text-primary">Rs. {{ '{:,.2f}'.format(counter_excess.balance if counter_excess else 0) }}</div>
+      <div class="small text-muted">excess cash waiting to be explained</div>
+    </div>
+    <div class="diff-tile flex-fill">
+      <div class="diff-tile-label">Unresolved (posted)</div>
+      <div class="diff-tile-value {% if open_posted_total == 0 %}text-success{% else %}text-danger{% endif %}">Rs. {{ '{:,.2f}'.format(open_posted_total) }}</div>
+      <div class="small text-muted">{{ 'all differences explained' if open_posted_total == 0 else 'resolve below to clear' }}</div>
+    </div>
+  </div>
+
   {% for title, card, kind in [('Less Counted Transactions', less, 'less'), ('Excess Counted Transactions', excess, 'excess')] %}
   {% if (kind == 'less' and show_less) or (kind == 'excess' and show_excess) %}
   <section class="diff-card mb-3">
@@ -139,7 +157,7 @@
       <span class="badge {% if kind == 'less' %}bg-danger{% else %}bg-primary{% endif %}">{{ 'SHORTAGE' if kind == 'less' else 'EXCESS' }}</span>
     </div>
     <div class="table-responsive"><table class="table diff-table align-middle mb-0">
-      <thead><tr><th>Day / account</th><th>Recorded by / time</th><th class="text-end">Expected</th><th class="text-end">Counted</th><th class="text-end">Difference</th><th>Status / resolution</th></tr></thead>
+      <thead><tr><th>Day / account</th><th>Recorded by / time</th><th class="text-end">Expected</th><th class="text-end">Counted</th><th class="text-end">Difference</th><th>Counter account entry</th><th>Status / resolution</th></tr></thead>
       <tbody>
       {% for item in card.rows %}
         <tr class="{% if item.status != 'open' %}diff-settled{% endif %}">
@@ -148,12 +166,65 @@
           <td class="text-end">Rs. {{ '{:,.2f}'.format(item.expected) }}</td>
           <td class="text-end">Rs. {{ '{:,.2f}'.format(item.counted) }}</td>
           <td class="text-end fw-bold">Rs. {{ '{:,.2f}'.format(item.difference) }}</td>
+          <td>
+            {% if item.posted_status == 'posted' %}
+              <span class="badge bg-primary">POSTED</span>
+              <div class="small mt-1">
+                {% set acct = item.account_name or 'Counted account' %}
+                {% set less_name = counter_less.name if counter_less else 'Counter Less' %}
+                {% set excess_name = counter_excess.name if counter_excess else 'Counter Excess' %}
+                {{ acct ~ ' → ' ~ less_name if item.difference < 0 else excess_name ~ ' → ' ~ acct }}
+                <br><a href="{{ url_for('daily_reconciliation', day=item.position_date.isoformat()) }}">ATX-{{ item.posted_out_tx_id }}</a>
+                · {{ item.posted_by or 'unknown' }}
+                <br>{{ item.posted_at.strftime('%Y-%m-%d %H:%M:%S') if item.posted_at else '—' }}
+              </div>
+            {% elif item.posted_status == 'resolved' %}
+              <span class="badge bg-success">RESOLVED</span>
+              <div class="small mt-1">
+                {{ item.resolution_kind|replace('_', ' ')|title if item.resolution_kind else '' }}
+                · ATX-{{ item.resolution_out_tx_id }}
+                <br>{{ item.resolved_by or 'unknown' }}
+                <br>{{ item.resolved_at.strftime('%Y-%m-%d %H:%M:%S') if item.resolved_at else '—' }}
+              </div>
+            {% elif item.posted_status == 'reversed' %}
+              <span class="badge bg-secondary">POSTING REVERSED</span>
+              <div class="small mt-1">day reopened</div>
+            {% elif item.posted_status == 'pending' %}
+              <span class="badge bg-light text-dark border">NOT POSTED</span>
+              <div class="small mt-1">posts when the day is finalised</div>
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
           <td>{% if item.status == 'open' %}<span class="badge bg-warning text-dark">OPEN</span>{% else %}
             <span class="badge bg-secondary">{{ item.status|upper }}</span><div class="small mt-1">by {{ item.closed_by or 'Unknown' }}<br>{{ item.closed_at.strftime('%Y-%m-%d %H:%M:%S') if item.closed_at else '—' }}</div>
             {% if item.closed_counted is not none %}<div class="small">New expected: Rs. {{ '{:,.2f}'.format(item.closed_expected) }}<br>New count: Rs. {{ '{:,.2f}'.format(item.closed_counted) }}</div>{% endif %}
-            {% endif %}</td>
+            {% endif %}
+            {% if can_resolve and item.posted_status == 'posted' %}
+            <form method="POST" action="{{ url_for('daily_reconciliation_resolve_difference', difference_id=item.id) }}"
+                  class="mt-2 d-flex flex-column gap-1" onsubmit="return confirm('Resolve this difference? A real entry is posted; nothing is deleted.');">
+              <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="return_to" value="{{ request.full_path }}">
+              <select name="resolution_kind" class="form-select form-select-sm" required>
+                <option value="">What happened to the money…</option>
+                {% for key, meta in resolution_kinds.items() %}
+                  {% if (item.difference < 0 and key in ('recovered_less', 'written_off')) or (item.difference > 0 and key in ('recovered_excess', 'income')) %}
+                    <option value="{{ key }}">{{ meta.label }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+              <select name="counterpart_account_id" class="form-select form-select-sm">
+                <option value="">— other side (needed for write-off / income) —</option>
+                {% for acc in counterpart_accounts %}
+                  <option value="{{ acc.id }}">{{ acc.name }}</option>
+                {% endfor %}
+              </select>
+              <input type="text" name="resolution_note" class="form-control form-control-sm"
+                     maxlength="300" placeholder="Note (required)" required>
+              <button class="btn btn-sm btn-outline-success fw-bold">Resolve</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
-      {% else %}<tr><td colspan="6" class="text-center text-muted py-4">No {{ 'less counted' if kind == 'less' else 'excess counted' }} differences match these filters.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="7" class="text-center text-muted py-4">No {{ 'less counted' if kind == 'less' else 'excess counted' }} differences match these filters.</td></tr>{% endfor %}
       </tbody>
     </table></div>
     <div class="p-3 d-flex justify-content-between align-items-center small">

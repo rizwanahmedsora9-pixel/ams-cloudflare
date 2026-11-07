@@ -72,9 +72,13 @@ def test_board_drops_rows_that_belong_to_a_deleted_account(client, app):
         db.session.delete(acc)
         db.session.commit()
 
-        # SQLite reuses the freed id for the next account.
+        # The locked day created the two counter accounts, which take the next
+        # rowids, so the new account does not inherit the freed id here.  The
+        # recycled-id hazard is nevertheless what the boot purge closes (see
+        # test_startup_purges_stale_rows_left_in_an_existing_database).
         fresh = _mk_account(db, Account, "NEW CASH", opening=250.0)
-        assert fresh.id == old_id
+        assert fresh.id != old_id
+        assert Account.query.filter_by(name="OLD CASH").first() is None
 
     _login(client)
     rv = client.get("/daily_reconciliation?day=2026-06-01")
@@ -124,8 +128,17 @@ def test_account_hard_delete_clears_its_board_rows(client, app):
     assert resp.status_code in (302, 303)
 
     with app.app_context():
-        assert Account.query.filter_by(id=acc_id).first() is None
-        assert CashDayAccountPosition.query.filter_by(account_id=acc_id).count() == 0
+        from models import CashDayDifference
+
+        # A finalised day posts real ledger rows, so the account carries
+        # historical references and the delete path archives it instead of
+        # erasing it.  Its reconciliation history stays with it (auditable), and
+        # because the account survives, the posted note still belongs to a real
+        # account rather than to a recycled id.
+        gone = Account.query.filter_by(id=acc_id).first()
+        assert gone is not None and gone.account_status == "archived"
+        assert gone.is_active is False
+        assert CashDayDifference.query.filter_by(account_id=acc_id).count() == 1
 
 
 def test_accounts_wipe_clears_daily_reconciliation_state(client, app):
@@ -176,8 +189,11 @@ def test_explicit_daily_reconciliation_target_wipes_board_state(client, app):
     with app.app_context():
         assert CashDayAccountPosition.query.count() == 0
         assert CashDayLock.query.count() == 0
-        # The account itself is untouched by this narrow target.
-        assert Account.query.count() == 1
+        from models import CashDayDifference
+        assert CashDayDifference.query.count() == 0
+        # The account itself is untouched by this narrow target (the two
+        # reconciliation counter accounts may exist alongside it).
+        assert Account.query.filter_by(name="TARGET CASH").count() == 1
 
 
 def test_accounts_domain_wipe_clears_board_state(client, app):
@@ -238,7 +254,7 @@ def test_preview_counts_board_rows_under_accounts(app):
         daily = _wipe_preview_for_targets(["daily_reconciliation"])
         daily_tables = set(daily["affected_tables"])
         assert daily_tables == {
-            "cash_day_account_position", "cash_day_lock",
+            "cash_day_account_position", "cash_day_lock", "cash_day_difference",
             "cash_day_shift_close", "cash_day_shift_close_position",
         }
 
@@ -292,7 +308,7 @@ def test_startup_purges_stale_rows_left_in_an_existing_database(app_factory, tmp
         db.session.delete(acc)  # pre-fix hard delete: board rows left behind
         db.session.commit()
         fresh = _mk_account(db, Account, "NEW CASH", opening=200.0)
-        assert fresh.id == old_id
+        assert fresh.id != old_id      # the counter accounts took the next rowids
         assert CashDayAccountPosition.query.count() == 1
         assert CashDayLock.query.count() == 1
 
@@ -300,4 +316,37 @@ def test_startup_purges_stale_rows_left_in_an_existing_database(app_factory, tmp
     with app2.app_context():
         assert CashDayAccountPosition.query.count() == 0
         assert CashDayLock.query.count() == 0
-        assert Account.query.count() == 1
+        # Only NEW CASH remains as a business account; the two reconciliation
+        # counter accounts may also exist (they are created on demand).
+        assert Account.query.filter(Account.category != "recon").count() == 1
+
+
+def test_narrow_wipe_takes_the_counter_postings_with_it(client, app):
+    """A wiped board must not leave its shortage parked in a counter account."""
+    from models import db, Account
+    from app.services import recon_counter
+    from app.services.payments_crud import ledger_balance
+
+    with app.app_context():
+        acc = _mk_account(db, Account, "WIPE CASH", opening=1000.0)
+        _count_and_lock(date(2026, 6, 6), acc.id, 900.0)
+        less, _excess = recon_counter.counter_accounts()
+        assert less is not None and ledger_balance(less.id) == 100
+
+    _login(client)
+    resp = client.post(
+        "/delete_selected_data",
+        data={"confirm_text": "DELETE SELECTED", "delete_targets": ["daily_reconciliation"]},
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+
+    with app.app_context():
+        from models import AccountTransaction, CashDayDifference
+        assert CashDayDifference.query.count() == 0
+        less, _excess = recon_counter.counter_accounts()
+        assert less is None or ledger_balance(less.id) == 0
+        assert AccountTransaction.query.filter(
+            AccountTransaction.source_type.in_(["CashDayDifference", "cash_day_difference"])
+        ).count() == 0
+        assert recon_counter.counter_invariants() == []

@@ -348,6 +348,7 @@ class CashDayLock(db.Model):
     total_expected = db.Column(db.Float, default=0)
     total_counted = db.Column(db.Float, default=0)
     difference = db.Column(db.Float, default=0)
+    posted_total = db.Column(db.Float, default=0)   # Σ differences posted to the counters
     note = db.Column(db.String(500))
     locked_by = db.Column(db.String(80))
     locked_at = db.Column(db.DateTime, default=pk_model_now)
@@ -430,11 +431,22 @@ class CashDayAccountPosition(db.Model):
 
 
 class CashDayDifference(db.Model):
-    """Reporting-only history of discrepancies in the daily board.
+    """History of discrepancies in the daily board, and their postings.
 
-    These rows are deliberately not Account or AccountTransaction records.
-    Amounts are snapshots; a changed discrepancy closes the old snapshot and
-    creates a new one. There are no user-facing edit or delete operations.
+    A discrepancy is *recorded* the moment a count differs from the expected
+    closing. Nothing is written to the ledger then: a count can be corrected
+    freely until the day is finalised.
+
+    Finalising the day posts the difference as a **paired transfer** against a
+    counter account (``recon_counter``): a shortage moves money from the counted
+    account into the *Counter Less* account, an excess moves it from the
+    *Counter Excess* account into the counted account. Both legs are real
+    ``AccountTransaction`` rows, so the books stay balanced and Σ balances never
+    changes — only the unexplained part is parked where it can be seen.
+
+    The posting is linked here (``posted_out_tx_id`` / ``posted_in_tx_id``), and
+    a difference is only ever closed by *posting the mirror entry* (resolve) or
+    by removing the day's postings (unlock). Rows are never edited or deleted.
     """
     __tablename__ = 'cash_day_difference'
     id = db.Column(db.Integer, primary_key=True)
@@ -454,3 +466,21 @@ class CashDayDifference(db.Model):
     closed_at = db.Column(db.DateTime)
     closed_expected = db.Column(db.Float)
     closed_counted = db.Column(db.Float)
+    # --- Counter-account posting (daily close of a finalised day) ----------
+    # pending  : recorded, nothing in the ledger yet (day not finalised)
+    # posted   : paired transfer written at lock, counter account carries it
+    # resolved : the pair was offset by a real explanation entry
+    # reversed : the day was unlocked and the pair removed
+    posted_status = db.Column(db.String(16), default='pending', index=True)
+    posted_out_tx_id = db.Column(db.Integer, nullable=True, index=True)
+    posted_in_tx_id = db.Column(db.Integer, nullable=True, index=True)
+    posted_at = db.Column(db.DateTime)
+    posted_by = db.Column(db.String(80))
+    posted_expected = db.Column(db.Float)
+    posted_counted = db.Column(db.Float)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.String(80))
+    resolution_kind = db.Column(db.String(24))   # recovered|written_off|corrected|income
+    resolution_note = db.Column(db.String(500))
+    resolution_out_tx_id = db.Column(db.Integer, nullable=True, index=True)
+    resolution_in_tx_id = db.Column(db.Integer, nullable=True, index=True)

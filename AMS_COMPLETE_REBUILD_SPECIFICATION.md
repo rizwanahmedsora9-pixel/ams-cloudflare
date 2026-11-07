@@ -838,7 +838,20 @@ All three share one POST endpoint (`/accounts/transactions/new`) with a mode fie
 - Expected closing = opening + in − out + transfer in − transfer out.
 - Save count stores the physical figure per account/day. Difference = counted − expected.
 - Verify & Lock freezes every account’s counted figure (defaulting to expected when uncounted), writes a day-level lock with totals and difference, and makes the locked counted totals the next day’s opening.
-- Unlock removes the day lock and unlocks the positions. Clear count removes one account’s counted figure.
+- **Locking also posts the difference** as a paired transfer against a counter account, so the counted account’s real balance becomes the counted figure (see “Difference counter accounts” below). Differentials are computed in minor units, the posting is idempotent (`daydiff:<day>:<account>:<row>:out|in`), and it is written in the same transaction as the lock.
+- Unlock reverses **and removes** that day’s posting pair (never `is_void`, because the boot-time void purge deletes voided rows without unwinding cached balances), then removes the day lock and unlocks the positions. Clear count removes one account’s counted figure.
+- The board’s `in`/`out`/`transfer` columns deliberately exclude these posting rows: they are the *consequence* of a count, never an input to the next one. Account openings do include them, which is what carries a counted closing into the next day.
+
+**Difference counter accounts.** Two `Account` rows with `category = 'recon'` (ids in `settings.recon_less_account_id` / `recon_excess_account_id`), created on demand by `app/services/recon_counter.py`:
+
+| Count vs ledger | Posting |
+|---|---|
+| counted **less** than expected (shortage) | `FBM ──100──▶ Counter Less Account` |
+| counted **more** than expected (excess) | `Counter Excess Account ──100──▶ FBM` |
+
+Both legs are ordinary `AccountTransaction` rows (`transaction_type` `Reconciliation Loss` / `Reconciliation Excess`, `source_type = CashDayDifference`), so Σ of all balances never changes: the unexplained part is *moved* into a named account instead of vanishing. Because every money-account filter in the app is `category in ('cash','bank')`, a `recon` account never appears on the board, in cash-flow in/out totals, or in any payment / GRN / driver picker, and the service layer refuses manual entries into it.
+
+**Resolving a difference.** A finalised day’s closing is never rewritten. The differences report offers **Resolve** (admin only, reason required), which offsets the counter account with a real, attributed entry: *shortage recovered* (`Counter Less → account`), *shortage written off* (`Counter Less → expense`), *excess returned* (`account → Counter Excess`), or *excess recognised as income*. The row then greys out showing who resolved it, when, and which ledger entry did it (Path B). Correcting a count instead (before the lock, or after an unlock) is Path A and simply removes the pair.
 - JSON responses mirror the HTML board for live updates.
 
 ### 10.6 Cash Flow page
@@ -855,7 +868,7 @@ All three share one POST endpoint (`/accounts/transactions/new`) with a mode fie
 
 **Opening balance:** explicit input wins; otherwise today’s session override; otherwise fresh-start zero when the user explicitly reset today; otherwise automatic carry-forward from prior movements. “Fresh start” is opt-in per session and hides earlier entries for today without changing account balances.
 
-**Physical-cash reconciliation:** enter physical cash available + reason for a date. Difference is computed against the **full unfiltered company-wide closing**, never the filtered view. Saving stores a CashFlowDifferenceAdjustment with an audit trail (create/edit/delete history). It does not change account balances; it informs the next-day opening in this report. `/cash_flow_differences` lists history; a detail page shows the audit trail.
+**Physical-cash reconciliation:** enter physical cash available + reason for a date. Difference is computed against the **full unfiltered company-wide closing**, never the filtered view. Saving stores a CashFlowDifferenceAdjustment with an audit trail (create/edit/delete history). It does not change account balances; it informs the next-day opening **in this report only** — the daily board’s day lock is the authoritative closing, and where a day is finalised on the board the board wins. `/cash_flow_differences` lists history; a detail page shows the audit trail.
 
 **Exports:** CSV and PDF, scope = filtered or all (respecting the status filter).
 
@@ -1239,8 +1252,10 @@ The rebuilt app must satisfy these observable behaviours. They are written as us
 | Account transfer to same account | Rejected. |
 | Loan source with insufficient balance | Allowed to go negative. |
 | Account reconciliation | Immutable record + adjustment; later edits in the closed period rejected. |
-| Daily lock | Counted closings become next-day openings; unlock restores editability. |
-| Cash Flow physical count | Compared against full unfiltered closing; does not change account balances. |
+| Daily lock | Counted closings become next-day openings **and** the difference is posted to a counter account; unlock reverses the posting and restores editability. |
+| Backdated movement into a finalised day | Rejected (`_assert_day_open`) — unlock the day or record it in the open period. |
+| Manual transfer / cash-flow entry into a counter account | Rejected; resolve the difference from the report instead. |
+| Cash Flow physical count | Compared against full unfiltered closing; does not change account balances (the daily board’s lock does). |
 
 ### 16.6 Ledgers and reports
 

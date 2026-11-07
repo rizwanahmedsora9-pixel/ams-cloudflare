@@ -145,6 +145,10 @@ CLASSIFICATION = {
                     "Client Advance Received": _node("ledger_only", "client"),
                 },
             },
+            "Reconciliation Clearing": {
+                "label": "Reconciliation Clearing",
+                "account_types": {"Difference Counter": _node("ledger_only")},
+            },
             "Loans Payable": {
                 "label": "Loans Payable",
                 "account_types": {
@@ -445,6 +449,8 @@ def legacy_account_type_for(category, subcategory, account_type):
             return "client"
         return "company"
     if cs == "Liabilities":
+        if sub == "Reconciliation Clearing":
+            return "recon_counter"
         if sub == "Supplier Payables":
             return "supplier"
         if sub == "Loans Payable":

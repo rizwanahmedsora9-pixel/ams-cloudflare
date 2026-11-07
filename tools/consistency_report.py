@@ -14,6 +14,7 @@ Checks performed:
   8. Booking with missing PendingBill
   9. CashFlowDifferenceAdjustment referencing non-existent reconciliation records
  10. Health snapshot freshness check
+ 11. Daily reconciliation counter postings vs the counted account balance
 
 Usage:
     python tools/consistency_report.py
@@ -373,6 +374,83 @@ def check_booking_missing_pending_bills(con: sqlite3.Connection) -> dict:
     }
 
 
+def check_daily_recon_counter_postings(con: sqlite3.Connection) -> dict:
+    """The counter-account invariants that must hold for every finalised day.
+
+    Not "today's balance equals the counted figure" — a later recovery, receipt
+    or expense legitimately moves an account on from what was counted.  What must
+    hold is that every posted difference still has both legs, the legs are equal
+    and net to zero, and the counter accounts hold exactly the unresolved amount.
+    """
+    empty = {
+        "check": "daily_reconciliation_counter_postings",
+        "posted": 0, "problems": [], "counter_total": 0.0, "unresolved_total": 0.0,
+        "status": "OK",
+    }
+    has_table = scalar(
+        con,
+        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='cash_day_difference'",
+    )
+    if not has_table:
+        return empty
+
+    posted_rows = rows(
+        con,
+        """
+        SELECT d.id, d.position_date, d.account_id, d.difference,
+               d.posted_out_tx_id, d.posted_in_tx_id, a.name AS account_name
+        FROM cash_day_difference d
+        LEFT JOIN account a ON a.id = d.account_id
+        WHERE d.posted_status = 'posted'
+        ORDER BY d.position_date, d.id
+        """,
+    )
+    problems = []
+    unresolved_minor = 0
+    for row in posted_rows:
+        # counters hold the opposite sign of the difference (see recon_counter)
+        unresolved_minor -= int(round(float(row.get("difference") or 0) * 100))
+        legs = rows(
+            con,
+            "SELECT id, amount_minor, amount, from_account_id, to_account_id "
+            "FROM account_transaction WHERE id IN (?, ?) "
+            "AND COALESCE(is_void, 0) = 0",
+            (row.get("posted_out_tx_id"), row.get("posted_in_tx_id")),
+        )
+        if len(legs) != 2:
+            problems.append({"difference_id": row["id"], "day": row["position_date"],
+                             "account": row["account_name"], "problem": "a ledger leg is missing"})
+            continue
+        amounts = {int(leg.get("amount_minor") or round(float(leg.get("amount") or 0) * 100))
+                   for leg in legs}
+        if len(amounts) != 1:
+            problems.append({"difference_id": row["id"], "day": row["position_date"],
+                             "account": row["account_name"],
+                             "problem": "the two legs carry different amounts"})
+
+    counter_minor = scalar(
+        con,
+        "SELECT COALESCE(SUM(COALESCE(a.balance_minor, a.balance * 100)), 0) "
+        "FROM account a WHERE LOWER(TRIM(COALESCE(a.category, ''))) = 'recon'",
+        default=0,
+    )
+    drift = int(round(float(counter_minor or 0))) - unresolved_minor
+    if drift:
+        problems.append({
+            "problem": "the counter accounts hold a different amount than the unresolved postings",
+            "counter_total": round(float(counter_minor or 0) / 100.0, 2),
+            "unresolved_total": round(unresolved_minor / 100.0, 2),
+        })
+    return {
+        "check": "daily_reconciliation_counter_postings",
+        "posted": len(posted_rows),
+        "problems": problems[:50],
+        "counter_total": round(float(counter_minor or 0) / 100.0, 2),
+        "unresolved_total": round(unresolved_minor / 100.0, 2),
+        "status": "FAIL" if problems else "OK",
+    }
+
+
 def run_all_checks() -> dict:
     con = connect()
     try:
@@ -386,6 +464,7 @@ def run_all_checks() -> dict:
             check_orphaned_invoices(con),
             check_booking_missing_pending_bills(con),
             check_health_snapshot(con),
+            check_daily_recon_counter_postings(con),
         ]
     finally:
         con.close()
