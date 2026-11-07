@@ -1,6 +1,6 @@
 """Services master — rent-like charges that are billed but never stocked.
 
-Covers the guarantees in SERVICES_PLAN.md that matter most:
+Covers the guarantees in docs/plans/SERVICES_PLAN.md that matter most:
 
 * a service line behaves like a bill line (total, booking pool, ledger);
 * a service is never stock — no GRN, no stock total, no stock report row;
@@ -506,7 +506,7 @@ def test_service_booking_and_sale_with_negative_stock_disallowed(app, client):
 
 def test_production_snapshot_differential_invariants(app_factory, tmp_path):
     """Run the conversion on a copy of LEGACY DATA/AMS_SMOOTH_IMPORT.amsdb and
-    verify every invariant in SERVICES_PLAN.md §12."""
+    verify every invariant in docs/plans/SERVICES_PLAN.md §12."""
     import shutil
     from pathlib import Path
     from sqlalchemy import func

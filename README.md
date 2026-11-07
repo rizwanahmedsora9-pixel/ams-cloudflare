@@ -10,14 +10,21 @@ permissions and data-maintenance tooling.
 server. A signed PythonAnywhere deployment webhook is available through
 `wsgi.py` (see "Deployment" below).
 
+> **Start here if you are an agent or a new contributor:** [`AGENTS.md`](AGENTS.md)
+> has the file map, the commands, the list of paths to ignore and the invariants
+> you must not break. Everything written *about* the code (specs, plans, dated
+> reports) lives under [`docs/`](docs/INDEX.md); the repo root holds code and
+> this README only.
+
 > **About the old audit files.** This repo used to ship a pile of session
 > reports (`AUDIT_REPORT.md`, `QA_FULL_AUDIT.md`, orphan plans, schema-failure
 > notes, continuation summaries). Those described **August 2026** — empty DB,
 > hardcoded webhook token, CSRF only on accounts, duplicate auto bill numbers,
 > Open-Khata receivables that could not be settled, wipe FK crashes. **The
 > current app is well ahead of those write-ups.** The findings were fixed in
-> code and locked with `tests/test_predator_regressions.py`. The historical
-> markdown was deleted so nobody treats a stale P0 list as the live state.
+> code and locked with `tests/test_predator_regressions.py`. Those files now
+> live in [`docs/history/`](docs/history/) as dated history, not as the live
+> state.
 
 ---
 
@@ -56,9 +63,16 @@ tools/                  Maintenance, audit, migration and health scripts
 tests/                  pytest (backend + frontend)
 full_db_sync/           SQLite .amsdb snapshot export/import (stdlib only)
 dummy_data/             Sample workbook generator / verifier
+docs/specs/             Rebuild specification (functional contract)
+docs/plans/             Forward-looking design for modules in progress
+docs/history/           Dated session reports — history, never current state
+AGENTS.md               Orientation map for AI agents and new contributors
 instance/               Runtime: SQLite DB, secret_key, logs (git-ignored)
 backups/db/             Daily DB backup files — outside instance/ (git-ignored)
 ```
+
+Start at [`docs/INDEX.md`](docs/INDEX.md) — it says which document answers which
+question, so you never have to guess whether a report is still true.
 
 `utils/module_loader.py` discovers blueprints at startup.
 
@@ -721,7 +735,9 @@ Repair scripts in `tools/repair_controlled/` require `--confirm` and take a
 backup first. See `tools/README.md`.
 
 The last full audit (test suite, wipe, one complete business cycle and the
-integrity tools) is written up in [`AUDIT_REPORT.md`](AUDIT_REPORT.md).
+integrity tools) is written up in
+[`docs/history/AUDIT_REPORT.md`](docs/history/AUDIT_REPORT.md). It is a dated
+report, not a description of the current tree — check the code and the tests.
 
 ---
 
