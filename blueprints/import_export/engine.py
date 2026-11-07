@@ -442,7 +442,7 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
         # enforcement does not abort the whole import.
         try:
             for table in reversed(selected_tables):
-                if table.name in WIPE_PROTECTED_TABLES or table.name == 'user':
+                if table.name in WIPE_PROTECTED_TABLES or table.name in ('user', 'cash_day_difference'):
                     continue
                 if scope_ctx.get('scope') == 'tenant' and 'tenant_id' in table.c:
                     db.session.execute(table.delete().where(table.c.tenant_id == target_tenant_id))
@@ -484,6 +484,16 @@ def _run_full_raw_import_bytes(file_bytes, scope_ctx, mode, source_file_name, al
 
     for table in selected_tables:
         if table.name == 'user':
+            continue
+        # Difference history is system-managed evidence, not editable data.
+        # A workbook may export it, but must never overwrite or forge it.
+        if table.name == 'cash_day_difference':
+            report['warnings'] += 1
+            report['table_results'].append({
+                'name': table.name, 'status': 'skipped', 'inserted': 0,
+                'updated': 0, 'skipped': 0, 'failed': 0,
+                'error': 'Reporting history is protected from spreadsheet imports.',
+            })
             continue
         table_stat = {
             'name': table.name, 'status': 'ok', 'inserted': 0, 'updated': 0,

@@ -370,6 +370,7 @@ ENDPOINT_PERMISSION_MAP = {
     # cash_flow map entries above never covered them.  daily_reconciliation is
     # not read-only: it saves counted balances and locks/unlocks a cash day.
     'daily_reconciliation': 'can_view_cash_flow',
+    'daily_reconciliation_differences': 'can_view_cash_flow',
     'financial_tracker': 'can_view_cash_flow',
     'current_payables_api': 'can_view_cash_flow',
     'current_payable_detail_api': 'can_view_cash_flow',

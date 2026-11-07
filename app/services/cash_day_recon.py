@@ -28,7 +28,7 @@ from sqlalchemy import case, func, or_
 
 from models import (
     db, Account, AccountTransaction, CashDayLock, CashDayAccountPosition,
-    CashDayShiftClose, CashDayShiftClosePosition,
+    CashDayShiftClose, CashDayShiftClosePosition, CashDayDifference,
 )
 from utils.money import from_minor, to_minor
 from app.services.time_money import _money_round, pk_now, pk_today
@@ -544,6 +544,86 @@ def close_shift(day, shift_name, actor=None, note=""):
     return record
 
 
+def _difference_actor(actor):
+    return str(getattr(actor, "username", None) or actor or "System")[:80]
+
+
+def _sync_difference(day, account, expected, counted, actor, *, source="live"):
+    """Record a discrepancy snapshot or close it, in the caller's transaction.
+
+    A correction never overwrites the original amount. An edited, still-wrong
+    count supersedes the previous snapshot; only a match marks it settled.
+    """
+    created = _naive_dt(getattr(account, "created_at", None))
+    query = CashDayDifference.query.filter_by(
+        position_date=day, account_id=account.id, status="open"
+    )
+    query = query.filter(CashDayDifference.account_created_at == created)
+    active = query.order_by(CashDayDifference.id.desc()).all()
+    expected = _money_round(expected)
+    counted = _money_round(counted) if counted is not None else None
+    difference = _money_round(counted - expected) if counted is not None else None
+    if (len(active) == 1 and difference and
+            _money_round(active[0].expected) == expected and
+            _money_round(active[0].counted) == counted):
+        return
+    now = pk_now()
+    who = _difference_actor(actor)
+    for entry in active:
+        entry.status = "cleared" if counted is None else ("settled" if difference == 0 else "superseded")
+        entry.closed_by = who
+        entry.closed_at = now
+        entry.closed_expected = expected
+        entry.closed_counted = counted
+    if difference:
+        db.session.add(CashDayDifference(
+            position_date=day, account_id=account.id,
+            account_created_at=created, account_name=account.name or "",
+            kind="less" if difference < 0 else "excess",
+            expected=expected, counted=counted, difference=difference,
+            status="open", source=source, recorded_by=who, recorded_at=now,
+        ))
+
+
+def refresh_differences(day, actor=None):
+    """Explicitly verify saved counts after ledger changes for a selected day."""
+    day = _to_date(day)
+    positions = account_positions_for_date(day)
+    for p in positions:
+        if p["counted"] is not None:
+            account = db.session.get(Account, p["account_id"])
+            if account is not None:
+                _sync_difference(day, account, p["expected_closing"], p["counted"], actor)
+    db.session.commit()
+
+
+def import_saved_differences(actor=None):
+    """Import the current state of older saved counts once, not invented history.
+
+    Calculate all days before writing: board rendering can perform housekeeping
+    commits. Existing histories are never recreated or overwritten.
+    """
+    days = [row[0] for row in db.session.query(CashDayAccountPosition.position_date)
+            .filter(CashDayAccountPosition.counted.isnot(None)).distinct().all()]
+    snapshots = [(day, p) for day in days for p in account_positions_for_date(day)
+                 if p["counted"] is not None and p["difference"] != 0]
+    imported = 0
+    for day, p in snapshots:
+        account = db.session.get(Account, p["account_id"])
+        if account is None:
+            continue
+        created = _naive_dt(getattr(account, "created_at", None))
+        exists = CashDayDifference.query.filter_by(
+            position_date=day, account_id=account.id, account_created_at=created
+        ).first()
+        if exists:
+            continue
+        _sync_difference(day, account, p["expected_closing"], p["counted"], actor, source="imported")
+        imported += 1
+    db.session.commit()
+    return imported
+
+
 def save_count(day, account_id, counted, actor=None):
     """Store the user-entered physical count for one account on a day.
 
@@ -572,6 +652,10 @@ def save_count(day, account_id, counted, actor=None):
     acc = db.session.get(Account, account_id)
     if acc is None:
         raise ValueError("Account not found.")
+    # Calculate before changing the row: account_positions_for_date may purge
+    # stale rows and commit. The count and its history then commit atomically.
+    board = account_positions_for_date(day)
+    position = next((p for p in board if p["account_id"] == account_id), None)
     actor_name = getattr(actor, "username", None) or actor
     if pos is None:
         pos = CashDayAccountPosition(
@@ -586,6 +670,8 @@ def save_count(day, account_id, counted, actor=None):
     pos.counted = amount
     pos.difference = None  # recomputed on read
     pos.updated_by = actor_name
+    if position is not None:
+        _sync_difference(day, acc, position["expected_closing"], amount, actor)
     db.session.commit()
     return pos
 
@@ -634,6 +720,12 @@ def lock_day(day, actor=None, note=""):
         pos.locked_by = actor_name
         pos.locked_at = now
         pos.updated_by = actor_name
+        # Only actual saved counts are evidence. Do not manufacture a report
+        # entry for an uncounted account defaulted to expected at lock time.
+        if p["counted"] is not None:
+            account = db.session.get(Account, p["account_id"])
+            if account is not None:
+                _sync_difference(day, account, p["expected_closing"], counted, actor)
 
     total_expected = _money_round(total_expected)
     total_counted = _money_round(total_counted)
@@ -661,7 +753,7 @@ def unlock_day(day):
     db.session.commit()
 
 
-def delete_count(day, account_id):
+def delete_count(day, account_id, actor=None):
     try:
         purge_stale_reconciliation_state()
     except Exception:
@@ -680,5 +772,10 @@ def delete_count(day, account_id):
             f"{day:%Y-%m-%d} is locked. Unlock the day before clearing counts."
         )
     if pos:
+        board = account_positions_for_date(day)
+        position = next((p for p in board if p["account_id"] == account_id), None)
+        account = db.session.get(Account, account_id)
+        if account is not None and position is not None:
+            _sync_difference(day, account, position["expected_closing"], None, actor)
         db.session.delete(pos)
         db.session.commit()

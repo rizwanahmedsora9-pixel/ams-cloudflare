@@ -73,6 +73,20 @@
     </form>
   </div>
 
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="small text-muted">Differences are reporting only; they do not change financial accounts, sales or profit.</div>
+    <div class="d-flex flex-wrap gap-2">
+      <form method="POST" action="{{ dr_post_action }}">
+        <input type="hidden" name="action" value="refresh_differences">
+        <input type="hidden" name="day" value="{{ dr.day_str }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        {% if dr.embed %}<input type="hidden" name="return_to" value="{{ dr_return_to }}">{% endif %}
+        <button class="btn btn-sm btn-outline-secondary" title="Check saved counts against current transactions, including older days">Update Differences for This Day</button>
+      </form>
+      <a class="btn btn-sm btn-primary fw-bold" href="{{ url_for('daily_reconciliation_differences') }}"><i class="bi bi-journal-text me-1"></i> Differences Report</a>
+    </div>
+  </div>
+
   <!-- STATUS BANNER -->
   {% if dr.day_lock %}
   <div class="dr-status-locked p-3 mb-3 d-flex align-items-center justify-content-between">
