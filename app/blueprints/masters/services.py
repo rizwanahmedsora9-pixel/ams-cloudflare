@@ -395,7 +395,7 @@ def migrate_rent_to_services():
                 code=mat.code,
                 unit=(mat.unit or 'Pcs'),
                 # Carried across purely so the value is preserved in data; it is
-                # never used to price a line. See SERVICES_PLAN.md §15 #2.
+                # never used to price a line. See docs/plans/SERVICES_PLAN.md §15 #2.
                 unit_price=float(mat.unit_price or 0),
                 converted_from_material_id=mat.id,
             ))

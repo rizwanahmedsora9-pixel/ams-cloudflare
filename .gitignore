@@ -48,3 +48,15 @@ scratch/pdf_out/
 # --- Local preview database (scratch, never committed) ---
 scratch/preview.db*
 scratch/preview.health.json
+
+# --- Untracked 2026-11-07: files stay on disk, out of git (code-readability pass) ---
+# Superseded legacy snapshots. AMS_SMOOTH_IMPORT.amsdb is deliberately NOT ignored:
+# tests/test_services_master.py uses it as a fixture and skips when it is absent.
+LEGACY DATA/AMS_FULL_*.amsdb
+# Vendored sourcemaps (build by-products; browsers only fetch them in devtools)
+static/vendor/**/*.map
+# Generated audit outputs — regenerate with: python "checking tool/checkallapp.py"
+checking tool/checkallapp_report.md
+checking tool/checkallapp_results.json
+# One-shot patch payloads (already applied; keep the folder's readme.md)
+pending patches/*.patch
