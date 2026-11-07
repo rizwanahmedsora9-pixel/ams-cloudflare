@@ -71,54 +71,107 @@
 </div>
 
 <script>
+/*
+ * This partial is included from the page content block, which layout.html
+ * renders BEFORE the bootstrap bundle script tag.  Running this code at once
+ * therefore threw "bootstrap is not defined" and the exception aborted the
+ * IIFE before the [data-urdu-receipt] buttons below were wired up - the Urdu
+ * PDF / Urdu Print buttons then did nothing at all on click.  Defer to
+ * DOMContentLoaded (bootstrap is loaded by then) and degrade gracefully: if
+ * bootstrap still is not available, fall back to plain links so a click always
+ * produces a document instead of a dead button.
+ */
 (function () {
-    var modalEl = document.getElementById('urduTermsModal');
-    if (!modalEl) return;
-    var modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+    function init() {
+        var modalEl = document.getElementById('urduTermsModal');
+        if (!modalEl) return;
 
-    var tcYes = document.getElementById('urduTcYes');
-    var tcNo = document.getElementById('urduTcNo');
-    var tcOptions = document.getElementById('urduTcOptions');
-    var downloadBtn = document.getElementById('urduTcDownload');
-    var printBtn = document.getElementById('urduTcPrint');
+        var tcYes = document.getElementById('urduTcYes');
+        var tcNo = document.getElementById('urduTcNo');
+        var tcOptions = document.getElementById('urduTcOptions');
+        var downloadBtn = document.getElementById('urduTcDownload');
+        var printBtn = document.getElementById('urduTcPrint');
+        var buttons = document.querySelectorAll('[data-urdu-receipt]');
 
-    tcYes.addEventListener('change', function () {
-        tcOptions.style.display = tcYes.checked ? 'block' : 'none';
-    });
-    tcNo.addEventListener('change', function () {
-        tcOptions.style.display = 'none';
-    });
-
-    function go(action) {
-        var yes = tcYes.checked;
-        var ids = Array.from(
-            tcOptions.querySelectorAll('input[name="urduTcIds"]:checked')
-        ).map(function (cb) { return cb.value; });
-
-        var url = action === 'print' ? printBtn.dataset.printUrl : downloadBtn.dataset.downloadUrl;
-        var sep = url.indexOf('?') === -1 ? '?' : '&';
-        url += sep + 'tc=' + (yes ? '1' : '0');
-        if (yes && ids.length) {
-            url += '&tc_ids=' + ids.join(',');
+        function urlFor(action) {
+            var url = action === 'print'
+                ? (printBtn.dataset.printUrl || '')
+                : (downloadBtn.dataset.downloadUrl || '');
+            if (!url) return '';
+            var sep = url.indexOf('?') === -1 ? '?' : '&';
+            return url + sep;
         }
-        modal.hide();
-        location.href = url;
+
+        var hasBootstrap = typeof window.bootstrap !== 'undefined'
+            && !!window.bootstrap.Modal;
+
+        // Without bootstrap we cannot open the dialog, so make every Urdu
+        // button behave as a direct link (terms default to "show all" server
+        // side would require tc=1; omit tc so the server shows its own
+        // confirmation page, which asks the same question).
+        if (!hasBootstrap) {
+            buttons.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var url = btn.dataset.printUrl || btn.dataset.downloadUrl || '';
+                    if (url) { location.href = url; }
+                });
+            });
+            return;
+        }
+
+        var modal = new window.bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+
+        tcYes.addEventListener('change', function () {
+            tcOptions.style.display = tcYes.checked ? 'block' : 'none';
+        });
+        tcNo.addEventListener('change', function () {
+            tcOptions.style.display = 'none';
+        });
+
+        function go(action) {
+            var yes = tcYes.checked;
+            var ids = Array.from(
+                tcOptions.querySelectorAll('input[name="urduTcIds"]:checked')
+            ).map(function (cb) { return cb.value; });
+
+            var base = urlFor(action);
+            if (!base) return;
+            var url = base + 'tc=' + (yes ? '1' : '0');
+            if (yes && ids.length) {
+                url += '&tc_ids=' + ids.join(',');
+            }
+            modal.hide();
+            location.href = url;
+        }
+
+        downloadBtn.addEventListener('click', function () { go('download'); });
+        printBtn.addEventListener('click', function () { go('print'); });
+
+        // Wire up the "Urdu Print" / "Urdu PDF" buttons on this page so they
+        // open the dialog instead of linking straight to the document.
+        buttons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                // Prefer the data URLs of the clicked button; keep whatever is
+                // already set when a button omits one, so a half-specified
+                // button can never wipe a working URL.
+                if (btn.dataset.downloadUrl) {
+                    downloadBtn.dataset.downloadUrl = btn.dataset.downloadUrl;
+                }
+                if (btn.dataset.printUrl) {
+                    printBtn.dataset.printUrl = btn.dataset.printUrl;
+                }
+                tcYes.checked = true;
+                tcNo.checked = false;
+                tcOptions.style.display = 'block';
+                modal.show();
+            });
+        });
     }
 
-    downloadBtn.addEventListener('click', function () { go('download'); });
-    printBtn.addEventListener('click', function () { go('print'); });
-
-    // Wire up the "Urdu Print" / "Urdu PDF" buttons on this page so they open
-    // the dialog instead of linking straight to the document.
-    document.querySelectorAll('[data-urdu-receipt]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            downloadBtn.dataset.downloadUrl = btn.dataset.downloadUrl || '';
-            printBtn.dataset.printUrl = btn.dataset.printUrl || '';
-            tcYes.checked = true;
-            tcNo.checked = false;
-            tcOptions.style.display = 'block';
-            modal.show();
-        });
-    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
 </script>
