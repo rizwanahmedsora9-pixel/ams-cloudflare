@@ -15,20 +15,31 @@ supplier ledgers, chart of accounts, cash flow, reconciliation, reports, PDFs
 
 One process, one database, no build step, no frontend bundler.
 
-## 2. Commands
+## 2. Fast workflow and commands
+
+* Start with the user's task. Search only relevant paths (`rg -n`), then read
+  the matching functions or template sections instead of whole large files.
+* Reuse an existing environment. Do not install dependencies, start the app,
+  run the full test suite, or run full-cycle checks for every change by default.
+* For behavior changes, add or update a focused test and run the smallest relevant
+  check first. Expand testing when the change affects shared financial, stock,
+  security or other critical behavior. Report any checks not run and why.
+* For documentation-only changes, check the diff; no dependency install is needed.
+* The automatic full-cycle GitHub Actions workflow is intentionally removed.
+  Its tools remain available for a deliberate manual run when needed.
 
 ```bash
-pip install -r requirements.txt          # core app (small, fast install)
-pip install -r requirements-dev.txt      # + pandas, PyMuPDF, WeasyPrint (slow, native deps)
-pytest                                   # tests/ — 1,100+ cases
+pip install -r requirements.txt pytest   # core app and focused tests, when needed
+pip install -r requirements-dev.txt      # full data/PDF stack, only when needed
 pytest tests/test_services_master.py -x -q          # one module
 pytest -k "grn and not slow" -x -q                  # by name
+pytest                                   # full suite, when appropriate
 python main.py                           # dev server
 ```
 
-`requirements-dev.txt` pulls WeasyPrint, which needs Pango/Cairo/GDK-PixBuf. If
-that install is painful, `pip install -r requirements.txt` plus pytest is enough
-for everything except PDF-layout tests — those skip themselves automatically.
+`requirements-dev.txt` pulls WeasyPrint, which needs Pango/Cairo/GDK-PixBuf.
+The core requirements plus pytest are enough for tests that do not need optional
+PDF or data dependencies; optional tests may skip when those are missing.
 
 ## 3. Where the code is
 
@@ -95,8 +106,8 @@ Do not open them whole; several are larger than a comfortable context budget.
 6. **A finalised reconciliation day is frozen.** Unlock first, then edit.
 
 `tests/test_services_master.py`, `tests/test_predator_regressions.py` and
-`tests/test_fifo_grn_profit_realtime.py` encode most of the above. If you change
-one of those areas, run them.
+`tests/test_fifo_grn_profit_realtime.py` encode most of the above. For changes
+in those areas, run the relevant focused tests and expand coverage as needed.
 
 ## 7. House rules for changes
 
