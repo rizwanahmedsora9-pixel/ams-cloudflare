@@ -135,6 +135,38 @@
     .rcpt-footer { padding: 8px 12px 10px; }
 }
 
+/* ---- TERMS & CONDITIONS (Urdu receipt only) ---- */
+.rcpt-terms {
+    border: 1px solid #bbb;
+    padding: 6px 8px;
+    margin-top: 8px;
+    page-break-inside: avoid;
+    font-size: 11px;
+}
+.rcpt-terms-title {
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #999;
+    color: #222 !important;
+}
+.rcpt-term {
+    margin-bottom: 6px;
+    page-break-inside: avoid;
+}
+.rcpt-term-title {
+    font-size: 10.5px;
+    font-weight: 900;
+}
+.rcpt-term-text {
+    font-size: 10.5px;
+    line-height: 1.55;
+    text-align: justify;
+}
+
 /* ============================================================
    PRINT STYLES
    ============================================================ */
@@ -182,6 +214,11 @@
     .rcpt-credits    { font-size:6.5pt !important; }
     .rcpt-sig-block  { padding-top:8px !important; }
     .rcpt-sig-row    { margin-bottom:4px !important; }
+    .rcpt-terms { font-size: 7pt !important; padding: 4px 6px !important; margin-top: 6px !important; }
+    .rcpt-terms-title { font-size: 6.5pt !important; }
+    .rcpt-term { margin-bottom: 5px !important; }
+    .rcpt-term-title { font-size: 7pt !important; }
+    .rcpt-term-text { font-size: 7pt !important; line-height: 1.5 !important; }
     .rcpt-wrapper, .rcpt-wrapper * { color:#000 !important; font-weight:700 !important; text-shadow:none !important; }
     .rcpt-table th { background:#eee !important; }
     .rcpt-table tfoot td { background:#f4f4f4 !important; }
@@ -206,12 +243,18 @@
                     </a>
                 </div>
                 <div class="btn-group btn-group-sm" role="group" aria-label="Urdu receipt">
-                    <a href="{{ pdf_download_url_ur }}" class="btn btn-info fw-bold text-dark" title="Download the Urdu receipt as PDF">
-                        <i class="bi bi-file-earmark-pdf"></i> Urdu PDF
-                    </a>
-                    <a href="{{ pdf_print_url_ur }}" class="btn btn-outline-info fw-bold" title="Print the Urdu receipt">
-                        <i class="bi bi-printer"></i> Urdu Print
-                    </a>
+                    <button type="button" class="btn btn-info fw-bold text-dark" data-urdu-receipt
+                            data-action="download" data-download-url="{{ pdf_download_url_ur }}"
+                            data-print-url="{{ pdf_print_url_ur }}"
+                            title="Download the Urdu receipt as PDF">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Urdu PDF
+                    </button>
+                    <button type="button" class="btn btn-outline-info fw-bold" data-urdu-receipt
+                            data-action="print" data-download-url="{{ pdf_download_url_ur }}"
+                            data-print-url="{{ pdf_print_url_ur }}"
+                            title="Print the Urdu receipt">
+                        <i class="bi bi-printer me-1"></i> Urdu Print
+                    </button>
                 </div>
             </div>
         </div>
@@ -320,6 +363,19 @@
 
     </div><!-- /rcpt-body -->
 
+    <!-- Terms & Conditions (Urdu receipt only) -->
+    {% if bill_lang == 'ur' and selected_terms_ur %}
+    <div class="rcpt-terms">
+        <div class="rcpt-terms-title">{{ 'Terms & Conditions'|bill_label(bill_lang) }}</div>
+        {% for term in selected_terms_ur %}
+        <div class="rcpt-term">
+            <div class="rcpt-term-title">{{ term.title|bill_label(bill_lang) }}</div>
+            <div class="rcpt-term-text"><span class="ur" lang="ur" dir="rtl">{{ term.content_ur }}</span></div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- FOOTER -->
     <div class="rcpt-footer">
         <div class="rcpt-sig-row">
@@ -347,10 +403,20 @@
         <a href="{{ pdf_print_url }}" class="btn btn-outline-warning fw-bold"><i class="bi bi-printer me-1"></i>English Print</a>
     </div>
     <div class="btn-group mt-2 mt-sm-0" role="group" aria-label="Urdu receipt">
-        <a href="{{ pdf_download_url_ur }}" class="btn btn-info fw-bold text-dark"><i class="bi bi-file-earmark-pdf me-1"></i>Urdu PDF</a>
-        <a href="{{ pdf_print_url_ur }}" class="btn btn-outline-info fw-bold"><i class="bi bi-printer me-1"></i>Urdu Print</a>
+        <button type="button" class="btn btn-info fw-bold text-dark" data-urdu-receipt
+                data-action="download" data-download-url="{{ pdf_download_url_ur }}"
+                data-print-url="{{ pdf_print_url_ur }}">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Urdu PDF
+        </button>
+        <button type="button" class="btn btn-outline-info fw-bold" data-urdu-receipt
+                data-action="print" data-download-url="{{ pdf_download_url_ur }}"
+                data-print-url="{{ pdf_print_url_ur }}">
+            <i class="bi bi-printer me-1"></i>Urdu Print
+        </button>
     </div>
 </div>
+
+{% include 'partials/urdu_terms_modal.html' %}
 
 {% if auto_print %}
 <script>

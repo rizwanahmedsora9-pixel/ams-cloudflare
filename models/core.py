@@ -116,6 +116,22 @@ class Settings(db.Model):
     recon_excess_account_id = db.Column(db.Integer, nullable=True)
 
 
+class TermsAndCondition(db.Model):
+    """Terms and conditions that can be printed on Urdu sales receipts.
+
+    Admin users can add, edit, enable/disable and order them from
+    Settings -> Terms & Conditions.  Only active rows are offered on the
+    Urdu receipt print/download dialog, and only the chosen ones are printed.
+    """
+    __tablename__ = 'terms_and_conditions'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False, default='')
+    content_ur = db.Column(db.Text, default='', nullable=False)   # Urdu text printed on the receipt
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=pk_model_now, index=True)
+
+
 class SchemaVersion(db.Model):
     """Tracks database schema version for upgrades."""
     id = db.Column(db.Integer, primary_key=True)

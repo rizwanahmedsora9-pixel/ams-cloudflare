@@ -1,6 +1,7 @@
 """bills — split from sales.py."""
 from ._common import *  # noqa
 from app.services.urdu_names import urdu_name
+from app.services.terms import get_selected_terms
 
 def _material_urdu_names():
     """``{english material name (casefolded): urdu name}`` for printed bills.
@@ -362,6 +363,40 @@ def download_invoice(bill_no):
         lang = 'ur'
     else:
         lang = 'en'
+
+    # Urdu receipts ask before printing/downloading whether terms and
+    # conditions should be shown, and which of them.  A direct link without
+    # the answer lands on a small confirmation screen first; the bill view
+    # page opens the same dialog as a modal so the normal flow is one click.
+    show_terms_ur = False
+    selected_terms_ur = []
+    if lang == 'ur' and 'tc' not in request.args:
+        return render_template(
+            'urdu_terms_confirm.html',
+            bill_no=bill_no,
+            action=action,
+            src=request.args.get('src'),
+            src_id=request.args.get('src_id'),
+            client_code=request.args.get('client_code'),
+            client_name=request.args.get('client_name'),
+            entry_id=request.args.get('entry_id'),
+        )
+
+    if lang == 'ur':
+        tc_raw = (request.args.get('tc') or '').strip().lower()
+        want_tc = tc_raw in ('1', 'yes', 'true', 'on')
+        tc_ids = []
+        for raw in (request.args.get('tc_ids') or '').split(','):
+            raw = raw.strip()
+            if raw:
+                try:
+                    tc_ids.append(int(raw))
+                except ValueError:
+                    pass
+        if want_tc:
+            show_terms_ur = True
+            selected_terms_ur = get_selected_terms(tc_ids)
+
     # Prefer saved Urdu names; otherwise use a best-effort transliteration.
     items = _with_urdu_item_names(items, lang)
     client_name_ur = ''
@@ -424,7 +459,9 @@ def download_invoice(bill_no):
         driver_name_ur=driver_name_ur,
         pk_now=pk_now,
         auto_print=(action == 'print'),
-        bill_lang=lang
+        bill_lang=lang,
+        show_terms_ur=show_terms_ur,
+        selected_terms_ur=selected_terms_ur,
     )
 
     # Keep the two language downloads distinguishable on disk.  The suffix is

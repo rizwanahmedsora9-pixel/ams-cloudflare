@@ -47,6 +47,7 @@ def register_hooks(app):
     from flask_login import current_user
     from models import Client, Material, Service, DeliveryPerson, Settings
     from app.services.backup import _start_hourly_backup_worker, _start_reconcile_worker
+    from app.services.terms import get_active_terms
     from app.services.permissions import _user_can
     from app.services.constants import (
         _AUTO_BACKUP_ENABLED,
@@ -341,6 +342,7 @@ def register_hooks(app):
                         'services': Service.query.filter_by(is_active=True).order_by(Service.name.asc()).all(),
                         'delivery_persons': DeliveryPerson.query.filter_by(is_active=True).order_by(DeliveryPerson.name.asc()).all(),
                         'settings': Settings.query.first(),
+                        'terms': get_active_terms(),
                     }
                     app._dropdown_cache = cache_obj
                 except Exception:

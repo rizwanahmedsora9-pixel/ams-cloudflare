@@ -1,0 +1,124 @@
+{# ===========================================================================
+   Urdu receipt print/download options modal.
+   Opened when the user clicks "Urdu Print" or "Urdu PDF" on a bill view.
+   Asks whether to show Terms & Conditions and which ones; only Urdu receipts
+   get this dialog — English receipts link straight to PDF/print as before.
+   =========================================================================== #}
+<div class="modal fade" id="urduTermsModal" tabindex="-1" aria-labelledby="urduTermsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark border-warning">
+            <div class="modal-header border-warning">
+                <h5 class="modal-title text-warning fw-bold" id="urduTermsModalLabel">
+                    <i class="bi bi-file-earmark-text me-2"></i>Urdu Receipt — Print Options
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-white-50 small">
+                <p class="mb-3 fw-bold text-white">
+                    <bdi dir="rtl">شرائط و ضوابط:</bdi> Display Terms &amp; Conditions on this Urdu receipt?
+                </p>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="urduTc" id="urduTcYes" value="1" checked>
+                    <label class="form-check-label text-white fw-bold" for="urduTcYes">
+                        <i class="bi bi-check-circle text-success me-1"></i> Yes — show terms and conditions
+                    </label>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="urduTc" id="urduTcNo" value="0">
+                    <label class="form-check-label" for="urduTcNo">
+                        <i class="bi bi-dash-circle text-muted me-1"></i> No — print without terms
+                    </label>
+                </div>
+
+                <div id="urduTcOptions" class="mb-3 border rounded p-2 bg-dark-subtle">
+                    <div class="small text-warning fw-bold text-uppercase mb-2">
+                        <i class="bi bi-menu-button-wide me-1"></i> Choose terms to display (Urdu receipt only)
+                    </div>
+                    <div class="list-group list-group-flush small">
+                        {% for term in terms or [] %}
+                        <div class="list-group-item bg-dark text-white border-secondary py-2">
+                            <input class="form-check-input mt-1" type="checkbox" name="urduTcIds" value="{{ term.id }}"
+                                   id="urduTc-{{ term.id }}" checked>
+                            <label class="form-check-label fw-bold d-block mb-1" for="urduTc-{{ term.id }}">
+                                {{ term.title }}
+                            </label>
+                            {% if term.content_ur %}
+                            <div class="text-white-75"><bdi dir="rtl">{{ term.content_ur }}</bdi></div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="list-group-item bg-dark text-white-50 border-secondary py-2">
+                            No terms configured yet — add them in Settings &rarr; Terms &amp; Conditions.
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-outline-warning btn-sm fw-bold me-2" id="urduTcDownload">
+                    <i class="bi bi-file-earmark-pdf me-1"></i> Download Urdu PDF
+                </button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold" id="urduTcPrint">
+                    <i class="bi bi-printer me-1"></i> Print Urdu Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modalEl = document.getElementById('urduTermsModal');
+    if (!modalEl) return;
+    var modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: false });
+
+    var tcYes = document.getElementById('urduTcYes');
+    var tcNo = document.getElementById('urduTcNo');
+    var tcOptions = document.getElementById('urduTcOptions');
+    var downloadBtn = document.getElementById('urduTcDownload');
+    var printBtn = document.getElementById('urduTcPrint');
+
+    tcYes.addEventListener('change', function () {
+        tcOptions.style.display = tcYes.checked ? 'block' : 'none';
+    });
+    tcNo.addEventListener('change', function () {
+        tcOptions.style.display = 'none';
+    });
+
+    function go(action) {
+        var yes = tcYes.checked;
+        var ids = Array.from(
+            tcOptions.querySelectorAll('input[name="urduTcIds"]:checked')
+        ).map(function (cb) { return cb.value; });
+
+        var url = action === 'print' ? printBtn.dataset.printUrl : downloadBtn.dataset.downloadUrl;
+        var sep = url.indexOf('?') === -1 ? '?' : '&';
+        url += sep + 'tc=' + (yes ? '1' : '0');
+        if (yes && ids.length) {
+            url += '&tc_ids=' + ids.join(',');
+        }
+        modal.hide();
+        location.href = url;
+    }
+
+    downloadBtn.addEventListener('click', function () { go('download'); });
+    printBtn.addEventListener('click', function () { go('print'); });
+
+    // Wire up the "Urdu Print" / "Urdu PDF" buttons on this page so they open
+    // the dialog instead of linking straight to the document.
+    document.querySelectorAll('[data-urdu-receipt]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            downloadBtn.dataset.downloadUrl = btn.dataset.downloadUrl || '';
+            printBtn.dataset.printUrl = btn.dataset.printUrl || '';
+            tcYes.checked = true;
+            tcNo.checked = false;
+            tcOptions.style.display = 'block';
+            modal.show();
+        });
+    });
+})();
+</script>

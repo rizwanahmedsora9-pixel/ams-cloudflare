@@ -788,6 +788,7 @@ LABELS = {
     'Company Stamp': 'کمپنی مہر',
     'Receiver / Authorized Sign': 'وصول کنندہ / مجاز دستخط',
     'Authorized Sign': 'مجاز دستخط',
+    'Terms & Conditions': 'شرائط و ضوابط',
     'Attachments': 'منسلکات',
     'No records': 'کوئی ' + _RECORDS + ' نہیں',
     'Active': 'فعال',

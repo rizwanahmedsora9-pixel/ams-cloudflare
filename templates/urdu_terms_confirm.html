@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-warning bg-dark shadow-sm mb-0" style="border-radius: 14px;">
+                <div class="card-header bg-transparent border-warning py-3">
+                    <h5 class="fw-bold text-warning mb-0"><i class="bi bi-file-earmark-text me-2"></i>Urdu Receipt — Print Options</h5>
+                    <div class="small text-white-50 mt-1">Bill: <bdi dir="ltr">{{ bill_no }}</bdi></div>
+                </div>
+                <div class="card-body p-4">
+                    <form method="GET"
+                          action="{{ url_for('download_invoice', bill_no=bill_no, lang='ur', action=action,
+                                              src=src, src_id=src_id, client_code=client_code,
+                                              client_name=client_name, entry_id=entry_id) }}">
+                        <p class="text-white small mb-3">
+                            <bdi dir="rtl" class="fw-bold">شرائط و ضوابط:</bdi> Display Terms &amp; Conditions on this Urdu receipt?
+                        </p>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="tc" id="tcYes" value="1" checked>
+                            <label class="form-check-label text-white fw-bold" for="tcYes">
+                                <i class="bi bi-check-circle text-success me-1"></i> Yes — show terms and conditions
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="tc" id="tcNo" value="0">
+                            <label class="form-check-label text-white-50" for="tcNo">
+                                <i class="bi bi-dash-circle text-muted me-1"></i> No — print without terms
+                            </label>
+                        </div>
+
+                        <div id="tcOptions" class="mb-3 border rounded p-3 bg-dark-subtle">
+                            <div class="small text-warning fw-bold text-uppercase mb-2">
+                                <i class="bi bi-menu-button-wide me-1"></i> Choose terms to display (Urdu receipt only)
+                            </div>
+                            <div class="list-group list-group-flush small">
+                                {% for term in terms %}
+                                <div class="list-group-item bg-dark text-white border-secondary py-2">
+                                    <input class="form-check-input mt-1" type="checkbox" name="tc_ids"
+                                           value="{{ term.id }}" id="tc-{{ term.id }}" checked>
+                                    <label class="form-check-label fw-bold d-block mb-1" for="tc-{{ term.id }}">
+                                        {{ term.title }}
+                                    </label>
+                                    {% if term.content_ur %}
+                                    <div class="text-white-75"><bdi dir="rtl">{{ term.content_ur }}</bdi></div>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <div class="list-group-item bg-dark text-white-50 border-secondary py-2">
+                                    No terms configured yet. Add them in Settings &rarr; Terms &amp; Conditions.
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{{ url_for('view_bill', bill_no=bill_no) }}" class="btn btn-outline-light btn-sm">
+                                <i class="bi bi-x-lg me-1"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-warning btn-sm fw-bold">
+                                {% if action == 'print' %}<i class="bi bi-printer me-1"></i> Print Urdu Receipt
+                                {% else %}<i class="bi bi-file-earmark-pdf me-1"></i> Download Urdu PDF
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
