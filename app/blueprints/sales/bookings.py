@@ -274,7 +274,10 @@ def bookings_page():
     bookings = bookings_pagination.items
     clients = Client.query.filter_by(is_active=True).order_by(Client.name.asc()).all()
     materials = Material.query.filter_by(is_active=True).order_by(Material.name.asc()).all()
-    accounts = Account.query.filter(func.coalesce(Account.is_active, True) == True).order_by(Account.name.asc()).all()
+    accounts = Account.query.filter(
+        func.coalesce(Account.is_active, True) == True,
+        func.lower(func.trim(Account.category)).in_(['cash', 'bank']),
+    ).order_by(Account.name.asc()).all()
     next_auto = peek_next_bill_no(AUTO_BILL_NAMESPACES['BOOKING'])
     return render_template('bookings.html',
                            bookings=bookings,
@@ -304,7 +307,10 @@ def booking_edit_modal(booking_id):
         .first_or_404()
     )
     clients = Client.query.filter_by(is_active=True).order_by(Client.name.asc()).all()
-    accounts = Account.query.filter(func.coalesce(Account.is_active, True) == True).order_by(Account.name.asc()).all()
+    accounts = Account.query.filter(
+        func.coalesce(Account.is_active, True) == True,
+        func.lower(func.trim(Account.category)).in_(['cash', 'bank']),
+    ).order_by(Account.name.asc()).all()
     materials = Material.query.filter_by(is_active=True).order_by(Material.name.asc()).all()
     services = Service.query.filter_by(is_active=True).order_by(Service.name.asc()).all()
     hist_names = {(it.material_name or '').strip().lower() for it in (booking.items or []) if it.material_name}

@@ -231,7 +231,10 @@ def direct_sales_page():
                            services=Service.query.filter_by(is_active=True).order_by(Service.name.asc()).all(),
                            clients=clients,
                            grns=grns,
-                           accounts=Account.query.filter(func.coalesce(Account.is_active, True) == True).order_by(Account.name.asc()).all(),
+                           accounts=Account.query.filter(
+                               func.coalesce(Account.is_active, True) == True,
+                               func.lower(func.trim(Account.category)).in_(['cash', 'bank']),
+                           ).order_by(Account.name.asc()).all(),
                            sale_client_code_by_id=sale_client_code_by_id,
                            booked_client_codes=booked_client_codes,
                            delivery_persons=delivery_persons,

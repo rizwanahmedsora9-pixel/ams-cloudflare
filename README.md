@@ -62,6 +62,37 @@ backups/db/             Daily DB backup files — outside instance/ (git-ignored
 
 `utils/module_loader.py` discovers blueprints at startup.
 
+### Daily reconciliation posts the counted figure
+
+Finalising a day on **Daily Reconciliation** does more than freeze the board: a
+non-zero difference is posted as a paired transfer against a counter account, so
+the real account balance becomes the physically counted figure.
+
+```
+counted less  (shortage)  FBM ──100──▶ Counter Less Account
+counted more  (excess)    Counter Excess Account ──100──▶ FBM
+```
+
+* `app/services/recon_counter.py` is the single writer of those two accounts;
+  they are created on demand and their ids live in `settings`
+  (`recon_less_account_id` / `recon_excess_account_id`).
+* Both legs are ordinary `AccountTransaction` rows, so Σ of all balances never
+  changes — the unexplained part is parked in a named account instead of
+  vanishing. The pair is idempotent (`daydiff:<day>:<account>:<row>:out|in`).
+* The accounts carry `category = 'recon'`. Every money-account filter in the app
+  is `category in ('cash','bank')`, so they never appear on the board, in
+  cash-flow totals or in any payment picker — and manual entries into them are
+  refused.
+* **Unlock** reverses and removes the pair. **Resolve** (differences report,
+  admin + reason) offsets it with a real entry: shortage recovered / written
+  off, excess returned / recognised as income.
+* A finalised day is fixed: *Update Differences* is disabled for it (unlock to
+  correct), and locking an earlier day late re-dates and re-posts the later
+  finalised days so their postings stay truthful.
+* `tools/consistency_report.py` verifies the invariants, and
+  `tools/post_historical_differences.py --dry-run` previews posting days that
+  were finalised before this existed.
+
 ### Custom sidebar
 
 The sidebar is data driven. **Settings → Sidebar Settings** (`/settings/sidebar`)

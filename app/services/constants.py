@@ -120,6 +120,11 @@ DOMAIN_WIPE_REGISTRY = {
         'AccountTransaction',
         # per-account reconciliation history + daily board counts/locks
         'AccountReconciliation',
+        # difference history (holds the counter-account posting links) and the
+        # shift-close snapshots: account-keyed, no FK, so they must be named
+        'CashDayShiftClosePosition',
+        'CashDayShiftClose',
+        'CashDayDifference',
         'CashDayAccountPosition',
         'CashDayLock',
         # drawer

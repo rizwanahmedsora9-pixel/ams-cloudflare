@@ -163,6 +163,50 @@ def _assert_period_open(account_id, posted_at, *, operation="change"):
         )
 
 
+def _locked_day_end(account_id, posted_at):
+    """End of the latest finalised daily-reconciliation day at/after *posted_at*.
+
+    Returns ``None`` when the movement is outside every locked day.  Used by
+    ``_assert_day_open`` so a backdated entry cannot quietly change a closing
+    figure that has already been counted and posted.
+    """
+    try:
+        from models import CashDayLock
+        posted_at = posted_at or pk_now()
+        day = posted_at.date() if hasattr(posted_at, 'date') else posted_at
+        lock = (
+            CashDayLock.query
+            .filter(CashDayLock.lock_date >= day)
+            .order_by(CashDayLock.lock_date.asc())
+            .first()
+        )
+    except Exception:
+        return None
+    if lock is None:
+        return None
+    return datetime.combine(lock.lock_date, time.max)
+
+
+def _assert_day_open(account_id, posted_at, *, operation="change"):
+    """Refuse a movement dated inside a day that was already finalised.
+
+    A finalised day's counted figure is a posted fact: its difference has
+    already moved real money into or out of a counter account.  Accepting a
+    backdated movement would silently invalidate that posting, so it is refused
+    with the same "record it in the open period" wording the reconcile-period
+    guard uses.
+    """
+    if not account_id or posted_at is None:
+        return
+    locked_end = _locked_day_end(account_id, posted_at)
+    if locked_end is not None and posted_at <= locked_end:
+        raise ValueError(
+            f"{locked_end:%Y-%m-%d} is finalised in the daily reconciliation. "
+            f"This entry cannot be {operation} in a locked day; unlock that day "
+            f"first, or record it in the open period instead."
+        )
+
+
 def active_clients():
     return Client.query.filter_by(is_active=True).order_by(Client.name.asc(), Client.id.asc()).all()
 
@@ -431,6 +475,7 @@ def save_client_payment(
         # edit branch has always applied must also hold on the create path,
         # otherwise a post-close receipt silently rewrites a closed period.
         _assert_period_open(payment_account_id, posted, operation="posted")
+        _assert_day_open(payment_account_id, posted, operation="posted")
     if not created:
         accounting_changed = any((
             old["amount"] != float(from_minor(amount_minor)),
@@ -442,8 +487,10 @@ def save_client_payment(
         ))
         if accounting_changed:
             _assert_period_open(old["payment_account_id"], payment.date_posted, operation="edited")
+            _assert_day_open(old["payment_account_id"], payment.date_posted, operation="edited")
             if payment_account_id != old["payment_account_id"]:
                 _assert_period_open(payment_account_id, posted, operation="posted")
+                _assert_day_open(payment_account_id, posted, operation="posted")
 
     payment.client_id = client_obj.id
     payment.client_name = client_obj.name
@@ -514,6 +561,7 @@ def delete_client_payment(payment, actor=None) -> bool:
     if source_type == "MaterialReturn":
         raise ValueError(f"This payment is controlled by Material Return #{source_id}; delete the material return instead.")
     _assert_period_open(payment.payment_account_id, payment.date_posted, operation="deleted")
+    _assert_day_open(payment.payment_account_id, payment.date_posted, operation="deleted")
 
     from app.services.void_rebuild import _set_payment_void_state, rebuild_pending_bills
 
@@ -545,6 +593,7 @@ def restore_client_payment(payment, actor=None) -> bool:
     if source_type == "MaterialReturn":
         raise ValueError(f"This payment is controlled by Material Return #{source_id}; restore the material return instead.")
     _assert_period_open(payment.payment_account_id, payment.date_posted, operation="restored")
+    _assert_day_open(payment.payment_account_id, payment.date_posted, operation="restored")
 
     from app.services.void_rebuild import _set_payment_void_state, rebuild_pending_bills
 
@@ -663,6 +712,7 @@ def save_supplier_payment(
             raise ValueError("The transaction date cannot be in the future.")
     if created:
         _assert_period_open(account.id, posted, operation="posted")
+        _assert_day_open(account.id, posted, operation="posted")
     if not created:
         accounting_changed = any((
             old["amount"] != float(from_minor(amount_minor)),
@@ -672,8 +722,10 @@ def save_supplier_payment(
         ))
         if accounting_changed:
             _assert_period_open(old["payment_account_id"], payment.date_posted, operation="edited")
+            _assert_day_open(old["payment_account_id"], payment.date_posted, operation="edited")
             if account.id != old["payment_account_id"]:
                 _assert_period_open(account.id, posted, operation="posted")
+                _assert_day_open(account.id, posted, operation="posted")
 
     payment.supplier_id = supplier.id
     payment.amount_minor = amount_minor
@@ -727,6 +779,7 @@ def delete_supplier_payment(payment, actor=None) -> bool:
     if source_type:
         raise ValueError(f"This payment is controlled by {source_type} #{source_id}; delete/reverse it there.")
     _assert_period_open(payment.payment_account_id, payment.date_posted, operation="deleted")
+    _assert_day_open(payment.payment_account_id, payment.date_posted, operation="deleted")
     from app.services.accounting import _sync_supplier_payment_accounting
 
     before = _supplier_payment_snapshot(payment)
@@ -754,6 +807,7 @@ def restore_supplier_payment(payment, actor=None) -> bool:
     if source_type:
         raise ValueError(f"This payment is controlled by {source_type} #{source_id}; restore it there.")
     _assert_period_open(payment.payment_account_id, payment.date_posted, operation="restored")
+    _assert_day_open(payment.payment_account_id, payment.date_posted, operation="restored")
     account = db.session.get(Account, payment.payment_account_id) if payment.payment_account_id else None
     if account and _account_minor(account) < abs(to_minor(payment.amount or 0)):
         raise ValueError("Insufficient balance to restore this supplier payment.")

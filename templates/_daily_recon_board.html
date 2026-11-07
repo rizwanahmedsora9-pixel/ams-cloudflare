@@ -74,8 +74,16 @@
   </div>
 
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-    <div class="small text-muted">Differences are reporting only; they do not change financial accounts, sales or profit.</div>
+    <div class="small text-muted">
+      A finalised day posts each difference to a counter account, so the accounts match the count;
+      the difference itself never touches sales or profit.
+    </div>
     <div class="d-flex flex-wrap gap-2">
+      {% if dr.day_lock %}
+      <span class="btn btn-sm btn-outline-secondary disabled" title="Unlock the day to correct its differences">
+        <i class="bi bi-lock me-1"></i>Differences fixed at finalisation
+      </span>
+      {% else %}
       <form method="POST" action="{{ dr_post_action }}">
         <input type="hidden" name="action" value="refresh_differences">
         <input type="hidden" name="day" value="{{ dr.day_str }}">
@@ -83,6 +91,7 @@
         {% if dr.embed %}<input type="hidden" name="return_to" value="{{ dr_return_to }}">{% endif %}
         <button class="btn btn-sm btn-outline-secondary" title="Check saved counts against current transactions, including older days">Update Differences for This Day</button>
       </form>
+      {% endif %}
       <a class="btn btn-sm btn-primary fw-bold" href="{{ url_for('daily_reconciliation_differences') }}"><i class="bi bi-journal-text me-1"></i> Differences Report</a>
     </div>
   </div>
@@ -99,7 +108,7 @@
         <div class="small text-secondary">Final day close by {{ dr.day_lock.locked_by or '—' }} on {{ dr.day_lock.locked_at.strftime('%Y-%m-%d %H:%M') if dr.day_lock.locked_at else '—' }}. Locked counted totals are carried to the next day's opening. {{ dr.shift_closes|length }} shift close checkpoint{{ '' if dr.shift_closes|length == 1 else 's' }} retained below.</div>
       </div>
     </div>
-    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Unlock day {{ dr.day_str }}? Next day openings will revert to ledger.');">
+    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Unlock day {{ dr.day_str }}? Any counter-account posting made when the day was finalised will be reversed, and next day openings revert to the ledger.');">
       <input type="hidden" name="day" value="{{ dr.day_str }}">
       {% if dr.embed %}<input type="hidden" name="return_to" value="{{ dr_return_to }}">{% endif %}
       <button class="btn btn-outline-primary fw-bold" name="action" value="unlock"><i class="bi bi-unlock me-1"></i> Unlock Day</button>
@@ -117,9 +126,12 @@
         <div class="small text-secondary">Record one or more shift closes as staff hand over; finalize the day only after the last shift. {{ dr.shift_closes|length }} shift close checkpoint{{ '' if dr.shift_closes|length == 1 else 's' }} recorded.</div>
       </div>
     </div>
-    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Finalize and lock day {{ dr.day_str }}? This is the final daily close. Locked counted totals become the next day opening balances.');">
+    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Finalize and lock day {{ dr.day_str }}? This is the final daily close. Every difference is posted to the counter accounts (a shortage is sent to {{ dr.counter_less.name if dr.counter_less else 'the Counter Less account' }}, an excess is received from {{ dr.counter_excess.name if dr.counter_excess else 'the Counter Excess account' }}), and the counted totals become the next day opening balances.');">
       <input type="hidden" name="day" value="{{ dr.day_str }}">
       {% if dr.embed %}<input type="hidden" name="return_to" value="{{ dr_return_to }}">{% endif %}
+      <input type="text" name="note" class="form-control form-control-sm me-2" style="max-width:260px;"
+             maxlength="300" placeholder="Reason for any difference"
+             title="Stored on the posting and on every ledger row it creates">
       <button class="btn btn-success fw-bold px-3" name="action" value="lock"><i class="bi bi-file-earmark-check me-1"></i> Finalize &amp; Lock Day</button>
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
     </form>
@@ -193,6 +205,46 @@
     </div></div>
   </div>
 
+  <!-- COUNTER ACCOUNT POSTINGS: where the difference went -->
+  <div class="dr-card p-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-arrow-left-right text-primary me-2"></i>
+        <span class="fw-bold" style="letter-spacing:.4px;">COUNTED DIFFERENCES FOR {{ dr.day_str }}</span>
+      </div>
+      <div class="small text-secondary">
+        A shortage is sent <em>to</em> the counter, an excess is received <em>from</em> it —
+        the running pair is always visible, never hidden in a report.
+      </div>
+    </div>
+    <div class="row g-2 mt-1">
+      <div class="col-md-4">
+        <div class="dr-kpi">
+          <div class="lbl">Counted less (shortage)</div>
+          <div class="val dr-mono text-danger">Rs. {{ "{:,.0f}".format(-(dr.posting.less_total or 0)) }}</div>
+          <div class="small text-muted mt-1">sent to {{ dr.counter_less.name if dr.counter_less else 'Counter Less Account' }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="dr-kpi">
+          <div class="lbl">Counted more (excess)</div>
+          <div class="val dr-mono text-primary">Rs. {{ "{:,.0f}".format(dr.posting.excess_total or 0) }}</div>
+          <div class="small text-muted mt-1">received from {{ dr.counter_excess.name if dr.counter_excess else 'Counter Excess Account' }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="dr-kpi">
+          <div class="lbl">Counter accounts hold now</div>
+          <div class="val dr-mono {% if dr.counter_total == 0 %}text-success{% else %}text-danger{% endif %}">Rs. {{ "{:,.0f}".format(dr.counter_total or 0) }}</div>
+          <div class="small text-muted mt-1">
+            {{ dr.posting.count }} difference{{ '' if dr.posting.count == 1 else 's' }} on this day{% if dr.posting.open_count %} ({{ dr.posting.open_count }} still unexplained){% endif %} ·
+            <a href="{{ url_for('daily_reconciliation_differences') }}">differences report</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ACCOUNT POSITIONS -->
   <div class="dr-card p-3">
     <div class="d-flex align-items-center mb-3">
@@ -242,8 +294,22 @@
             </td>
             <td class="text-end dr-mono" data-dr-field="difference">
               {% if p.effective_counted is not none %}
-                {% if p.difference == 0 %}<span class="dr-badge-recon">0 (RECONCILED)</span>
-                {% else %}<span class="dr-badge-diff">{{ "{:,.0f}".format(p.difference) }}</span>{% endif %}
+                {% set shown_diff = p.posted_difference if p.posted_difference is not none else p.difference %}
+                {% if shown_diff == 0 %}<span class="dr-badge-recon">0 (RECONCILED)</span>
+                {% else %}<span class="dr-badge-diff">{{ "{:,.0f}".format(shown_diff) }}</span>{% endif %}
+                {% if p.posting and p.posting.status == 'posted' and p.posting.difference %}
+                  <div class="small mt-1 text-primary fw-semibold" title="Posted to {{ p.posting.counter_name }} at finalisation">
+                    <i class="bi bi-arrow-left-right me-1"></i>
+                    {{ 'sent to ' if p.posting.difference < 0 else 'received from ' }}{{ p.posting.counter_name }}
+                    · ATX-{{ p.posting.posted_out_tx_id }}
+                  </div>
+                {% elif p.posting and p.posting.status == 'resolved' %}
+                  <div class="small mt-1 text-muted" title="Resolved by {{ p.posting.resolved_by or 'unknown' }}">
+                    <i class="bi bi-check2-circle me-1"></i>Resolved by {{ p.posting.resolved_by or 'unknown' }}
+                  </div>
+                {% elif p.posting and p.posting.status == 'reversed' %}
+                  <div class="small mt-1 text-muted"><i class="bi bi-arrow-counterclockwise me-1"></i>Posting reversed (day reopened)</div>
+                {% endif %}
               {% else %}<span class="text-muted">—</span>{% endif %}
             </td>
             <td class="text-center">

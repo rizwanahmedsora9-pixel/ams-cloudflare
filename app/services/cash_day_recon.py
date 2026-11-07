@@ -17,9 +17,15 @@ is exactly the "locked amount shows as next day opening balances" behaviour.
 Counted amounts are typed by hand, so parsing lives here (``parse_counted_amount``)
 and accepts "160,000"/"Rs. 160000.50"; locked days refuse count changes until
 they are unlocked.
+
+Finalising a day also **posts** each non-zero difference as a paired transfer
+against a counter account (see ``app/services/recon_counter.py``), so the counted
+account's real balance becomes the counted figure instead of the board being the
+only place the number exists.  Unlocking removes the pair again.
 """
 from __future__ import annotations
 
+import logging
 import math
 import re
 from datetime import date, datetime, time, timedelta
@@ -36,6 +42,16 @@ from app.services.cash_flow_svc import (
     CF_DIR_IN, CF_DIR_OUT, CF_DIR_TRANSFER,
     collect_cash_flow_rows, _cf_company_accounts, _cf_account_label,
 )
+
+logger = logging.getLogger(__name__)
+
+#: Ledger rows written by the daily close itself.  They are *consequences* of a
+#: count, never an input to one: if the board counted yesterday's own posting as
+#: today's activity the day would reconcile against itself, and re-locking would
+#: "discover" that the shortage vanished.  Openings still include them (they are
+#: what makes the next day start from the counted figure).
+RECON_SOURCE_TYPES = ("cashdaydifference", "cash_day_difference")
+
 
 def _to_date(value) -> date:
     if isinstance(value, date) and not isinstance(value, datetime):
@@ -137,6 +153,24 @@ def purge_stale_reconciliation_state(*, commit=True):
     if positions_removed:
         db.session.flush()
 
+    # Difference history is account-keyed too: an orphaned row (or one written
+    # before the account now holding that id existed) is residue from a previous
+    # dataset and must never resurface on the report.
+    differences_removed = 0
+    for difference in CashDayDifference.query.all():
+        account = accounts.get(difference.account_id)
+        created = _naive_dt(getattr(account, 'created_at', None))
+        recorded = _naive_dt(getattr(difference, 'recorded_at', None))
+        stale = account is None or (created and recorded and recorded < created and
+                                    _naive_dt(getattr(difference, 'account_created_at', None)) != created)
+        if not stale:
+            continue
+        if difference.posted_status in ('posted', 'reversed'):
+            from app.services import recon_counter
+            recon_counter.reverse_posting(difference, reason='Stale reconciliation row purged')
+        db.session.delete(difference)
+        differences_removed += 1
+
     locks_removed = 0
     existing_locks = CashDayLock.query.all()
     if existing_locks:
@@ -157,7 +191,7 @@ def purge_stale_reconciliation_state(*, commit=True):
             elif lock_day in touched_dates:
                 _refresh_lock_totals(lock)
 
-    if positions_removed or locks_removed:
+    if positions_removed or locks_removed or differences_removed:
         if commit:
             try:
                 db.session.commit()
@@ -171,8 +205,11 @@ def clear_account_reconciliation_state(account_id, *, commit=True) -> int:
     """Remove every Daily Reconciliation row belonging to one account id.
 
     Called when an account is deleted so the id it frees up cannot hand its
-    old counts/locks to whichever account is created next.
+    old counts/locks to whichever account is created next.  The difference
+    history goes with it — including any counter-account posting, which is
+    reversed first so no money is left stranded in a counter account.
     """
+    from app.services import recon_counter
     try:
         account_id = int(account_id)
     except (TypeError, ValueError):
@@ -184,6 +221,13 @@ def clear_account_reconciliation_state(account_id, *, commit=True) -> int:
         .distinct()
         .all()
     }
+    for difference in CashDayDifference.query.filter_by(account_id=account_id).all():
+        if difference.posted_status in (recon_counter.STATUS_POSTED, recon_counter.STATUS_REVERSED):
+            recon_counter.reverse_posting(
+                difference, reason='The counted account was deleted',
+            )
+        db.session.delete(difference)
+
     removed = int(
         CashDayAccountPosition.query.filter_by(account_id=account_id).delete(
             synchronize_session=False
@@ -221,8 +265,13 @@ def _opening_effective_day(account):
     return ob_date.date() if hasattr(ob_date, "date") else ob_date
 
 
-def _movement_minor(account_id, *, after=None, through=None):
-    """(incoming, outgoing) minor units for one account — voided rows excluded."""
+def _movement_minor(account_id, *, after=None, through=None, exclude_recon=False):
+    """(incoming, outgoing) minor units for one account — voided rows excluded.
+
+    ``exclude_recon=True`` drops the ledger rows written by the daily close
+    itself (see ``RECON_SOURCE_TYPES``); openings keep them, because they are the
+    mechanism that carries a counted closing into the next day.
+    """
     amount_expr = func.coalesce(
         AccountTransaction.amount_minor,
         func.round(AccountTransaction.amount * 100.0),
@@ -244,6 +293,11 @@ def _movement_minor(account_id, *, after=None, through=None):
         q = q.filter(AccountTransaction.date_posted > after)
     if through is not None:
         q = q.filter(AccountTransaction.date_posted <= through)
+    if exclude_recon:
+        q = q.filter(or_(
+            AccountTransaction.source_type.is_(None),
+            func.lower(func.trim(AccountTransaction.source_type)).notin_(RECON_SOURCE_TYPES),
+        ))
     incoming, outgoing = q.one()
     return int(round(float(incoming or 0))), int(round(float(outgoing or 0)))
 
@@ -322,6 +376,10 @@ def parse_counted_amount(value, *, field="Counted amount"):
     return _money_round(amount)
 
 
+def _is_recon_posting(row) -> bool:
+    return (row.get("source_type") or "").strip().lower() in RECON_SOURCE_TYPES
+
+
 def _activity_between(from_date: str, to_date: str) -> dict:
     """Per-account movement totals for a date window (inclusive)."""
     act = {}
@@ -330,6 +388,8 @@ def _activity_between(from_date: str, to_date: str) -> dict:
     rows = collect_cash_flow_rows(from_date, to_date)
     for r in rows:
         if (r.get("status") or "active") != "active":
+            continue
+        if _is_recon_posting(r):
             continue
         rtype = r.get("type")
         aid = r.get("account_id")
@@ -387,6 +447,29 @@ def account_positions_for_date(day) -> list:
     # previous day (the same rule ledger_balance() uses on every Accounts
     # screen).  Computing it from the ledger in minor units keeps the board
     # exact instead of drifting a few paisa on float accumulation.
+    # Days are rarely finalised in order.  A late lock posts its difference at
+    # the end of *its own* day, so any already-locked later day must be re-dated
+    # from the ledger — otherwise its frozen counted closing would sit on top of
+    # a movement it never saw.  Cheap no-op when the days are in order.
+    from app.services import recon_counter
+    if locks and any(_to_date(p.position_date) > day for p in locks.values()):
+        moved_days = recon_counter.refresh_forward_lock_openings(day)
+        if moved_days:
+            locks = {
+                p.account_id: p
+                for p in CashDayAccountPosition.query.filter(
+                    CashDayAccountPosition.is_locked.is_(True),
+                    CashDayAccountPosition.position_date < day,
+                    CashDayAccountPosition.account_id.in_([a.id for a in accounts] or [0]),
+                ).order_by(CashDayAccountPosition.position_date.asc()).all()
+                if position_belongs_to_account(p, account_by_id.get(p.account_id))
+            }
+            # A later day whose expected closing moved now shows a different
+            # difference; its posting must follow, or the account would no
+            # longer end that day at what was counted.
+            for moved_day in moved_days:
+                _resync_locked_day(moved_day)
+
     opening_by_acc = {
         acc.id: _money_round(_account_opening(acc, day, locks.get(acc.id)))
         for acc in accounts
@@ -432,6 +515,14 @@ def account_positions_for_date(day) -> list:
             "effective_counted": eff_counted,
             "difference": difference,
             "is_locked": is_locked,
+            "posted_status": getattr(s, "posted_status", None) if s is not None else None,
+            "posted_out_tx_id": getattr(s, "posted_out_tx_id", None) if s is not None else None,
+            "posted_in_tx_id": getattr(s, "posted_in_tx_id", None) if s is not None else None,
+            "posted_difference": (
+                _money_round(getattr(s, "posted_counted", 0) - getattr(s, "posted_expected", 0))
+                if (s is not None and getattr(s, "posted_status", None) in ("posted", "resolved"))
+                else None
+            ),
         })
     return positions
 
@@ -503,7 +594,7 @@ def close_shift(day, shift_name, actor=None, note=""):
             opening = _money_round(p["opening"])
             movement_start = day_start
         incoming_minor, outgoing_minor = _movement_minor(
-            p["account_id"], after=movement_start, through=closed_at
+            p["account_id"], after=movement_start, through=closed_at, exclude_recon=True
         )
         amount_in = _money_round(from_minor(incoming_minor))
         amount_out = _money_round(from_minor(outgoing_minor))
@@ -575,6 +666,19 @@ def _sync_difference(day, account, expected, counted, actor, *, source="live"):
         entry.closed_at = now
         entry.closed_expected = expected
         entry.closed_counted = counted
+        # A difference that was already posted to the counter accounts must not
+        # leave its money parked once it no longer exists: remove the pair in the
+        # same transaction that closes the row.
+        if getattr(entry, "posted_status", None) == "posted":
+            try:
+                from app.services import recon_counter
+                recon_counter.reverse_posting(
+                    entry, actor=actor,
+                    reason=f"Difference closed ({entry.status}) on re-check",
+                )
+            except Exception:
+                logger.exception("Un-posting a superseded difference failed")
+                raise
     if difference:
         db.session.add(CashDayDifference(
             position_date=day, account_id=account.id,
@@ -585,16 +689,48 @@ def _sync_difference(day, account, expected, counted, actor, *, source="live"):
         ))
 
 
-def refresh_differences(day, actor=None):
-    """Explicitly verify saved counts after ledger changes for a selected day."""
+def _resync_locked_day(day):
+    """Re-record (and re-post) the differences of an already-finalised day.
+
+    Called when a late lock changed what an earlier day's expected closing was:
+    the frozen count stays, the derived difference is corrected, and the counter
+    posting is brought in line in the same transaction.
+    """
     day = _to_date(day)
+    for position in account_positions_for_date(day):
+        if position["counted"] is None:
+            continue
+        account = db.session.get(Account, position["account_id"])
+        if account is not None:
+            _sync_difference(day, account, position["expected_closing"],
+                             position["counted"], actor=None, source="relock")
+    db.session.flush()
+    if get_day_lock(day):
+        _post_day_differences(day, note="Re-dated after a later lock")
+
+
+def refresh_differences(day, actor=None):
+    """Explicitly verify saved counts after ledger changes for a selected day.
+
+    A **finalised** day is deliberately left alone: its differences were posted
+    (or resolved) when it was locked, and re-deriving them from the ledger would
+    recreate the very difference the posting exists to explain — and, after a
+    resolve, post it a second time.  Re-checking is for open days only; a
+    changed finalised day is corrected by unlocking it.
+    """
+    day = _to_date(day)
+    if get_day_lock(day):
+        return 0
     positions = account_positions_for_date(day)
+    checked = 0
     for p in positions:
         if p["counted"] is not None:
             account = db.session.get(Account, p["account_id"])
             if account is not None:
                 _sync_difference(day, account, p["expected_closing"], p["counted"], actor)
+                checked += 1
     db.session.commit()
+    return checked
 
 
 def import_saved_differences(actor=None):
@@ -683,6 +819,8 @@ def lock_day(day, actor=None, note=""):
     closing when not manually counted) and a day-level lock row is written.
     The locked counted totals become the next day's opening positions.
     """
+    from app.services import recon_counter
+
     day = _to_date(day)
     actor_name = getattr(actor, "username", None) or actor
     now = pk_now()
@@ -740,17 +878,79 @@ def lock_day(day, actor=None, note=""):
     lock.note = note or ""
     lock.locked_by = actor_name
     lock.locked_at = now
+    db.session.flush()
+
+    # Post every non-zero difference as a paired transfer against the counter
+    # accounts, so the real account balances equal the counted figures.  This is
+    # the same transaction as the lock: either the day is locked *and* posted, or
+    # neither happened.
+    posted, post_messages = _post_day_differences(day, actor=actor, note=note)
+    lock.posted_total = _money_round(sum(posted))
+    # Days finalised out of order: this posting moves the ledger, so any later
+    # day that was already locked has to be re-dated (and re-posted) from it.
+    moved_days = recon_counter.refresh_forward_lock_openings(day)
+    for moved_day in moved_days:
+        if moved_day != day:
+            _resync_locked_day(moved_day)
     db.session.commit()
+    try:
+        lock.posting_messages = post_messages
+    except Exception:  # pragma: no cover - never fail a completed lock
+        pass
     return lock
 
 
-def unlock_day(day):
+def _post_day_differences(day, *, actor=None, note=""):
+    """Post the day's open differences; return ``(amounts, messages)``."""
+    from app.services import recon_counter
+
+    posted, messages = [], []
+    try:
+        rows = recon_counter.postable_differences(day)
+        for row in rows:
+            if not row.difference:
+                continue
+            ok, message = recon_counter.post_difference(
+                row, actor=actor, reason=note or "Daily reconciliation difference",
+            )
+            if ok:
+                posted.append(abs(float(row.difference or 0)))
+                messages.append(message)
+            elif message:
+                messages.append(f'{row.account_name}: {message}')
+    except Exception:
+        logger.exception('Posting daily reconciliation differences failed')
+        raise
+    return posted, messages
+
+
+def unlock_day(day, *, actor=None, reason=""):
+    """Reopen a finalised day.
+
+    The day's differences were posted to the counter accounts at lock time, so
+    they must be removed in the same transaction — otherwise the books would keep
+    a shortage for a day that is no longer finalised.
+    """
+    from app.services import recon_counter
+
     day = _to_date(day)
+    removed = 0
+    for row in CashDayDifference.query.filter(
+        CashDayDifference.position_date == day,
+        CashDayDifference.posted_status.in_(
+            [recon_counter.STATUS_POSTED, recon_counter.STATUS_REVERSED]
+        ),
+    ).all():
+        removed += recon_counter.reverse_posting(
+            row, actor=actor, reason=reason or f'Day {day:%Y-%m-%d} unlocked',
+        )
+
     CashDayAccountPosition.query.filter_by(position_date=day).update({"is_locked": False})
     lock = get_day_lock(day)
     if lock:
         db.session.delete(lock)
     db.session.commit()
+    return removed
 
 
 def delete_count(day, account_id, actor=None):

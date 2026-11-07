@@ -505,6 +505,12 @@ def add_transfer():
             to_account = db.session.get(Account, to_account_id) if to_account_id else None
             if not _is_account_active(from_account) or not _is_account_active(to_account):
                 raise ValueError('Select valid active source and destination accounts.')
+            from app.services.recon_counter import is_counter_account
+            if is_counter_account(from_account) or is_counter_account(to_account):
+                raise ValueError(
+                    'Daily reconciliation counter accounts cannot take manual '
+                    'transfers. Resolve the difference from the differences report.'
+                )
             if from_account.id == to_account.id:
                 raise ValueError('Source and destination accounts cannot be the same.')
             available_minor = int(from_account.balance_minor) if from_account.balance_minor is not None else to_minor(from_account.balance or 0)
@@ -533,7 +539,9 @@ def add_transfer():
             flash(f'Unable to record transfer: {exc}', 'danger')
         return redirect(url_for('accounts.transfers'))
     
-    accounts = _active_accounts().order_by(Account.name.asc(), Account.id.asc()).all()
+    accounts = _active_accounts().filter(
+        func.lower(func.trim(Account.category)).in_(['cash', 'bank'])
+    ).order_by(Account.name.asc(), Account.id.asc()).all()
     return render_template(
         'accounts/add_transfer.html', accounts=accounts,
         account_options=[{'id': a.id, 'label': _account_option_label(a)} for a in accounts],

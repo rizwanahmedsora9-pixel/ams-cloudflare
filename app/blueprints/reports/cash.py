@@ -1038,10 +1038,20 @@ def _dr_build_context(day_value, embed=False):
     prev_str = (datetime.strptime(day_str, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
     next_str = (datetime.strptime(day_str, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
 
+    from app.services import recon_counter
+
+    posting_by_account = recon_counter.difference_summary(day_str)
+    for position in positions:
+        position['posting'] = posting_by_account.get(position['account_id'])
+
     return dict(
         day_str=day_str,
         prev_str=prev_str,
         next_str=next_str,
+        counter_less=recon_counter.counter_accounts()[0],
+        counter_excess=recon_counter.counter_accounts()[1],
+        counter_total=recon_counter.counter_balance_total(),
+        posting=_dr_posting_summary(day_str),
         positions=positions,
         day_lock=day_lock,
         shift_closes=shift_closes,
@@ -1054,6 +1064,49 @@ def _dr_build_context(day_value, embed=False):
         accounts_total=len(positions),
         embed=embed,
     )
+
+
+def _dr_posting_summary(day_str):
+    """What the finalised day's differences did to the counter accounts.
+
+    Plain primitives only — this dict is also handed to ``jsonify`` for the
+    board's AJAX save, so it must never carry ORM objects.
+    """
+    from app.services import recon_counter as rc
+    from models import CashDayDifference
+
+    # Everything the finalised day sent to the counters, resolved or not: the
+    # day's story must not shrink as differences are explained away.  Only a
+    # reopened (reversed) posting leaves this set.
+    rows = (
+        CashDayDifference.query
+        .filter(
+            CashDayDifference.position_date == rc.day_of(day_str),
+            CashDayDifference.posted_status.in_([rc.STATUS_POSTED, rc.STATUS_RESOLVED]),
+        )
+        .order_by(CashDayDifference.id.asc())
+        .all()
+    )
+    less_total = _money_round(sum(float(r.difference or 0) for r in rows if (r.difference or 0) < 0))
+    excess_total = _money_round(sum(float(r.difference or 0) for r in rows if (r.difference or 0) > 0))
+    unresolved = [r for r in rows if r.posted_status == rc.STATUS_POSTED]
+    return {
+        'count': len(rows),
+        'open_count': len(unresolved),
+        'less_total': less_total,
+        'excess_total': excess_total,
+        'net': _money_round(less_total + excess_total),
+        'posted_of_day': _money_round(sum(abs(float(r.difference or 0)) for r in rows)),
+        'rows': [
+            {
+                'id': r.id, 'account_id': r.account_id, 'account_name': r.account_name,
+                'kind': r.kind, 'difference': _money_round(r.difference or 0),
+                'posted_status': r.posted_status,
+                'posted_out_tx_id': r.posted_out_tx_id, 'posted_in_tx_id': r.posted_in_tx_id,
+            }
+            for r in rows
+        ],
+    }
 
 
 def _safe_return_to():
@@ -1120,8 +1173,14 @@ def daily_reconciliation():
                 message = 'Counted balance saved.'
                 status = 'success'
             elif action == 'refresh_differences':
-                recon.refresh_differences(day_str, actor=current_user)
-                message = 'Saved counts checked against current expected balances; differences report updated.'
+                checked = recon.refresh_differences(day_str, actor=current_user)
+                if checked:
+                    message = ('Saved counts checked against current expected balances; '
+                               'differences report updated.')
+                else:
+                    message = (f'Day {day_str} is finalised, so its differences are fixed. '
+                               'Unlock the day to correct them.')
+                    status = 'warning'
             elif action == 'close_shift':
                 shift_close = recon.close_shift(
                     day_str,
@@ -1135,12 +1194,24 @@ def daily_reconciliation():
                 )
                 status = 'success'
             elif action == 'lock':
-                recon.lock_day(day_str, actor=current_user, note=request.form.get('note') or '')
-                message = f'Day {day_str} finalized and locked. Locked totals become the next day opening.'
+                lock = recon.lock_day(day_str, actor=current_user, note=request.form.get('note') or '')
+                posted_messages = getattr(lock, 'posting_messages', None) or []
+                message = (
+                    f'Day {day_str} finalized and locked. '
+                    + (' '.join(posted_messages) + ' ' if posted_messages else '')
+                    + 'Locked totals become the next day opening.'
+                )
                 status = 'success'
             elif action == 'unlock':
-                recon.unlock_day(day_str)
-                message = f'Day {day_str} unlocked.'
+                removed = recon.unlock_day(
+                    day_str, actor=current_user,
+                    reason=request.form.get('note') or '',
+                )
+                message = (
+                    f'Day {day_str} unlocked. '
+                    + (f'{removed} counter-account posting(s) reversed. '
+                       if removed else '')
+                )
                 status = 'warning'
             elif action == 'clear_count':
                 recon.delete_count(day_str, request.form.get('account_id'), actor=current_user)
@@ -1166,6 +1237,7 @@ def daily_reconciliation():
             status = 'danger'
         if wants_json:
             payload = _dr_json_context(day_str)
+            payload['posting'] = _dr_posting_summary(day_str)
             payload.update({'ok': ok, 'message': message, 'error': None if ok else message, 'status': status})
             return jsonify(payload), (200 if ok else 400)
         flash(message, status)
@@ -1178,6 +1250,20 @@ def daily_reconciliation():
         'daily_reconciliation.html',
         dr=_dr_build_context(day_str),
     )
+
+
+@bp.route('/daily_reconciliation/differences/<int:difference_id>/resolve', methods=['POST'])
+@login_required
+def daily_reconciliation_resolve_difference(difference_id):
+    """Resolve one posted difference (its own URL, so the report stays readable)."""
+    from models import CashDayDifference
+
+    difference = db.session.get(CashDayDifference, difference_id)
+    back = url_for('daily_reconciliation_differences')
+    if difference is None:
+        flash('Difference not found.', 'danger')
+        return redirect(back)
+    return _dr_resolve_difference(actor=current_user, difference=difference)
 
 
 @bp.route('/daily_reconciliation/differences', methods=['GET', 'POST'])
@@ -1194,6 +1280,10 @@ def daily_reconciliation_differences():
     every filtered row.  Nothing here writes to the difference history.
     """
     from models import CashDayDifference
+    from app.services import recon_counter
+
+    if request.method == 'POST' and (request.form.get('action') or '') == 'resolve':
+        return _dr_resolve_difference(actor=current_user)
 
     if request.method == 'POST':
         from app.services import cash_day_recon as recon
@@ -1478,7 +1568,82 @@ def daily_reconciliation_differences():
         show_less=f_kind in ('all', 'less'), show_excess=f_kind in ('all', 'excess'),
         summary=summary, account_summary=account_summary,
         account_options=account_options,
-        filter_args=filter_args, active_labels=active_labels)
+        filter_args=filter_args, active_labels=active_labels,
+        counter_less=recon_counter.counter_accounts()[0],
+        counter_excess=recon_counter.counter_accounts()[1],
+        counter_total=recon_counter.counter_balance_total(),
+        open_posted_total=recon_counter.open_difference_total(),
+        resolution_kinds=recon_counter.RESOLUTION_KINDS,
+        can_resolve=_dr_can_resolve(),
+        counterpart_accounts=_dr_resolution_accounts())
+
+
+def _dr_can_resolve():
+    """Only an operator who may finalise a day may resolve its differences."""
+    role = (getattr(current_user, 'role', '') or '').strip().lower()
+    if role in ('admin', 'root'):
+        return True
+    return bool(getattr(current_user, 'can_manage_accounts', False))
+
+
+def _dr_resolution_accounts():
+    """Accounts that can absorb a resolved difference (never a counter account)."""
+    from app.services.recon_counter import RECON_CATEGORY
+    return (
+        Account.query
+        .filter(
+            func.coalesce(Account.is_active, True) == True,  # noqa: E712
+            func.lower(func.trim(Account.category)) != RECON_CATEGORY,
+        )
+        .order_by(Account.name.asc(), Account.id.asc())
+        .all()
+    )
+
+
+def _dr_resolve_difference(*, actor=None, difference=None):
+    """Close a *posted* difference by posting what really happened to the money.
+
+    A finalised day's closing is a fact, so resolving never rewrites the count:
+    it offsets the counter account with a real, attributed entry.
+    """
+    from app.services import recon_counter
+    from models import CashDayDifference
+
+    if difference is not None:
+        row = difference
+    else:
+        diff_id = request.form.get('difference_id', type=int)
+        row = db.session.get(CashDayDifference, diff_id) if diff_id else None
+    back = url_for('daily_reconciliation_differences')
+    if not _dr_can_resolve():
+        flash('Only an administrator can resolve a difference.', 'danger')
+        return redirect(back)
+    if row is None:
+        flash('Difference not found.', 'danger')
+        return redirect(back)
+    try:
+        counterpart = request.form.get('counterpart_account_id', type=int)
+        tx = recon_counter.resolve_difference(
+            row,
+            kind=request.form.get('resolution_kind'),
+            counterpart=counterpart,
+            note=request.form.get('resolution_note') or '',
+            actor=actor,
+        )
+        db.session.commit()
+        flash(
+            f'Difference resolved: Rs. {abs(float(row.difference or 0)):,.2f} '
+            f'({recon_counter.counter_name_for(row.kind)}) offset by entry '
+            f'ATX-{tx.id}.', 'success'
+        )
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'danger')
+    except Exception:
+        db.session.rollback()
+        logger.exception('Resolving a daily reconciliation difference failed')
+        flash('Unable to resolve the difference. Please try again.', 'danger')
+    return redirect(request.form.get('return_to') or back)
 
 
 def _ft_date_preset(preset, today):

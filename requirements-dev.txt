@@ -2,3 +2,6 @@
 -r requirements-full.txt
 pytest>=8.0,<9.0
 pypdf>=4.0,<6.0
+# Rasterises the generated Urdu invoice PDF so the receipt-layout tests can measure
+# ink bands (tests/test_urdu_receipt_layout.py skips them when it is absent).
+pymupdf>=1.24

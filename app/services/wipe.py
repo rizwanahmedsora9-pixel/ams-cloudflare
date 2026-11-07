@@ -137,6 +137,28 @@ def purge_daily_reconciliation_state(session=None):
         logging.getLogger('wipe').warning(
             'Daily reconciliation lock purge skipped', exc_info=True
         )
+    # Difference history (and its counter-account posting links) is account-keyed
+    # with no FK: leaving it behind would show old discrepancies against a fresh
+    # set of accounts, and the posted_transaction ids would point at deleted rows.
+    # Each posted pair is reversed first, so its money leaves the counter accounts
+    # with the rest of the board state instead of being stranded there.
+    try:
+        from app.services.recon_counter import STATUS_POSTED, STATUS_REVERSED, reverse_posting
+
+        for difference in s.query(CashDayDifference).all():
+            if difference.posted_status in (STATUS_POSTED, STATUS_REVERSED):
+                reverse_posting(difference, reason='Daily reconciliation data wiped')
+        s.flush()
+    except Exception:
+        logging.getLogger('wipe').warning(
+            'Daily reconciliation posting reversal skipped', exc_info=True
+        )
+    try:
+        s.query(CashDayDifference).delete(synchronize_session=False)
+    except Exception:
+        logging.getLogger('wipe').warning(
+            'Daily reconciliation difference purge skipped', exc_info=True
+        )
     logging.getLogger('wipe').info(
         'Daily reconciliation state cleared: %s positions, %s day locks', positions, locks
     )
@@ -465,7 +487,7 @@ def _wipe_dataset_preview_map():
         'invoices': {'label': 'Invoices', 'tables': ['invoice'], 'queries': [('invoice', q(Invoice))]},
         'payments': {'label': 'Payments', 'tables': ['payment', 'waive_off', 'pending_bill'], 'queries': [('payment', q(Payment)), ('waive_off', q(WaiveOff))]},
         'bookings': {'label': 'Bookings', 'tables': ['booking_item', 'booking', 'pending_bill'], 'queries': [('booking_item', q(BookingItem)), ('booking', q(Booking))]},
-        'accounts': {'label': 'Financial Accounts', 'tables': ['account', 'account_transaction', 'account_reconciliation', 'fbm_cash_drawer_entry', 'fbm_cash_drawer_category', 'cash_flow_entry', 'cash_flow_entry_audit', 'cash_flow_difference_adjustment', 'cash_flow_reconciliation_audit', 'cash_day_shift_close_position', 'cash_day_shift_close', 'cash_day_account_position', 'cash_day_lock'], 'queries': [('account', q(Account)), ('account_transaction', q(AccountTransaction)), ('account_reconciliation', q(AccountReconciliation)), ('cash_day_shift_close_position', q(CashDayShiftClosePosition)), ('cash_day_shift_close', q(CashDayShiftClose)), ('cash_day_account_position', q(CashDayAccountPosition)), ('cash_day_lock', q(CashDayLock)), ('fbm_cash_drawer_entry', q(FbmCashDrawerEntry))]},
+        'accounts': {'label': 'Financial Accounts', 'tables': ['account', 'account_transaction', 'account_reconciliation', 'fbm_cash_drawer_entry', 'fbm_cash_drawer_category', 'cash_flow_entry', 'cash_flow_entry_audit', 'cash_flow_difference_adjustment', 'cash_flow_reconciliation_audit', 'cash_day_shift_close_position', 'cash_day_shift_close', 'cash_day_difference', 'cash_day_account_position', 'cash_day_lock'], 'queries': [('account', q(Account)), ('account_transaction', q(AccountTransaction)), ('account_reconciliation', q(AccountReconciliation)), ('cash_day_shift_close_position', q(CashDayShiftClosePosition)), ('cash_day_shift_close', q(CashDayShiftClose)), ('cash_day_difference', q(CashDayDifference)), ('cash_day_account_position', q(CashDayAccountPosition)), ('cash_day_lock', q(CashDayLock)), ('fbm_cash_drawer_entry', q(FbmCashDrawerEntry))]},
         'account_categories': {'label': 'Account Categories', 'tables': ['account_category'], 'queries': [('account_category', q(AccountCategory))]},
         'cash_drawer_entries': {'label': 'Cash Drawer Entries', 'tables': ['fbm_cash_drawer_entry'], 'queries': [('fbm_cash_drawer_entry', q(FbmCashDrawerEntry))]},
         'cash_drawer_categories': {'label': 'Cash Drawer Categories', 'tables': ['fbm_cash_drawer_category'], 'queries': [('fbm_cash_drawer_category', q(FbmCashDrawerCategory))]},
@@ -473,7 +495,7 @@ def _wipe_dataset_preview_map():
         'account_reconciliations': {'label': 'Account Reconciliations', 'tables': ['account_reconciliation'], 'queries': [('account_reconciliation', q(AccountReconciliation))]},
         'cash_flow_entries': {'label': 'Cash Flow Entries', 'tables': ['cash_flow_entry', 'cash_flow_entry_audit'], 'queries': [('cash_flow_entry', q(CashFlowEntry)), ('cash_flow_entry_audit', q(CashFlowEntryAudit))]},
         'cash_flow_categories': {'label': 'Cash Flow Categories & Parties', 'tables': ['cash_flow_category', 'cash_flow_subcategory', 'cash_flow_party'], 'queries': [('cash_flow_category', q(CashFlowCategory)), ('cash_flow_subcategory', q(CashFlowSubcategory)), ('cash_flow_party', q(CashFlowParty))]},
-        'daily_reconciliation': {'label': 'Daily & Shift Reconciliation', 'tables': ['cash_day_shift_close_position', 'cash_day_shift_close', 'cash_day_account_position', 'cash_day_lock'], 'queries': [('cash_day_shift_close_position', q(CashDayShiftClosePosition)), ('cash_day_shift_close', q(CashDayShiftClose)), ('cash_day_account_position', q(CashDayAccountPosition)), ('cash_day_lock', q(CashDayLock))]},
+        'daily_reconciliation': {'label': 'Daily & Shift Reconciliation', 'tables': ['cash_day_shift_close_position', 'cash_day_shift_close', 'cash_day_difference', 'cash_day_account_position', 'cash_day_lock'], 'queries': [('cash_day_shift_close_position', q(CashDayShiftClosePosition)), ('cash_day_shift_close', q(CashDayShiftClose)), ('cash_day_difference', q(CashDayDifference)), ('cash_day_account_position', q(CashDayAccountPosition)), ('cash_day_lock', q(CashDayLock))]},
         'cash_reconciliation_data': {'label': 'Cash Reconciliation Data', 'tables': ['cash_flow_difference_adjustment'], 'queries': [('cash_flow_difference_adjustment', q(CashFlowDifferenceAdjustment))]},
         'cash_reconciliation_audit': {'label': 'Cash Audit Trail', 'tables': ['cash_flow_reconciliation_audit'], 'queries': [('cash_flow_reconciliation_audit', q(CashFlowReconciliationAudit))]},
         'delivery_person_payments': {'label': 'Driver Payments', 'tables': ['delivery_person_payment'], 'queries': [('delivery_person_payment', q(DeliveryPersonPayment))]},

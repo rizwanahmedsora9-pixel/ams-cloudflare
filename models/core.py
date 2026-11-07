@@ -108,6 +108,12 @@ class Settings(db.Model):
     google_access_token = db.Column(db.String(1000))
     google_token_expiry = db.Column(db.String(50))
     google_sender_email = db.Column(db.String(200))
+    # Ids of the two "counter" accounts that hold unexplained daily-count
+    # differences (see app/services/recon_counter.py).  Stored here so no code
+    # depends on their names, and so they can be renamed or replaced without a
+    # migration.
+    recon_less_account_id = db.Column(db.Integer, nullable=True)
+    recon_excess_account_id = db.Column(db.Integer, nullable=True)
 
 
 class SchemaVersion(db.Model):

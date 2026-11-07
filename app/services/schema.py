@@ -634,8 +634,29 @@ def _backfill_accounting_integrity_columns():
         logging.getLogger(__name__).exception('Accounting integrity metadata backfill failed')
 
 
-def _ensure_account_type_compat():
+def _ensure_recon_counter_classification():
+    """Keep the daily-reconciliation counter accounts out of the cash/bank flows.
+
+    They are ordinary ``Account`` rows (that is what makes the paired posting a
+    real ledger movement), but their ``category`` must stay ``recon`` — every
+    money-account filter in the app is ``category in ('cash','bank')``, so the
+    value is what keeps them off the daily board and out of every payment picker.
+    A legacy ``account_type``/``type`` sync or an import could rewrite it.
     """
+    try:
+        db.session.execute(text(
+            "UPDATE account SET category = 'recon', class_subcategory = 'Reconciliation Clearing' "
+            "WHERE LOWER(TRIM(COALESCE(account_type, ''))) = 'recon_counter' "
+            "OR LOWER(TRIM(COALESCE(type, ''))) = 'recon_counter'"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+def _ensure_account_type_compat():
+    """Kept for compatibility; also re-pins the reconciliation counter category.
+
     Keep legacy `account.type` and newer `account.account_type` consistent.
     Some existing DBs enforce NOT NULL on `account.type`.
     """
@@ -655,6 +676,7 @@ def _ensure_account_type_compat():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    _ensure_recon_counter_classification()
 
 
 def _ensure_direct_sale_idempotency_index():
@@ -788,6 +810,25 @@ _PERFORMANCE_INDEXES = [
     # makes a second commit impossible even under a race.
     ("uq_grn_manual_bill_no",      "CREATE UNIQUE INDEX IF NOT EXISTS uq_grn_manual_bill_no ON grn(manual_bill_no) WHERE manual_bill_no IS NOT NULL AND TRIM(manual_bill_no) <> ''"),
 ]
+
+
+def _ensure_daydiff_posting_index():
+    """DB-level duplicate guard for daily-reconciliation counter postings.
+
+    Each posting leg carries a deterministic ``idempotency_key``
+    (``daydiff:<day>:<account>:<row>:out|in``).  The application checks it
+    first; this partial unique index makes a duplicate commit impossible even if
+    two operators finalise the same day at the same moment.
+    """
+    try:
+        db.session.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_account_tx_daydiff_key "
+            "ON account_transaction(idempotency_key) "
+            "WHERE idempotency_key LIKE 'daydiff:%'"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _ensure_performance_indexes():
@@ -1053,6 +1094,7 @@ def _bootstrap_database():
         pass
     try:
         _ensure_performance_indexes()
+        _ensure_daydiff_posting_index()
     except Exception:
         pass
     try:
