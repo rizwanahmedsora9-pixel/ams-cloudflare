@@ -2,8 +2,9 @@
 
 These pin the three defects users report on an Urdu bill:
 
-* the Urdu receipt date must read ``شام 05:31 06 نومبر 2026`` with the
-  figures in the requested order and the pieces of the line not touching;
+* the Urdu receipt date must read ``05:31 شام 06 نومبر 2026`` - the English
+  order, written right to left, so the clock sits nearest the right edge - with
+  the figures in the requested order and the pieces of the line not touching;
 * a phone number / account number / amount sat on the wrong side or in the
   middle of the sheet, because every figure line was treated as right-to-left;
 * ``مینول بل:`` and ``MB NO.9102`` (and ``06`` / ``نومبر``) collided because
@@ -88,21 +89,30 @@ def test_amount_line_keeps_figure_left_of_the_urdu_label():
 # ---------------------------------------------------------------------------
 
 def test_date_line_uses_the_requested_urdu_reading_order():
-    """``شام 04:15 06 نومبر 2026`` starts at the right edge of the sheet."""
-    para = _para(_urdu('شام '), _latin('04:15 '), _latin('06 '),
+    """``04:15 شام 06 نومبر 2026`` starts at the right edge of the sheet."""
+    para = _para(_latin('04:15 '), _urdu('شام '), _latin('06 '),
                  _urdu('نومبر '), _latin('2026'))
     assert para._line_flags == [True]
     # The renderer's physical left-to-right placement reverses the RTL groups.
-    # Reading from the right edge gives: شام → time → day → month → year.
+    # Reading from the right edge gives: time → شام → day → month → year, the
+    # same sequence the English bill reads from its own left edge.
     assert [(flag, text.strip()) for flag, text in _runs(para)] == [
         (False, '2026'), (True, 'نومبر'), (False, '06'),
-        (False, '04:15'), (True, 'شام'),
+        (True, 'شام'), (False, '04:15'),
     ]
+
+
+def test_time_is_the_run_nearest_the_right_edge():
+    """The line opens with the clock, never with the صبح/شام label."""
+    para = _para(_latin('04:15 '), _urdu('شام '), _latin('06 '),
+                 _urdu('نومبر '), _latin('2026'))
+    rightmost = para._lines[0][-1]          # last physical run == right edge
+    assert rightmost.text().strip() == '04:15'
 
 
 def test_date_breaks_into_whole_words_never_fragments():
     """Wrapped, the date must split between runs - the words stay whole."""
-    para = _para(_urdu('شام '), _latin('04:15 '), _latin('06 '),
+    para = _para(_latin('04:15 '), _urdu('شام '), _latin('06 '),
                  _urdu('نومبر '), _latin('2026'), width=44)
     assert len(para._lines) > 1
     pieces = ' '.join(
@@ -298,6 +308,74 @@ def test_receipt_date_is_one_line(urdu_receipt_pdf):
     assert len(tall) >= 3
     for top, bottom, left, right in text_band_list(header):
         assert right - left > 12, 'a fragment of a line was left stranded'
+
+
+def _date_figures(pdf_bytes):
+    """``{kind: (x0, x1)}`` of the clock / day / year on the receipt date line.
+
+    The Nastaleeq runs of the line are drawn as private-use glyph ids, which
+    text extraction cannot read, so the guard works on the three figure groups
+    the date is built from - all of them Latin.  PDF text extraction splits a
+    Nastaleeq run and the Latin run of one visual line into two records, so
+    the pieces are gathered by *vertical overlap* with the clock instead of by
+    the extractor's own line grouping.
+    """
+    import re
+
+    import pymupdf
+
+    clock = re.compile(r'\d{1,2}:\d{2}')
+    spans = []
+    for block in pymupdf.open('pdf', pdf_bytes)[0].get_text('dict')['blocks']:
+        for line in block.get('lines', []):
+            spans.extend(line['spans'])
+
+    times = [s for s in spans if clock.fullmatch(s['text'].strip())]
+    if not times:
+        return {}
+    clock_span = times[0]
+    top, bottom = clock_span['bbox'][1], clock_span['bbox'][3]
+
+    def on_the_line(span):
+        y0, y1 = span['bbox'][1], span['bbox'][3]
+        overlap = min(bottom, y1) - max(top, y0)
+        return overlap > 0.5 * (y1 - y0)
+
+    found = {}
+    for span in spans:
+        if not on_the_line(span):
+            continue
+        text = span['text'].strip()
+        if clock.fullmatch(text):
+            found['time'] = span['bbox']
+        elif re.fullmatch(r'\d{1,2}', text):
+            found['day'] = span['bbox']
+        elif re.fullmatch(r'\d{4}', text):
+            found['year'] = span['bbox']
+    return found
+
+
+def test_urdu_date_is_written_right_to_left_on_the_page(urdu_receipt_pdf):
+    """The clock must be the item nearest the right edge of the date line.
+
+    The Urdu bill says the same thing the English one says - time, AM/PM, day,
+    month, year - only written the other way.  Checking the ink, not the
+    markup, is what pins both the browser print view and the saved PDF: the
+    date line used to be pinned ``direction: ltr``, so the receipt opened with
+    ``شام`` and the year landed on the right.
+    """
+    figures = _date_figures(urdu_receipt_pdf)
+    assert {'time', 'day', 'year'} <= set(figures), figures
+
+    # Right-to-left means each following piece sits further LEFT than the one
+    # before it: time > day > year.
+    assert figures['time'][0] > figures['day'][2], (
+        f"the day is not left of the clock: {figures}")
+    assert figures['day'][0] > figures['year'][2], (
+        f"the year is not left of the day: {figures}")
+    # Nothing of the date line may stick out past the time on its right.
+    right_edge = max(box[2] for box in figures.values())
+    assert figures['time'][2] == pytest.approx(right_edge, abs=0.5)
 
 
 def text_band_list(bands):
