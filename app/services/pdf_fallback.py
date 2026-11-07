@@ -36,10 +36,15 @@ from app.services.pdf_layout import (
 
 log = logging.getLogger(__name__)
 
-# Same geometry the WeasyPrint path forces: 14.8cm x 21cm with 1cm margins.
+# Same geometry the WeasyPrint path and the browser print stylesheet use:
+# A5 portrait (14.8cm x 21cm) with 10mm top/bottom and 8mm left/right margins.
+# One geometry for all three views is what keeps "print" and "download PDF"
+# from drifting apart.
 PAGE_WIDTH_CM = 14.8
 PAGE_HEIGHT_CM = 21.0
-MARGIN_CM = 1.0
+MARGIN_X_CM = 0.8
+MARGIN_Y_CM = 1.0
+MARGIN_CM = MARGIN_X_CM          # kept for backwards compatibility
 
 # Block-level tags that terminate the current inline run.
 _BLOCK_TAGS = {
@@ -260,7 +265,7 @@ def _build_story(blocks, body_font, bold_font, small_size):
                 data.append(out[:width])
             if not data:
                 continue
-            tbl = Table(data, colWidths=[(PAGE_WIDTH_CM - 2 * MARGIN_CM) * 28.35 / width] * width)
+            tbl = Table(data, colWidths=[(PAGE_WIDTH_CM - 2 * MARGIN_X_CM) * 28.35 / width] * width)
             tbl.setStyle(TableStyle([
                 ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#9aa0a6')),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -269,13 +274,21 @@ def _build_story(blocks, body_font, bold_font, small_size):
     return story
 
 
-def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
+def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report',
+                       margin_x_cm=None, margin_y_cm=None):
     """Render *html* into a real PDF.  Returns bytes, or ``None`` on failure.
+
+    ``margin_x_cm`` / ``margin_y_cm`` are the page margins the template asked
+    for in its own ``@page`` rule.  Honouring them is what makes the downloaded
+    PDF sit on the same sheet as the browser's print preview: bills print edge
+    to edge (``margin: 0``) while statements ask for ``10mm 8mm``.
 
     Raises nothing: callers fall back to their own behaviour when this returns
     ``None``, but the intent is that this path succeeds wherever ReportLab is
     importable, so a PDF is always delivered.
     """
+    margin_x = MARGIN_X_CM if margin_x_cm is None else max(float(margin_x_cm), 0.0)
+    margin_y = MARGIN_Y_CM if margin_y_cm is None else max(float(margin_y_cm), 0.0)
     try:
         from reportlab.lib.units import cm
         from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
@@ -309,7 +322,7 @@ def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
         except Exception:
             pass
 
-        usable_width = (PAGE_WIDTH_CM - 2 * MARGIN_CM) * cm
+        usable_width = (PAGE_WIDTH_CM - 2 * margin_x) * cm
 
         # Layout the real DOM instead of a flattened text stream, so flex
         # headers, summary boxes, receipt footers and table geometry survive.
@@ -327,23 +340,30 @@ def render_html_to_pdf(html, download_name='document.pdf', title='AMS Report'):
         pagesize = (PAGE_WIDTH_CM * cm, PAGE_HEIGHT_CM * cm)
         doc = BaseDocTemplate(
             buf, pagesize=pagesize, title=title,
-            leftMargin=MARGIN_CM * cm, rightMargin=MARGIN_CM * cm,
-            topMargin=MARGIN_CM * cm, bottomMargin=MARGIN_CM * cm,
+            leftMargin=margin_x * cm, rightMargin=margin_x * cm,
+            topMargin=margin_y * cm, bottomMargin=margin_y * cm,
         )
         frame = Frame(
-            MARGIN_CM * cm, MARGIN_CM * cm,
-            (PAGE_WIDTH_CM - 2 * MARGIN_CM) * cm,
-            (PAGE_HEIGHT_CM - 2 * MARGIN_CM) * cm,
+            margin_x * cm, margin_y * cm,
+            (PAGE_WIDTH_CM - 2 * margin_x) * cm,
+            (PAGE_HEIGHT_CM - 2 * margin_y) * cm,
             id='main',
         )
 
+        # A running footer needs room below the frame.  Templates that print
+        # edge to edge (bills, receipts: ``@page { margin: 0 }``) have none, so
+        # the footer is dropped there rather than stamped over the content.
+        footer = margin_y >= 0.6
+
         def _decorate(canv, _doc):
+            if not footer:
+                return
             canv.saveState()
             canv.setFont(body_font, 6.5)
             canv.setFillColorRGB(0.35, 0.35, 0.35)
-            canv.drawString(MARGIN_CM * cm, 0.55 * cm, title)
+            canv.drawString(margin_x * cm, 0.45 * cm, title)
             canv.drawRightString(
-                (PAGE_WIDTH_CM - MARGIN_CM) * cm, 0.55 * cm,
+                (PAGE_WIDTH_CM - margin_x) * cm, 0.45 * cm,
                 f'Page {_doc.page}',
             )
             canv.restoreState()

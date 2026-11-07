@@ -7,19 +7,13 @@ def client_ledger(id):
     client = db.session.get(Client, id)
     if client:
         page = request.args.get('page', 1, type=int)
-        client_name_norm = (client.name or '').strip().lower()
-        entry_filter = or_(
-            Entry.client_code == client.code,
-            func.lower(func.trim(Entry.client)) == client_name_norm
-        )
+        # The on-screen Material Ledger, the printed sheet and the PDF must all
+        # report the same figures, so the filter and the summary live in one
+        # place (app.services.ledgers) and every view calls them.
+        entry_filter = client_material_entry_filter(client)
         pagination = Entry.query.filter(entry_filter, Entry.is_void == False).order_by(
             Entry.date.desc()).paginate(page=page, per_page=10)
-        summary_query = db.session.query(
-            Entry.material,
-            func.sum(case((Entry.type == 'IN', Entry.qty), else_=-Entry.qty)).label('total')
-        ).filter(entry_filter, Entry.is_void == False, Entry.type.in_(['IN', 'OUT'])).group_by(Entry.material).all()
-        summary = {row.material: row.total for row in summary_query}
-        total_qty = sum(float(v or 0) for v in summary.values())
+        summary, total_qty = client_material_summary(client)
 
         pending_photos = {
             b.bill_no: b.photo_url
@@ -39,4 +33,3 @@ def client_ledger(id):
                                clients=clients,
                                materials=materials)
     return redirect(url_for('clients'))
-

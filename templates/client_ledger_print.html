@@ -150,8 +150,14 @@
             <a href="{{ url_for('download_client_ledger', id=client.id) }}" class="btn btn-warning btn-sm fw-bold text-dark">
                 <i class="bi bi-file-earmark-pdf"></i> PDF
             </a>
+            <a href="{{ url_for('download_client_ledger', id=client.id, lang='ur') }}" class="btn btn-outline-warning btn-sm fw-bold">
+                <i class="bi bi-file-earmark-pdf"></i> Urdu PDF
+            </a>
             <a href="{{ url_for('download_client_ledger', id=client.id, action='print') }}" class="btn btn-success btn-sm fw-bold">
                 <i class="bi bi-printer"></i> Print
+            </a>
+            <a href="{{ url_for('download_client_ledger', id=client.id, action='print', lang='ur') }}" class="btn btn-outline-success btn-sm fw-bold">
+                <i class="bi bi-printer"></i> Urdu Print
             </a>
         </div>
     </div>
@@ -285,37 +291,57 @@
         </table>
         {% endif %}
 
-        <!-- Material Transactions -->
-        {% if material_history_grouped %}
-        <div class="rcpt-section-title">Material Transaction Ledger</div>
+        <!-- Material Summary — same rows/figures as the on-screen Material Ledger -->
+        {% if material_summary %}
+        <div class="rcpt-section-title">Material Summary</div>
+        <table class="rcpt-table">
+            <thead>
+                <tr>
+                    <th class="text-start">Material</th>
+                    <th class="text-end" style="width:95px;">Net Qty (IN - OUT)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mat_name, qty in material_summary.items()|sort %}
+                <tr>
+                    <td>{{ mat_name }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(qty or 0) }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="font-weight:900;">
+                    <td>Net material position</td>
+                    <td class="text-end">{{ "{:,.2f}".format(material_total_qty or 0) }}</td>
+                </tr>
+            </tbody>
+        </table>
+        {% endif %}
+
+        <!-- Movement History — the same columns the web page shows -->
+        {% if movement_rows %}
+        <div class="rcpt-section-title">Movement History</div>
         <table class="rcpt-table">
             <thead>
                 <tr>
                     <th class="text-start" style="width:55px;">Date</th>
-                    <th class="text-start" style="width:65px;">Bill #</th>
+                    <th class="text-start" style="width:38px;">Time</th>
                     <th class="text-start">Material</th>
-                    <th class="text-end" style="width:55px;">Added</th>
-                    <th class="text-end" style="width:65px;">Dispatched</th>
-                    <th class="text-end" style="width:65px;">Balance</th>
+                    <th class="text-start" style="width:52px;">Type</th>
+                    <th class="text-end" style="width:52px;">Qty</th>
+                    <th class="text-start" style="width:65px;">Bill No</th>
+                    <th class="text-start" style="width:80px;">Notes</th>
                 </tr>
             </thead>
             <tbody>
-                {% for material_name, items in material_history_grouped.items() %}
-                    {% for m in items %}
-                    <tr>
-                        <td>{{ m.date or '' }}</td>
-                        <td class="bill-no {{ '' if m.bill_no else 'text-center' }}">{{ m.bill_no or '-' }}</td>
-                        <td>
-                            {{ m.material_display or material_name }}
-                            {% if m.note %}
-                            <div style="font-size:8.5px; color:#444; font-weight:600;">Note: {{ m.note }}</div>
-                            {% endif %}
-                        </td>
-                        <td class="{{ 'text-end' if (m.qty_added or 0) > 0 else 'text-center' }}">{{ "{:,.2f}".format(m.qty_added or 0) if (m.qty_added or 0) > 0 else '-' }}</td>
-                        <td class="{{ 'text-end' if (m.qty_dispatched or 0) > 0 else 'text-center' }}">{{ "{:,.2f}".format(m.qty_dispatched or 0) if (m.qty_dispatched or 0) > 0 else '-' }}</td>
-                        <td class="text-end">{{ "{:,.2f}".format(m.balance or 0) }}</td>
-                    </tr>
-                    {% endfor %}
+                {% for m in movement_rows %}
+                <tr>
+                    <td>{{ m.date or '' }}</td>
+                    <td>{{ m.time or '' }}</td>
+                    <td>{{ m.material_display or m.material or '' }}</td>
+                    <td>{{ m.type or '-' }}</td>
+                    <td class="text-end">{{ "{:,.2f}".format(m.qty or 0) }}</td>
+                    <td class="bill-no {{ '' if m.bill_no else 'text-center' }}">{{ m.bill_no or '-' }}</td>
+                    <td>{{ m.note or '' }}</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -347,6 +373,7 @@
     <a href="javascript:history.back()" class="btn btn-dark fw-bold me-2">Go Back</a>
     <a href="{{ url_for('download_client_ledger', id=client.id, action='print') }}" class="btn btn-success fw-bold"><i class="bi bi-printer me-1"></i>Print</a>
     <a href="{{ url_for('download_client_ledger', id=client.id) }}" class="btn btn-warning fw-bold text-dark ms-2"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+    <a href="{{ url_for('download_client_ledger', id=client.id, lang='ur') }}" class="btn btn-outline-warning fw-bold ms-2"><i class="bi bi-file-earmark-pdf me-1"></i>Urdu PDF</a>
 </div>
 
 {% if auto_print %}
