@@ -317,8 +317,9 @@ def _date_figures(pdf_bytes):
     text extraction cannot read, so the guard works on the three figure groups
     the date is built from - all of them Latin.  PDF text extraction splits a
     Nastaleeq run and the Latin run of one visual line into two records, so
-    the pieces are gathered by *vertical overlap* with the clock instead of by
-    the extractor's own line grouping.
+    the pieces are gathered by *vertical overlap* instead of by the
+    extractor's own line grouping, and the clock is the one that shares its
+    band with a four-digit year - that pair is the date and nothing else.
     """
     import re
 
@@ -330,29 +331,34 @@ def _date_figures(pdf_bytes):
         for line in block.get('lines', []):
             spans.extend(line['spans'])
 
-    times = [s for s in spans if clock.fullmatch(s['text'].strip())]
-    if not times:
-        return {}
-    clock_span = times[0]
-    top, bottom = clock_span['bbox'][1], clock_span['bbox'][3]
+    def band_of(span):
+        """The spans that share a visual line with *span*."""
+        top, bottom = span['bbox'][1], span['bbox'][3]
+        out = []
+        for other in spans:
+            y0, y1 = other['bbox'][1], other['bbox'][3]
+            overlap = min(bottom, y1) - max(top, y0)
+            if overlap > 0.5 * (y1 - y0):
+                out.append(other)
+        return out
 
-    def on_the_line(span):
-        y0, y1 = span['bbox'][1], span['bbox'][3]
-        overlap = min(bottom, y1) - max(top, y0)
-        return overlap > 0.5 * (y1 - y0)
-
-    found = {}
     for span in spans:
-        if not on_the_line(span):
+        if not clock.fullmatch(span['text'].strip()):
             continue
-        text = span['text'].strip()
-        if clock.fullmatch(text):
-            found['time'] = span['bbox']
-        elif re.fullmatch(r'\d{1,2}', text):
-            found['day'] = span['bbox']
-        elif re.fullmatch(r'\d{4}', text):
-            found['year'] = span['bbox']
-    return found
+        line = band_of(span)
+        if not any(re.fullmatch(r'\d{4}', s['text'].strip()) for s in line):
+            continue
+        found = {}
+        for member in line:
+            text = member['text'].strip()
+            if clock.fullmatch(text):
+                found['time'] = member['bbox']
+            elif re.fullmatch(r'\d{1,2}', text):
+                found['day'] = member['bbox']
+            elif re.fullmatch(r'\d{4}', text):
+                found['year'] = member['bbox']
+        return found
+    return {}
 
 
 def test_urdu_date_is_written_right_to_left_on_the_page(urdu_receipt_pdf):
