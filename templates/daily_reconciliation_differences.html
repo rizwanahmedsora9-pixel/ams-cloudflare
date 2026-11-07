@@ -8,6 +8,11 @@
   .diff-table th { background:#f8fafc; color:#64748b; font-size:11px; text-transform:uppercase; white-space:nowrap; }
   .diff-settled { background:#f1f5f9 !important; color:#64748b; }
   .diff-settled td { background:#f1f5f9 !important; color:#64748b; }
+  .diff-tile { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px 16px; height:100%; }
+  .diff-tile .diff-tile-label { color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; }
+  .diff-tile .diff-tile-value { font-size:20px; font-weight:800; }
+  .diff-summary-table { font-size:13px; }
+  .diff-summary-table th { background:#f8fafc; color:#64748b; font-size:11px; text-transform:uppercase; white-space:nowrap; }
 </style>
 <div class="diff-page">
   <div class="diff-header p-4 mb-3">
@@ -23,16 +28,114 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <button class="btn btn-sm btn-outline-primary">Import Existing Counts</button>
     </form>
-    <form method="get" class="d-flex flex-wrap align-items-end gap-2 mt-3">
-      <div><label class="small fw-semibold" for="from_date">From date</label><input class="form-control form-control-sm" id="from_date" type="date" name="from_date" value="{{ from_date }}"></div>
-      <div><label class="small fw-semibold" for="to_date">To date</label><input class="form-control form-control-sm" id="to_date" type="date" name="to_date" value="{{ to_date }}"></div>
-      <button class="btn btn-sm btn-primary">Filter</button><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('daily_reconciliation_differences') }}">Clear</a>
+    <form method="get" class="mt-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="preset">Date range</label>
+          <select class="form-select form-select-sm" id="preset" name="preset">
+            <option value="custom" {% if preset == 'custom' %}selected{% endif %}>Custom range</option>
+            <option value="today" {% if preset == 'today' %}selected{% endif %}>Today</option>
+            <option value="yesterday" {% if preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+            <option value="last_7" {% if preset == 'last_7' %}selected{% endif %}>Last 7 days</option>
+            <option value="last_30" {% if preset == 'last_30' %}selected{% endif %}>Last 30 days</option>
+            <option value="this_month" {% if preset == 'this_month' %}selected{% endif %}>This month</option>
+            <option value="all" {% if preset == 'all' %}selected{% endif %}>All dates</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="from_date">From date</label><input class="form-control form-control-sm" id="from_date" type="date" name="from_date" value="{{ from_date }}"></div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="to_date">To date</label><input class="form-control form-control-sm" id="to_date" type="date" name="to_date" value="{{ to_date }}"></div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="kind">Less / Excess</label>
+          <select class="form-select form-select-sm" id="kind" name="kind">
+            <option value="all" {% if f_kind == 'all' %}selected{% endif %}>Less + Excess</option>
+            <option value="less" {% if f_kind == 'less' %}selected{% endif %}>Less only (shortage)</option>
+            <option value="excess" {% if f_kind == 'excess' %}selected{% endif %}>Excess only</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="status">Status</label>
+          <select class="form-select form-select-sm" id="status" name="status">
+            <option value="all" {% if f_status == 'all' %}selected{% endif %}>All statuses</option>
+            <option value="open" {% if f_status == 'open' %}selected{% endif %}>Open</option>
+            <option value="settled" {% if f_status == 'settled' %}selected{% endif %}>Settled</option>
+            <option value="superseded" {% if f_status == 'superseded' %}selected{% endif %}>Superseded</option>
+            <option value="cleared" {% if f_status == 'cleared' %}selected{% endif %}>Cleared</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="account_id">Account</label>
+          <select class="form-select form-select-sm" id="account_id" name="account_id">
+            <option value="">All accounts</option>
+            {% for option in account_options %}<option value="{{ option.id }}" {% if f_account_id == option.id %}selected{% endif %}>{{ option.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="recorded_by">Recorded by</label><input class="form-control form-control-sm" id="recorded_by" type="text" name="recorded_by" value="{{ f_recorded_by }}" placeholder="e.g. Admin"></div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="source">Source</label>
+          <select class="form-select form-select-sm" id="source" name="source">
+            <option value="all" {% if f_source == 'all' %}selected{% endif %}>All sources</option>
+            <option value="live" {% if f_source == 'live' %}selected{% endif %}>Live counts</option>
+            <option value="imported" {% if f_source == 'imported' %}selected{% endif %}>Imported snapshots</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="amount_min">Min difference (Rs.)</label><input class="form-control form-control-sm" id="amount_min" type="text" inputmode="decimal" name="amount_min" value="{{ amount_min }}" placeholder="e.g. 500"></div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="amount_max">Max difference (Rs.)</label><input class="form-control form-control-sm" id="amount_max" type="text" inputmode="decimal" name="amount_max" value="{{ amount_max }}" placeholder="Any"></div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="q">Search</label><input class="form-control form-control-sm" id="q" type="search" name="q" value="{{ f_q }}" placeholder="Account or person"></div>
+        <div class="col-6 col-md-3 col-xl-2"><label class="small fw-semibold" for="sort">Sort by</label>
+          <select class="form-select form-select-sm" id="sort" name="sort">
+            <option value="newest" {% if f_sort == 'newest' %}selected{% endif %}>Newest recorded</option>
+            <option value="oldest" {% if f_sort == 'oldest' %}selected{% endif %}>Oldest recorded</option>
+            <option value="day_newest" {% if f_sort == 'day_newest' %}selected{% endif %}>Newest day</option>
+            <option value="day_oldest" {% if f_sort == 'day_oldest' %}selected{% endif %}>Oldest day</option>
+            <option value="largest" {% if f_sort == 'largest' %}selected{% endif %}>Largest difference</option>
+            <option value="smallest" {% if f_sort == 'smallest' %}selected{% endif %}>Smallest difference</option>
+          </select>
+        </div>
+        <div class="col-12 col-xl-auto d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Apply Filters</button>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('daily_reconciliation_differences') }}">Clear</a>
+          <a class="btn btn-sm btn-outline-success" href="{{ url_for('daily_reconciliation_differences', export_csv=1, **filter_args) }}"><i class="bi bi-filetype-csv me-1"></i>Export CSV</a>
+        </div>
+      </div>
     </form>
+    {% if active_labels %}
+    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+      <span class="small fw-semibold text-muted">Filters applied:</span>
+      {% for label in active_labels %}<span class="badge bg-primary-subtle text-primary-emphasis border">{{ label }}</span>{% endfor %}
+      <span class="small text-muted">{{ summary.total }} matching record{{ '' if summary.total == 1 else 's' }}</span>
+    </div>
+    {% endif %}
   </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-xl-3"><div class="diff-tile"><div class="diff-tile-label text-danger">Less · Shortage</div><div class="diff-tile-value text-danger">Rs. {{ '{:,.2f}'.format(summary.less_total) }}</div><div class="small text-muted">{{ summary.less_count }} record{{ '' if summary.less_count == 1 else 's' }} in filtered view</div></div></div>
+    <div class="col-6 col-xl-3"><div class="diff-tile"><div class="diff-tile-label text-primary">Excess</div><div class="diff-tile-value text-primary">Rs. {{ '{:,.2f}'.format(summary.excess_total) }}</div><div class="small text-muted">{{ summary.excess_count }} record{{ '' if summary.excess_count == 1 else 's' }} in filtered view</div></div></div>
+    <div class="col-6 col-xl-3"><div class="diff-tile"><div class="diff-tile-label">Net Difference</div><div class="diff-tile-value {% if summary.net < 0 %}text-danger{% elif summary.net > 0 %}text-primary{% endif %}">Rs. {{ '{:,.2f}'.format(summary.net) }}</div><div class="small text-muted">Excess minus shortage</div></div></div>
+    <div class="col-6 col-xl-3"><div class="diff-tile"><div class="diff-tile-label text-warning">Still Open</div><div class="diff-tile-value">Rs. {{ '{:,.2f}'.format(summary.open_total) }}</div><div class="small text-muted">{{ summary.open_count }} unresolved record{{ '' if summary.open_count == 1 else 's' }}</div></div></div>
+  </div>
+
+  {% if account_summary %}
+  <section class="diff-card mb-3">
+    <div class="p-3"><h5 class="fw-bold mb-1">Summary by Account</h5><span class="small text-muted">Filtered totals per account — click an account to see only its differences.</span></div>
+    <div class="table-responsive"><table class="table diff-summary-table align-middle mb-0">
+      <thead><tr><th>Account</th><th class="text-end">Less</th><th class="text-end">Less Rs.</th><th class="text-end">Excess</th><th class="text-end">Excess Rs.</th><th class="text-end">Net Rs.</th><th class="text-end">Open</th></tr></thead>
+      <tbody>
+      {% for row in account_summary %}
+        <tr>
+          <td><a href="{{ row.filter_url }}">{{ row.account_name }}</a><div class="small text-muted">{{ row.total }} record{{ '' if row.total == 1 else 's' }}</div></td>
+          <td class="text-end">{{ row.less_count }}</td>
+          <td class="text-end text-danger fw-semibold">Rs. {{ '{:,.2f}'.format(row.less_total) }}</td>
+          <td class="text-end">{{ row.excess_count }}</td>
+          <td class="text-end text-primary fw-semibold">Rs. {{ '{:,.2f}'.format(row.excess_total) }}</td>
+          <td class="text-end fw-bold {% if row.net < 0 %}text-danger{% elif row.net > 0 %}text-primary{% endif %}">Rs. {{ '{:,.2f}'.format(row.net) }}</td>
+          <td class="text-end">{% if row.open_count %}<span class="badge bg-warning text-dark">{{ row.open_count }} OPEN</span>{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endif %}
+
   {% for title, card, kind in [('Less Counted Transactions', less, 'less'), ('Excess Counted Transactions', excess, 'excess')] %}
+  {% if (kind == 'less' and show_less) or (kind == 'excess' and show_excess) %}
   <section class="diff-card mb-3">
     <div class="p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <div><h5 class="fw-bold mb-1">{{ title }}</h5><span class="small text-muted">{{ card.total }} record{{ '' if card.total == 1 else 's' }} · newest first</span></div>
+      <div><h5 class="fw-bold mb-1">{{ title }}</h5><span class="small text-muted">{{ card.total }} record{{ '' if card.total == 1 else 's' }} · {{ sort_label }}</span></div>
       <span class="badge {% if kind == 'less' %}bg-danger{% else %}bg-primary{% endif %}">{{ 'SHORTAGE' if kind == 'less' else 'EXCESS' }}</span>
     </div>
     <div class="table-responsive"><table class="table diff-table align-middle mb-0">
@@ -50,16 +153,27 @@
             {% if item.closed_counted is not none %}<div class="small">New expected: Rs. {{ '{:,.2f}'.format(item.closed_expected) }}<br>New count: Rs. {{ '{:,.2f}'.format(item.closed_counted) }}</div>{% endif %}
             {% endif %}</td>
         </tr>
-      {% else %}<tr><td colspan="6" class="text-center text-muted py-4">No {{ 'less counted' if kind == 'less' else 'excess counted' }} differences found.</td></tr>{% endfor %}
+      {% else %}<tr><td colspan="6" class="text-center text-muted py-4">No {{ 'less counted' if kind == 'less' else 'excess counted' }} differences match these filters.</td></tr>{% endfor %}
       </tbody>
     </table></div>
     <div class="p-3 d-flex justify-content-between align-items-center small">
       <span>Page {{ card.page }} of {{ card.pages }}</span><div class="d-flex gap-2">
-      {% if card.page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('daily_reconciliation_differences', from_date=from_date, to_date=to_date, less_page=(card.page-1 if kind == 'less' else less.page), excess_page=(card.page-1 if kind == 'excess' else excess.page)) }}">Previous</a>{% endif %}
-      {% if card.page < card.pages %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('daily_reconciliation_differences', from_date=from_date, to_date=to_date, less_page=(card.page+1 if kind == 'less' else less.page), excess_page=(card.page+1 if kind == 'excess' else excess.page)) }}">Next</a>{% endif %}
+      {% if card.page > 1 %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('daily_reconciliation_differences', less_page=(card.page-1 if kind == 'less' else less.page), excess_page=(card.page-1 if kind == 'excess' else excess.page), **filter_args) }}">Previous</a>{% endif %}
+      {% if card.page < card.pages %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('daily_reconciliation_differences', less_page=(card.page+1 if kind == 'less' else less.page), excess_page=(card.page+1 if kind == 'excess' else excess.page), **filter_args) }}">Next</a>{% endif %}
       </div>
     </div>
   </section>
+  {% endif %}
   {% endfor %}
 </div>
+<script>
+  // Editing a date by hand means the range is custom again, not a preset.
+  (function () {
+    var preset = document.getElementById('preset');
+    ['from_date', 'to_date'].forEach(function (id) {
+      var input = document.getElementById(id);
+      if (input && preset) input.addEventListener('change', function () { preset.value = 'custom'; });
+    });
+  })();
+</script>
 {% endblock %}
