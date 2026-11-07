@@ -1,5 +1,0 @@
-{
- "label": "post-restore-regression",
- "started": "2026-11-04T06:42:51.464829+00:00",
- "contribution": "4 known defect(s) still reproduce: KF-005, KF-007, KF-008 \u00b7 31/31 write paths ok"
-}
