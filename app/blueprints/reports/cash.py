@@ -1119,6 +1119,9 @@ def daily_reconciliation():
                 )
                 message = 'Counted balance saved.'
                 status = 'success'
+            elif action == 'refresh_differences':
+                recon.refresh_differences(day_str, actor=current_user)
+                message = 'Saved counts checked against current expected balances; differences report updated.'
             elif action == 'close_shift':
                 shift_close = recon.close_shift(
                     day_str,
@@ -1140,7 +1143,7 @@ def daily_reconciliation():
                 message = f'Day {day_str} unlocked.'
                 status = 'warning'
             elif action == 'clear_count':
-                recon.delete_count(day_str, request.form.get('account_id'))
+                recon.delete_count(day_str, request.form.get('account_id'), actor=current_user)
                 message = 'Counted balance cleared.'
                 status = 'warning'
             else:
@@ -1175,6 +1178,52 @@ def daily_reconciliation():
         'daily_reconciliation.html',
         dr=_dr_build_context(day_str),
     )
+
+
+@bp.route('/daily_reconciliation/differences', methods=['GET', 'POST'])
+@login_required
+def daily_reconciliation_differences():
+    """Reporting-only discrepancy snapshots, with independent card pagination."""
+    from models import CashDayDifference
+
+    if request.method == 'POST':
+        from app.services import cash_day_recon as recon
+        try:
+            count = recon.import_saved_differences(actor=current_user)
+            flash(f'Imported {count} current saved-count difference(s). Earlier edits cannot be reconstructed.', 'success')
+        except Exception:
+            db.session.rollback()
+            logger.exception('Importing saved daily differences failed')
+            flash('Unable to import saved differences. Please try again.', 'danger')
+        return redirect(url_for('daily_reconciliation_differences'))
+
+    from_date = (request.args.get('from_date') or '').strip()
+    to_date = (request.args.get('to_date') or '').strip()
+    for value in (from_date, to_date):
+        if value:
+            try:
+                datetime.strptime(value, '%Y-%m-%d')
+            except ValueError:
+                abort(400, 'Invalid date filter.')
+    if from_date and to_date and from_date > to_date:
+        abort(400, 'From date must not be after to date.')
+
+    def card(kind, page_name):
+        page = max(1, request.args.get(page_name, 1, type=int) or 1)
+        q = CashDayDifference.query.filter_by(kind=kind)
+        if from_date:
+            q = q.filter(CashDayDifference.position_date >= date.fromisoformat(from_date))
+        if to_date:
+            q = q.filter(CashDayDifference.position_date <= date.fromisoformat(to_date))
+        total = q.count()
+        pages = max(1, (total + 9) // 10)
+        page = min(page, pages)
+        rows = q.order_by(CashDayDifference.recorded_at.desc(), CashDayDifference.id.desc()).offset((page - 1) * 10).limit(10).all()
+        return dict(rows=rows, total=total, page=page, pages=pages)
+
+    return render_template('daily_reconciliation_differences.html',
+        less=card('less', 'less_page'), excess=card('excess', 'excess_page'),
+        from_date=from_date, to_date=to_date)
 
 
 def _ft_date_preset(preset, today):

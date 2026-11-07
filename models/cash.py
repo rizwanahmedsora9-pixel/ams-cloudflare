@@ -427,3 +427,30 @@ class CashDayAccountPosition(db.Model):
         UniqueConstraint('position_date', 'account_id', name='uq_cash_day_position'),
     )
 
+
+
+class CashDayDifference(db.Model):
+    """Reporting-only history of discrepancies in the daily board.
+
+    These rows are deliberately not Account or AccountTransaction records.
+    Amounts are snapshots; a changed discrepancy closes the old snapshot and
+    creates a new one. There are no user-facing edit or delete operations.
+    """
+    __tablename__ = 'cash_day_difference'
+    id = db.Column(db.Integer, primary_key=True)
+    position_date = db.Column(db.Date, nullable=False, index=True)
+    account_id = db.Column(db.Integer, nullable=False, index=True)
+    account_created_at = db.Column(db.DateTime)
+    account_name = db.Column(db.String(100), nullable=False)
+    kind = db.Column(db.String(10), nullable=False, index=True)  # less / excess
+    expected = db.Column(db.Float, nullable=False)
+    counted = db.Column(db.Float, nullable=False)
+    difference = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(16), nullable=False, default='open', index=True)
+    source = db.Column(db.String(16), nullable=False, default='live')
+    recorded_by = db.Column(db.String(80))
+    recorded_at = db.Column(db.DateTime, nullable=False, default=pk_model_now, index=True)
+    closed_by = db.Column(db.String(80))
+    closed_at = db.Column(db.DateTime)
+    closed_expected = db.Column(db.Float)
+    closed_counted = db.Column(db.Float)
