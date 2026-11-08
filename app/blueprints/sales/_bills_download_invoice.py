@@ -357,6 +357,9 @@ def download_invoice(bill_no):
 
     action = (request.args.get('action') or 'download').lower()
     disposition = 'inline' if action in ['print', 'view'] else 'attachment'
+    # Carbon copy: an Urdu receipt prints twice on one A4 leaf by default
+    # (original + office copy).  ?copies=1 asks for a single A5 sheet.
+    copies = 1 if (request.args.get('copies') or '').strip() == '1' else 2
     # Bills are single-language documents: ?lang=en (default) or ?lang=ur.
     lang = (request.args.get('lang') or 'en').strip().lower()
     if lang in ('ur', 'urdu', 'urd'):
@@ -375,6 +378,7 @@ def download_invoice(bill_no):
             'urdu_terms_confirm.html',
             bill_no=bill_no,
             action=action,
+            copies=copies,
             src=request.args.get('src'),
             src_id=request.args.get('src_id'),
             client_code=request.args.get('client_code'),
@@ -427,8 +431,10 @@ def download_invoice(bill_no):
         tx_note = urdu_tx_note(tx_note)
         # An Urdu bill is its own document (app/services/urdu_receipt.py), not
         # the English receipt with swapped labels: it has its own sheet,
-        # header, panel, table and footer, and the print view is that same
-        # sheet.  Both "Urdu PDF" and "Urdu Print" return it here.
+        # header, meta strip, panel, table, summary and terms.  It is also a
+        # carbon copy by default - the same A5 receipt twice on one A4 leaf,
+        # original for the customer and copy for the office.  Both "Urdu PDF"
+        # and "Urdu Print" return it here.
         return _urdu_bill_response(
             bill_type=bill_type,
             bill=bill_obj,
@@ -445,6 +451,7 @@ def download_invoice(bill_no):
             grn_bd=grn_bd,
             action=action,
             disposition=disposition,
+            copies=copies,
         )
     section_map = {
         'Booking': 'BOOKING',
@@ -521,7 +528,9 @@ def download_invoice(bill_no):
 # this route only collects the bill's data and hands it over.  Keeping the
 # document out of ``view_bill.html`` is deliberate: the Urdu sheet must not
 # inherit the English receipt's layout (or its black rules, ``INVOICE`` badge
-# and English table header) when a label is translated.
+# and English table header) when a label is translated.  The sheet is composed
+# onto paper here too: ``copies=2`` (default) lays the receipt out twice on one
+# A4 landscape leaf, ``copies=1`` prints a single A5 page.
 
 _URDU_SECTION = {
     'Booking': 'BOOKING',
@@ -536,8 +545,13 @@ _URDU_SECTION = {
 def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
                         client_balance, delivery_people, driver_name_ur,
                         client_name_ur, transaction_label, transaction_note,
-                        terms, grn_bd, action, disposition):
-    """Return the Urdu bill as a PDF (download) or as the print page."""
+                        terms, grn_bd, action, disposition, copies=2):
+    """Return the Urdu bill as a PDF (download) or as the print page.
+
+    ``copies`` is the carbon-copy switch: 2 (the default) prints the same A5
+    receipt twice on one A4 landscape leaf - original for the customer on the
+    right, office copy on the left - and 1 prints a single A5 sheet.
+    """
     from app.services import bill_urdu
     from app.services.files_pdf import _safe_download_name
     from app.services.time_money import pk_now
@@ -571,7 +585,7 @@ def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
 
     if action == 'print':
         html = bill_urdu.render_html(document, title=title,
-                                     auto_print=False)
+                                     auto_print=False, copies=copies)
         response = make_response(html)
         name = _safe_download_name(f'{section}-{stamp}-UR.html', 'bill-ur.html')
         response.headers['Content-Disposition'] = f'{disposition}; filename={name}'
@@ -579,12 +593,12 @@ def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return response
 
-    data = bill_urdu.render_pdf(document, title=title)
+    data = bill_urdu.render_pdf(document, title=title, copies=copies)
     if not data:
         # ReportLab is a hard dependency of the PDF path; if it is missing the
         # printable page is still a correct Urdu bill, so serve that instead of
         # an error.
-        html = bill_urdu.render_html(document, title=title)
+        html = bill_urdu.render_html(document, title=title, copies=copies)
         response = make_response(html)
         name = _safe_download_name(f'{section}-{stamp}-UR.html', 'bill-ur.html')
         response.headers['Content-Disposition'] = f'{disposition}; filename={name}'

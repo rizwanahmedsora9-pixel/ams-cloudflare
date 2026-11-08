@@ -10,3 +10,12 @@ flask-weasyprint>=0.6,<1.0
 uharfbuzz>=0.30
 arabic-reshaper>=3.0
 python-bidi>=0.4
+# fontTools builds the PUA-mapped copy of the Jameel Noori face that ReportLab
+# needs (glyph-id -> U+F0000+gid).  Without it the Urdu runs are drawn as
+# glyph ids the unmodified cmap does not contain and silently disappear from
+# the PDF, which is why it is a hard requirement of the Urdu sheet.
+fonttools>=4.40
+# The Urdu sheet prints a QR of the bill on every copy.  segno is pure Python,
+# so it installs everywhere ReportLab does; without it the QR block is left
+# blank and the rest of the sheet is unaffected.
+segno>=1.5,<2.0

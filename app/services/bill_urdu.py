@@ -6,12 +6,16 @@ figure printed here is read from the bill exactly as stored - the module never
 recomputes a total, so the Urdu sheet cannot disagree with the ledger.
 
 The sheet is the *only* Urdu bill the app produces: "Urdu PDF" and "Urdu
-Print" both render this document, so what is previewed is what prints.
+Print" both render this document, so what is previewed is what prints.  It is
+printed as a carbon copy by default - the same A5 receipt twice on one A4
+landscape leaf, ``اصل`` (customer) on the right and ``نقل`` (office) on the
+left - and as a single A5 page when ``copies=1``.
 """
 from __future__ import annotations
 
 from app.services import urdu_receipt as R
 from app.services.bilingual import LABELS, _URDU_TX
+from app.services.urdu_names import urdu_name
 
 # Labels used by the Urdu sheet, in the sheet's own words.  They are collected
 # here (not inline) so a wording change happens in one place.
@@ -20,9 +24,9 @@ L_DATE = 'تاریخ'
 L_TIME = 'وقت'
 L_PHONE = 'فون'
 L_CODE = 'کوڈ'
-L_ITEMS = 'آئٹمز'
+L_ITEMS = 'ٹرانزیکشن کی تفصیلات'
 L_COL_INDEX = 'نمبر'
-L_COL_NAME = 'تفصیل / میٹیریل'
+L_COL_NAME = 'تفصیل / آئٹم'
 L_COL_QTY = 'مقدار'
 L_COL_RATE = 'ریٹ'
 L_COL_AMOUNT = 'رقم (روپے)'
@@ -36,10 +40,7 @@ L_BALANCE_AFTER = 'بقایا رقم'
 L_SUPPLIER = 'سپلائر'
 L_PARTY = 'بل برائے'
 L_TERMS = 'شرائط و ضوابط'
-L_STAMP = 'کمپنی مہر'
-L_SIGN = 'وصول کنندہ / مجاز دستخط'
-L_THANKS = 'آپ کے کاروبار کا شکریہ'
-L_CREDIT = 'سافٹ ویئر: اے ایم ایس سسٹم فار ایز'
+L_SIGN = 'مجاز دستخط'
 
 # Shop note shown in the strip above the party block.  Settings can override
 # it; this is the wording of the approved sheet.
@@ -58,6 +59,16 @@ _PAYMENT_METHOD_UR = {
 }
 
 _RECEIPT_TYPES = {'Payment', 'Receipt', 'Receipts'}
+
+# The short word the meta strip prints between the date and the bill number.
+_TYPE_LABEL = {
+    'DirectSale': 'Sale',
+    'Booking': 'Booking',
+    'Payment': 'Payment',
+    'Invoice': 'Invoice',
+    'GRN': 'GRN',
+    'PendingBill': 'Pending',
+}
 
 
 def _money(value):
@@ -146,7 +157,7 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
     if bank:
         rows.append(('بینک', bank))
     if account_name:
-        rows.append(('اکاؤنٹ کا نام', account_name))
+        rows.append(('اکاؤنٹ', account_name))
     account_no = (getattr(bill, 'account_no', '') or '').strip()
     if account_no:
         rows.append(('اکاؤنٹ نمبر', account_no))
@@ -155,8 +166,7 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
     if not people and driver_name_ur:
         people = [driver_name_ur]
     if people:
-        label = 'ڈلیوری پرسن' if len(people) == 1 else 'ڈلیوری پرسنز'
-        rows.append((label, '، '.join(people)))
+        rows.append(('ڈیلیوری', '، '.join(people)))
     return rows[:4]
 
 
@@ -211,11 +221,38 @@ def _summary_rows(bill_type, amount, paid, discount, previous):
     return rows
 
 
+def _panel_fields(bill_type, party_label, party_name, party_code, detail_rows):
+    """The four inline fields of the info panel, in the sheet's order.
+
+    Reading right to left the approved bill prints: bill-to, delivery, code,
+    account.  A payment receipt has no delivery, so its method fills the slot
+    instead.  Four is the panel's width - anything after that is dropped
+    rather than pushed under the next field.
+    """
+    fields = []
+    if party_name:
+        fields.append((party_label or L_PARTY, party_name))
+    rows = [r for r in (detail_rows or []) if r and r[1]]
+    delivery = [r for r in rows if r[0].startswith('ڈیلیوری')]
+    account = [r for r in rows if r[0] in ('اکاؤنٹ', 'بینک', 'اکاؤنٹ نمبر')]
+    method = [r for r in rows if r[0] == 'ادائیگی']
+    rest = [r for r in rows
+            if r not in delivery and r not in account and r not in method]
+    fields.extend(delivery)
+    if party_code:
+        fields.append(('کوڈ', party_code))
+    fields.extend(account[:1])
+    if bill_type in _RECEIPT_TYPES or bill_type == 'Payment':
+        fields.extend(method[:1])
+    fields.extend(rest)
+    return fields[:4]
+
+
 def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None,
                    previous_balance=0, client_balance=0, delivery_people=None,
                    driver_name_ur='', client_name_ur='', transaction_label='',
                    transaction_note='', settings=None, terms=None,
-                   grn_bd=None, party_label=''):
+                   grn_bd=None, party_label='', qr_text=None, qr_caption=None):
     """Return the :mod:`app.services.urdu_receipt` document for one bill."""
     bill = bill
     amount = float(getattr(bill, 'amount', 0) or 0)
@@ -243,10 +280,13 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
             party_code = (getattr(bill, 'client_code', '') or '')
         label = label or L_PARTY
 
-    company_name = _settings_value(settings, 'company_name',
-                                   default='FAZAL BUILDING MATERIALS')
-    company_address = _settings_value(settings, 'company_address',
-                                      default='JALAL PUR SOBTIAN GUJRAT')
+    # The sheet's head is Urdu, so an English shop name is transliterated the
+    # same way client and driver names are (a curated entry wins when the
+    # settings already hold Urdu text - urdu_name keeps it untouched).
+    company_name = urdu_name(_settings_value(
+        settings, 'company_name', default='FAZAL BUILDING MATERIALS'), '')
+    company_address = urdu_name(_settings_value(
+        settings, 'company_address', default='JALAL PUR SOBTIAN GUJRAT'), '')
     company_phone = _settings_value(settings, 'company_phone',
                                     default='+92331-0000993 | +92340-3872722')
     proprietor = _settings_value(settings, 'proprietor_name_ur')
@@ -267,6 +307,28 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     if date_posted is None:
         date_posted = getattr(bill, 'created_at', None)
 
+    detail_rows = _detail_rows(bill_type, bill, delivery_people,
+                               driver_name_ur, grn_bd=grn_bd)
+    # The QR code carries the scan-and-verify line of the bill: number, party
+    # code, the amount and the date, pipe separated so any phone reader shows
+    # the same four facts.
+    qr_parts = [bill_no]
+    if party_code:
+        qr_parts.append(str(party_code))
+    if bill_type in _RECEIPT_TYPES or bill_type == 'Payment':
+        qr_parts.append(_money(amount))
+    else:
+        qr_parts.append(_money(amount))
+    if date_posted is not None:
+        try:
+            qr_parts.append(date_posted.strftime('%d-%m-%Y'))
+        except Exception:
+            pass
+    if qr_text is None:
+        qr_text = ' | '.join(p for p in qr_parts if p)
+    if qr_caption is None:
+        qr_caption = bill_no
+
     return R.build_document(
         bill_no=bill_no,
         date_posted=date_posted,
@@ -278,24 +340,30 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         party_name=party_name,
         party_code=party_code,
         party_label=label,
-        detail_rows=_detail_rows(bill_type, bill, delivery_people,
-                                 driver_name_ur, grn_bd=grn_bd),
+        detail_rows=detail_rows,
+        fields=_panel_fields(bill_type, label, party_name, party_code,
+                             detail_rows),
+        type_label=_TYPE_LABEL.get(bill_type, ''),
+        qr_text=qr_text,
+        qr_caption=qr_caption,
         items=_item_rows(items),
         summary=_summary_rows(bill_type, amount, paid, discount, previous),
         terms=term_rows,
-        footer_thanks=L_THANKS,
-        footer_credit=L_CREDIT,
-        signature_left=L_STAMP,
-        signature_right=L_SIGN,
+        signature_label=L_SIGN,
         items_title=L_ITEMS,
     )
 
 
-def render_pdf(document, title='Urdu Bill'):
-    """PDF bytes for *document* (``None`` when ReportLab cannot run)."""
-    return R.render_pdf(document, title=title)
+def render_pdf(document, title='Urdu Bill', copies=2):
+    """PDF bytes for *document* (``None`` when ReportLab cannot run).
+
+    ``copies=2`` (the default) is the carbon-copy leaf: the same A5 bill twice
+    on one A4 landscape page, original on the right and copy on the left.
+    """
+    return R.render_pdf(document, title=title, copies=copies)
 
 
-def render_html(document, title='Urdu Bill', auto_print=False):
-    """Full print page for *document* (same sheet as the PDF)."""
-    return R.render_html(document, title=title, auto_print=auto_print)
+def render_html(document, title='Urdu Bill', auto_print=False, copies=2):
+    """Full print page for *document* (same pages as the PDF)."""
+    return R.render_html(document, title=title, auto_print=auto_print,
+                         copies=copies)

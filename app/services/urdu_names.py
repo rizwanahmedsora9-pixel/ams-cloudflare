@@ -94,6 +94,8 @@ _WORDS = {
     'company': 'کمپنی', 'bank': 'بینک', 'account': 'اکاؤنٹ',
     'booking': 'بکنگ', 'delivery': 'ڈیلیوری', 'payment': 'پیمنٹ',
     'cement': 'سیمنٹ', 'goods': 'گڈز', 'material': 'میٹیریل',
+    'materials': 'میٹیریلز', 'building': 'بلڈنگ', 'builders': 'بلڈرز',
+    'fazal': 'فضل', 'sobtian': 'صوبتیاں', 'sohtian': 'صوبتیاں',
     'driver': 'ڈریور', 'conductor': 'کنڈکٹر',
     # Short all-caps-friendly words (single vowel), so they keep word reading.
     'work': 'ورک', 'home': 'ہوم', 'food': 'فوڈ', 'room': 'روم', 'good': 'گڈ',
