@@ -255,6 +255,19 @@ def _shape_dir(text, direction='rtl'):
         return _shape(text)
 
 
+def word_gap(size):
+    """Width of the gap between two Nastaleeq words at *size*.
+
+    The bundled Jameel Noori face maps ``U+0020`` to a 5-unit advance in a
+    2048-unit em - a quarter of a point at 10pt, i.e. invisible.  Drawing the
+    shaped run verbatim therefore glued every pair of Urdu words together
+    (``٭٭ٹھیکہسیمنٹ``), which is what "the font is not working" looks like on
+    paper.  Nastaleeq word gaps are drawn at a fraction of the type size, the
+    same value :mod:`app.services.urdu_text` uses for its own paragraphs.
+    """
+    return max(float(size or 0) * 0.24, 1.4)
+
+
 _ARABIC_RUN = r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFEFE]+'
 _LTR_RUN = r'[0-9A-Za-z]+(?:[×xX/:.\-+][0-9A-Za-z]+)*'
 _RUN_TOKEN = re.compile(_ARABIC_RUN + '|' + _LTR_RUN + r'|\s+|.')
@@ -296,13 +309,23 @@ def _urdu_runs(text):
 
 
 def _urdu_width(text, size):
-    """Advance width in points of a bidi-ordered Urdu run at *size*."""
+    """Advance width in points of a bidi-ordered Urdu run at *size*.
+
+    The gaps between words are counted at :func:`word_gap`, the width the
+    renderer actually draws, so a label measured here is never narrower than
+    the drawing beside it.
+    """
     from app.services.urdu_text import glyphs_width, UPEM
     total = 0.0
+    words = 0
     for chunk, direction in _urdu_runs(text):
         glyphs = _shape_dir(chunk, direction)
         if glyphs:
             total += glyphs_width(glyphs) * size / UPEM
+        if chunk.strip():
+            words += 1
+    if words > 1:
+        total += (words - 1) * word_gap(size)
     return total
 
 
@@ -428,6 +451,13 @@ def wrap_urdu(text, size, width, max_lines=3):
 # ---------------------------------------------------------------------------
 
 def qr_matrix(text):
+    """The QR matrix for *text* (``True`` = dark module), or ``None``.
+
+    ``segno`` is used when it is installed; the bundled
+    :mod:`app.services.qr_code` encoder takes over when it is not, so a host
+    that never installed the optional extra still prints a scannable code.
+    Both return the symbol without a quiet zone, which :func:`_draw_qr` adds.
+    """
     text = (text or '').strip()
     if not text:
         return None
@@ -435,10 +465,18 @@ def qr_matrix(text):
         import segno
         for error in ('m', 'l'):
             try:
-                qr = segno.make(text, error=error)
+                qr = segno.make(text, error=error, micro=False)
                 return [[bool(cell) for cell in row] for row in qr.matrix]
             except Exception:
                 continue
+    except Exception:
+        pass
+    try:
+        from app.services import qr_code
+        for error in ('m', 'l'):
+            matrix = qr_code.make_matrix(text, error=error)
+            if matrix:
+                return matrix
     except Exception:
         return None
     return None
@@ -448,7 +486,9 @@ def _draw_qr(sheet, doc):
     matrix = qr_matrix(doc.get('qr_text'))
     if matrix:
         rows, cols = len(matrix), len(matrix[0])
-        # Four clear modules on every side make the live QR scannable.
+        # Four clear modules on every side make the live QR scannable; the
+        # modules are sized so the whole code (quiet zone included) is exactly
+        # QR_SIZE wide whatever version the payload needed.
         module = QR_SIZE / (max(rows, cols) + 8)
         pad = 4 * module
         x0, y0 = QR_X + pad, QR_Y + pad
@@ -461,13 +501,16 @@ def _draw_qr(sheet, doc):
                 start = c
                 while c < cols and row[c]:
                     c += 1
+                # A hair of overdraw hides the seams between adjacent runs and
+                # keeps the PDF/print output a solid finder pattern.
                 sheet.rect(x0 + start * module, y0 + r * module,
-                           (c - start) * module + 0.06, module + 0.06,
+                           (c - start) * module + 0.05, module + 0.05,
                            fill=NAVY)
     caption = (doc.get('qr_caption') or doc.get('bill_no') or '').strip()
     if caption:
         sheet.text(QR_X, QR_CAPTION_Y, caption, 5.5, color=INK, align='left',
                    urdu=has_arabic(caption))
+
 
 
 # ---------------------------------------------------------------------------
@@ -994,6 +1037,36 @@ def _draw_terms(state, doc, sheets):
         return sum(max(1, len(wrap_urdu(text, size, width, max_lines=3)))
                    for _n, text in items)
 
+    half = (len(entries) + 1) // 2
+    columns = ((entries[:half], right_width), (entries[half:], left_width))
+
+    def block_height(each_size, each_step):
+        tallest = 0
+        for column, width in columns:
+            lines = sum(max(1, len(wrap_urdu(text, each_size, width,
+                                             max_lines=3)))
+                        for _n, text in column)
+            tallest = max(tallest, lines * each_step)
+        return tallest
+
+    # The clause width is now measured at the width actually drawn, so a long
+    # clause wraps where it used to overflow silently.  Keep the approved
+    # leading (TERMS_STEP) and the two equal columns, and pick the largest
+    # type size at which the whole block fits the page it starts on; a very
+    # long term list still flows onto the next sheet below.
+    available = bottom - (state['y'] + TERMS_GAP + 20.4924)
+    smallest = round(TERMS_SIZE * 0.86, 2)
+    for index in range(10):
+        candidate = round(TERMS_SIZE - 0.1 * index, 2)
+        if candidate < smallest:
+            break
+        size = candidate
+        if block_height(size, step) <= available:
+            break
+    # Only a genuinely long list needs the leading tightened.
+    while step > TERMS_STEP * 0.86 and block_height(size, step) > available:
+        step = round(step - 0.5, 2)
+
     pending = entries
     while pending:
         sheet = state['sheet']
@@ -1103,9 +1176,14 @@ def _draw_urdu(canvas, x, baseline, text, size, color, align, bold=False):
         return
     shaped = []
     total = 0.0
+    visible = [chunk for chunk, _direction in runs if chunk.strip()]
     for chunk, direction in runs:
         glyphs = _shape_dir(chunk, direction) or []
         width = glyphs_width(glyphs) * size / UPEM if glyphs else 0.0
+        if not chunk.strip():
+            # The face's own space is a quarter of a point wide: draw the gap
+            # the sheet needs instead of the glyph's advance.
+            width = word_gap(size) if len(visible) > 1 else 0.0
         shaped.append((glyphs, width))
         total += width
     pen = x - total if align == 'right' else (
@@ -1120,10 +1198,14 @@ def _draw_urdu(canvas, x, baseline, text, size, color, align, bold=False):
         canvas._textRenderMode = 2
     scale = size / UPEM
     for glyphs, width in shaped:
+        if not glyphs:
+            pen += width              # a word gap, no ink
+            continue
         for gid, advance, dx, dy in glyphs:
             canvas.drawString(pen + dx * scale, baseline + dy * scale,
                               chr(_PUA_BASE + gid))
             pen += advance * scale
+        pen += width - glyphs_width(glyphs) * size / UPEM
     canvas.restoreState()
 
 

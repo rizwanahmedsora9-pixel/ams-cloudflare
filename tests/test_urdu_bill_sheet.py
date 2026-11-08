@@ -687,8 +687,15 @@ def test_reference_bill_data_flows_through_the_real_adapter():
         'ادا شدہ رقم': '614,936',
         'کل بقایا رقم': '522,400',
     }
-    assert doc['qr_text'] == 'SB-SL-1008 | FBMCL-00002 | 1,105,636 | 07-11-2026'
+    # Without a request there is no reachable host for a verify link, so the
+    # QR falls back to the in-line bill summary - still the real bill, never a
+    # fake "SAMPLE QR".
     assert doc['qr_caption'] == 'SB-SL-1008', 'the real bill, not a fake SAMPLE QR'
+    assert 'SB-SL-1008' in doc['qr_text']
+    assert 'FBMCL-00002' in doc['qr_text']
+    assert '1,105,636' in doc['qr_text'], 'the bill total must be in the code'
+    assert '522,400' in doc['qr_text'], 'the closing balance must be in the code'
+    assert 'SAMPLE' not in doc['qr_text']
 
     sheets = R.layout_document(doc)
     assert len(sheets) == 1
@@ -701,11 +708,16 @@ def test_reference_terms_use_equal_columns_and_the_red_fourth_number():
     sheet = R.layout_document(_reference_document())[0]
     assert abs(R.TERMS_RIGHT_WIDTH - R.TERMS_LEFT_WIDTH) < 0.02
     assert round(R.TERMS_COLUMN_W, 2) == 184.25
+    # the numbered clause text (the "N." markers are drawn a touch smaller)
     clauses = [op for op in sheet.ops if op['op'] == 'text'
-               and op['size'] == R.TERMS_SIZE]
-    assert len(clauses) == 7, 'each reference clause fits on one line'
-    assert [round(op['y'], 3) for op in clauses[:4]] == [
-        521.215, 532.885, 544.555, 556.225]
+               and R.TERMS_SIZE * 0.85 <= op['size'] <= R.TERMS_SIZE
+               and op['y'] > 500.0
+               and not re.fullmatch(r'\d+\.', op['text'])]
+    assert len(clauses) == 7, 'each reference clause sets on one line'
+    # The type is the largest size at which no clause wraps, on the approved
+    # leading, all on one A5 sheet.
+    assert [round(op['y'], 1) for op in clauses[:4]] == [
+        521.2, 532.4, 543.6, 554.7]
     numbers = {op['text']: op for op in sheet.ops if op['op'] == 'text'
                and re.fullmatch(r'\d+\.', op['text'])}
     assert numbers['4.']['color'] == R.TERMS_RED

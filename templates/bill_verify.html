@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+{#
+  The page a customer reaches by scanning the QR code on an Urdu receipt.
+  It is deliberately standalone (no app layout): the person holding the paper
+  bill must see the bill, not the shop's internal navigation, and it has to
+  read well on a phone.  The bill itself is re-read from the database after
+  the signed link is checked, so every figure here is the real posted bill.
+#}
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% if verified %}Bill {{ bill_no }} &middot; verified{% else %}Bill verification{% endif %}</title>
+  <style>
+    @font-face { font-family: 'Jameel Noori'; src: url("/static/fonts/JameelNooriNastaleeq.ttf") format("truetype"); font-display: swap; }
+    @font-face { font-family: 'DejaVu Sans'; src: url("/static/fonts/DejaVuSans.ttf") format("truetype"); }
+    @font-face { font-family: 'DejaVu Sans'; src: url("/static/fonts/DejaVuSans-Bold.ttf") format("truetype"); font-weight: 700; }
+    :root {
+      --navy: #1A3A5C; --ink: #14263B; --muted: #66788D;
+      --line: #C4D1E0; --panel: #EEF3F9; --paper: #F4F7FB;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 18px 12px 40px; background: var(--paper);
+      color: var(--ink); font-family: 'DejaVu Sans', Arial, sans-serif;
+      font-size: 15px; line-height: 1.45;
+    }
+    .sheet { max-width: 720px; margin: 0 auto; background: #fff;
+             border: 1px solid var(--line); border-radius: 10px;
+             box-shadow: 0 6px 22px rgba(20,38,59,.10); overflow: hidden; }
+    header { background: var(--navy); color: #fff; padding: 14px 18px;
+             display: flex; justify-content: space-between; align-items: center;
+             gap: 10px; flex-wrap: wrap; }
+    header .ur { font-family: 'Jameel Noori', 'Noto Nastaliq Urdu', serif;
+                 font-size: 21px; line-height: 1.9; }
+    header .sub { font-size: 11.5px; opacity: .78; }
+    .ok { background: #1E7B4B; border-radius: 999px; padding: 4px 12px;
+          font-size: 12.5px; font-weight: 700; letter-spacing: .2px; }
+    .body { padding: 16px 18px 4px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px;
+            margin-bottom: 14px; }
+    @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
+    .k { color: var(--muted); font-size: 11.5px; text-transform: uppercase;
+         letter-spacing: .4px; }
+    .v { font-weight: 700; font-size: 15.5px; word-break: break-word; }
+    .v.ur { font-family: 'Jameel Noori', 'Noto Nastaliq Urdu', serif;
+            font-size: 18px; line-height: 1.9; font-weight: 400; }
+    .ltr { direction: ltr; unicode-bidi: isolate; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0 14px; }
+    th, td { padding: 7px 8px; border-bottom: 1px solid var(--line);
+             font-size: 13.5px; text-align: left; }
+    thead th { background: var(--navy); color: #fff; font-size: 11.5px;
+               text-transform: uppercase; letter-spacing: .3px;
+               border-bottom: 0; }
+    tbody tr:nth-child(even) { background: var(--panel); }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.item .ur { font-family: 'Jameel Noori', 'Noto Nastaliq Urdu', serif;
+                  font-size: 16px; line-height: 1.9; }
+    td.item .latin { color: var(--muted); font-size: 11.5px; }
+    .totals { margin: 0 0 16px auto; width: min(100%, 360px); }
+    .totals table { margin: 0; }
+    .totals th { color: var(--muted); font-weight: 400; border-bottom: 1px solid var(--line); }
+    .totals tr:last-child th, .totals tr:last-child td {
+      background: var(--navy); color: #fff; font-weight: 700; border-bottom: 0;
+    }
+    .note { background: var(--panel); border: 1px solid var(--line);
+            border-radius: 8px; padding: 10px 12px; font-size: 13.5px;
+            margin-bottom: 14px; }
+    footer { border-top: 1px solid var(--line); padding: 12px 18px;
+             font-size: 11.5px; color: var(--muted);
+             display: flex; justify-content: space-between; gap: 10px;
+             flex-wrap: wrap; }
+    .bad { text-align: center; padding: 44px 22px; }
+    .bad .mark { font-size: 44px; color: #C0392B; line-height: 1; }
+    .bad h1 { font-size: 20px; margin: 12px 0 6px; }
+    .bad p { color: var(--muted); margin: 4px 0; font-size: 13.5px; }
+  </style>
+</head>
+<body>
+  {% if verified %}
+  <main class="sheet">
+    <header>
+      <div>
+        <div class="ur" dir="rtl">بل تصدیق شدہ</div>
+        <div class="sub">Bill verified &middot; scanned from the printed receipt</div>
+      </div>
+      <span class="ok">&#10003; Verified</span>
+    </header>
+
+    <div class="body">
+      <div class="grid">
+        <div>
+          <div class="k">Bill number / بل نمبر</div>
+          <div class="v ltr">{{ bill_no or '—' }}</div>
+          <div class="k" style="margin-top:6px">Type</div>
+          <div class="v">{{ bill_type }}</div>
+        </div>
+        <div>
+          <div class="k">Date &amp; time / تاریخ و وقت</div>
+          <div class="v ltr">{{ posted_text or '—' }}</div>
+        </div>
+        <div>
+          <div class="k">Client / گاہک</div>
+          <div class="v ur" dir="rtl">{{ client_name_ur or client_name or '—' }}</div>
+          {% if client_name and client_name_ur %}
+          <div class="ltr" style="color:var(--muted);font-size:12.5px">{{ client_name }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <div class="k">Client ID / کوڈ</div>
+          <div class="v ltr">{{ client_id or '—' }}</div>
+          {% if client_phone %}
+          <div class="ltr" style="color:var(--muted);font-size:12.5px">{{ client_phone }}</div>
+          {% endif %}
+        </div>
+        {% if delivery %}
+        <div>
+          <div class="k">Delivery / ڈیلیوری</div>
+          <div class="v ur" dir="rtl">{{ delivery }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if lines %}
+      <table>
+        <thead>
+          <tr>
+            <th style="width:38px">#</th>
+            <th>Item / تفصیل</th>
+            <th class="num">Qty</th>
+            <th class="num">Rate</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td style="color:var(--muted)">{{ line.index }}</td>
+            <td class="item">
+              <div class="ur" dir="rtl">{{ line.name }}</div>
+              {% if line.name_latin and line.name_latin != line.name %}
+              <div class="latin ltr">{{ line.name_latin }}</div>
+              {% endif %}
+            </td>
+            <td class="num ltr">{{ line.qty }}</td>
+            <td class="num ltr">{{ line.rate }}</td>
+            <td class="num ltr" style="font-weight:700">{{ line.amount }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+
+      <div class="totals">
+        <table>
+          <tbody>
+            <tr>
+              <th>Total / کل رقم</th>
+              <td class="num ltr" style="font-weight:700">{{ amount }}</td>
+            </tr>
+            {% if previous not in ('0', '0.00', '') %}
+            <tr>
+              <th>Previous balance / پچھلا بقایا</th>
+              <td class="num ltr">{{ previous }}</td>
+            </tr>
+            {% endif %}
+            {% if discount not in ('0', '0.00', '') %}
+            <tr>
+              <th>Discount / رعایت</th>
+              <td class="num ltr">{{ discount }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+              <th>Paid / ادا شدہ</th>
+              <td class="num ltr">{{ paid }}</td>
+            </tr>
+            <tr>
+              <th>Balance / بقایا رقم</th>
+              <td class="num ltr">{{ outstanding }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {% if note %}
+      <div class="note">
+        <div class="k">Note / نوٹ</div>
+        <div>{{ note }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <footer>
+      <span>This bill was loaded from the company ledger after the QR
+            signature was checked.</span>
+      <span>AMSales</span>
+    </footer>
+  </main>
+
+  {% else %}
+  <main class="sheet">
+    <div class="bad">
+      <div class="mark">&#10007;</div>
+      <h1 dir="rtl">بل تصدیق نہیں ہو سکا</h1>
+      <p>This bill could not be verified.</p>
+      <p>
+        {% if reason == 'link' %}
+        The link in the QR code is not a valid company bill link. Please scan
+        the code printed on the receipt again.
+        {% else %}
+        The bill this code points to no longer exists. Ask the shop to reprint
+        the receipt.
+        {% endif %}
+      </p>
+    </div>
+  </main>
+  {% endif %}
+</body>
+</html>

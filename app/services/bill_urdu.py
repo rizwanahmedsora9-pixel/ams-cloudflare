@@ -248,6 +248,160 @@ def _panel_fields(bill_type, party_label, party_name, party_code, detail_rows):
     return fields[:4]
 
 
+# ---------------------------------------------------------------------------
+# QR payload
+# ---------------------------------------------------------------------------
+# The code in the sheet's header is what a customer's phone reads.  The
+# reference receipt carried only the bill number there, so a scan showed
+# nothing useful; the approved sheet's QR is therefore a *bill summary*: shop,
+# bill number and type, date and time, the client's name and ID, the delivery
+# person, the line items and the money figures.  Scanning the printed sheet
+# (or the PDF on a phone) therefore shows the bill itself.
+#
+# Size discipline: the block is 51pt wide on an A5 sheet, so the symbol must
+# not grow past ~61 modules (about 0.26mm per module) or a phone camera stops
+# resolving it.  :func:`_qr_payload` therefore shrinks the content - item lines
+# first, then to the compact reference line - until the *actual* encoded
+# symbol fits that budget.  That is measured with the real encoder below, so
+# the printed code is always the scannable one.
+QR_MAX_MODULES = 61
+QR_SEPARATOR = '|'
+_QR_LINE_WIDTH = 44
+_QR_ITEM_WIDTH = 60
+
+
+def _qr_line(text, width=_QR_LINE_WIDTH):
+    """One payload field, clipped so a stray long name cannot bloat the QR."""
+    text = ' '.join(str(text or '').split())
+    if len(text) > width:
+        text = text[:width - 1].rstrip() + '~'
+    return text
+
+
+def _qr_number(value):
+    """``1290`` / ``1290.5`` - never ``1,290`` (two bytes for a comma)."""
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        return str(value or '')
+    if abs(number - round(number)) < 1e-9:
+        return str(int(round(number)))
+    return ('%.2f' % number).rstrip('0').rstrip('.')
+
+
+def _qr_item(item):
+    """``1.ڈی جی 1*2000=2000`` - index, name, qty, rate, amount."""
+    return _qr_line(f"{item.get('index')}.{item.get('name')} "
+                    f"{_qr_number(str(item.get('qty', '')).replace(',', ''))}"
+                    f"*{_qr_number(str(item.get('rate', '')).replace(',', ''))}"
+                    f"={_qr_number(str(item.get('amount', '')).replace(',', ''))}",
+                    width=_QR_ITEM_WIDTH)
+
+
+def qr_symbol(text):
+    """``(matrix, error_level)`` for *text* at the most robust level that fits.
+
+    ``m`` is preferred (more damage tolerance on a paper bill); ``l`` is used
+    only when ``m`` would need a bigger symbol than the printed block can
+    resolve.  ``None`` when even ``l`` does not fit.
+    """
+    from app.services import qr_code
+    for error in ('m', 'l'):
+        for attempt in (error, error.upper()):
+            matrix = qr_code.make_matrix(text, error=attempt)
+            if matrix:
+                return (matrix, error) if len(matrix) <= QR_MAX_MODULES else None
+    return None
+
+
+def _qr_payload(doc, item_rows, *, company_name='', client_name='',
+                client_id='', delivery='', bill_type='', bill_id=None):
+    """``(text, error)`` for the header QR.
+
+    Priority, highest first - the facts a scan must always show:
+
+    1. bill number, date and time, client name, client ID;
+    2. the money figures (total / previous / paid / balance);
+    3. as many item lines as still fit the scannable symbol;
+    4. shop name, bill type and delivery person (decorative, dropped first).
+
+    When the app can build a signed verify link, that link *replaces* the
+    text: the phone then opens the complete bill, which no 51pt symbol could
+    ever hold as text.
+    """
+    field = lambda value, width=_QR_LINE_WIDTH: _qr_line(value, width)  # noqa: E731
+    essentials = [
+        field(doc.get('bill_no'), 24),
+        field(f"{doc.get('date')} {doc.get('time')}", 40),
+        field(client_name or doc.get('party_name'), 30),
+        field(client_id or doc.get('party_code'), 22),
+    ]
+    extras = [
+        field(company_name or doc.get('company_name'), 34),
+        field(doc.get('type_label'), 12),
+        field(delivery, 24),
+    ]
+    totals = [field(f"{row.get('label')}:{row.get('value')}", 30)
+              for row in doc.get('summary') or []]
+    items = [_qr_item(row) for row in item_rows or []]
+
+    def assemble(heads, lines):
+        head = [p for part in heads for p in part if p]
+        return QR_SEPARATOR.join(head + lines + totals)
+
+    def encode(text):
+        found = qr_symbol(text)
+        return found[1] if found else None
+
+    # The signed verify link opens the whole bill, so it is the best payload.
+    if bill_id is not None:
+        try:
+            from app.services import bill_verify
+            link = bill_verify.qr_payload(bill_type, bill_id, doc.get('bill_no'),
+                                          posted=doc.get('date', ''))
+        except Exception:
+            link = ''
+        if link:
+            error = encode(link)
+            if error:
+                return link, error
+
+    # Text payload: keep the essentials, then fit as many *real* line items as
+    # the symbol allows.  The optional extras (shop name, bill type, delivery)
+    # are sacrificed first when they cost an item line.
+    best = None
+    for heads in ([essentials, extras], [essentials]):
+        if not encode(assemble(heads, [])):
+            continue
+        keep = 0
+        for candidate in range(1, len(items) + 1):
+            dropped = len(items) - candidate
+            tail = items[:candidate] + ([f"+{dropped} مزید"] if dropped else [])
+            if encode(assemble(heads, tail)):
+                keep = candidate
+            else:
+                break
+        # More items beats more decoration.
+        score = (keep, len(heads))
+        if best is None or score > best[0]:
+            best = (score, heads, keep)
+    if best is not None:
+        _score, heads, keep = best
+        dropped = len(items) - keep
+        text = assemble(heads, items[:keep] +
+                        ([f"+{dropped} مزید"] if dropped else []))
+        error = encode(text)
+        if error:
+            return text, error
+
+    # Last resort: one compact reference line, which always fits.
+    compact = QR_SEPARATOR.join(str(part) for part in (
+        doc.get('bill_no'), client_id or doc.get('party_code'),
+        (doc.get('summary') or [{}])[0].get('value', ''),
+        doc.get('date'), doc.get('time')) if part)
+    return compact, (encode(compact) or 'l')
+
+
 def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None,
                    previous_balance=0, client_balance=0, delivery_people=None,
                    driver_name_ur='', client_name_ur='', transaction_label='',
@@ -320,27 +474,11 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
 
     detail_rows = _detail_rows(bill_type, bill, delivery_people,
                                driver_name_ur, grn_bd=grn_bd)
-    # The QR code carries the scan-and-verify line of the bill: number, party
-    # code, the amount and the date, pipe separated so any phone reader shows
-    # the same four facts.
-    qr_parts = [bill_no]
-    if party_code:
-        qr_parts.append(str(party_code))
-    if bill_type in _RECEIPT_TYPES or bill_type == 'Payment':
-        qr_parts.append(_money(amount))
-    else:
-        qr_parts.append(_money(amount))
-    if date_posted is not None:
-        try:
-            qr_parts.append(date_posted.strftime('%d-%m-%Y'))
-        except Exception:
-            pass
-    if qr_text is None:
-        qr_text = ' | '.join(p for p in qr_parts if p)
-    if qr_caption is None:
-        qr_caption = bill_no
-
-    return R.build_document(
+    item_rows = _item_rows(items)
+    summary_rows = _summary_rows(bill_type, amount, paid, discount, previous)
+    # Build the sheet document once without a QR so the payload quotes the
+    # exact bill number, date, time and totals that are printed on it.
+    document = R.build_document(
         bill_no=bill_no,
         date_posted=date_posted,
         company_name=company_name,
@@ -356,14 +494,36 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         fields=_panel_fields(bill_type, label, party_name, party_code,
                              detail_rows),
         type_label=_TYPE_LABEL.get(bill_type, ''),
-        qr_text=qr_text,
-        qr_caption=qr_caption,
-        items=_item_rows(items),
-        summary=_summary_rows(bill_type, amount, paid, discount, previous),
+        items=item_rows,
+        summary=summary_rows,
         terms=term_rows,
         signature_label=L_SIGN,
         items_title=L_ITEMS,
     )
+    # The header QR is the bill itself: shop, number, type, date and time,
+    # client name and ID, delivery person, the line items and the totals.
+    qr_error = ''
+    if qr_text is None:
+        delivery = '، '.join(p for p in (delivery_people or []) if p)
+        if delivery:
+            delivery = f"ڈیلیوری {delivery}"
+        elif driver_name_ur:
+            delivery = f"ڈیلیوری {driver_name_ur}"
+        qr_text, qr_error = _qr_payload(
+            document, item_rows,
+            company_name=company_name,
+            client_name=party_name,
+            client_id=party_code,
+            delivery=delivery,
+            bill_type=bill_type,
+            bill_id=getattr(bill, 'id', None),
+        )
+    if qr_caption is None:
+        qr_caption = bill_no
+    document['qr_text'] = qr_text or ''
+    document['qr_error'] = qr_error or ''
+    document['qr_caption'] = qr_caption or ''
+    return document
 
 
 def render_pdf(document, title='Urdu Bill', copies=1):

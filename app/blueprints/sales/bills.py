@@ -8,3 +8,4 @@ from ._bills_delete_bill import delete_bill  # noqa
 from ._bills_view_bill_detail import view_bill_detail  # noqa
 from ._bills_pending_bills import pending_bills  # noqa
 from ._bills_mixed_transactions import mixed_transactions  # noqa
+from ._bills_verify import verify_bill  # noqa
