@@ -226,8 +226,33 @@ def download_supplier_payment(payment_id):
         material_ledger_recent=[],
         material_stock_summary=[],
         auto_print=(action == 'print'),
-        bill_lang=lang,
+        bill_lang='en',
     )
+    if lang == 'ur':
+        # The Urdu sheet is the approved A5 bill (app/services/urdu_receipt.py),
+        # not the English receipt with translated labels: one document, one
+        # layout, for every kind of bill.  Without this, a supplier payment
+        # would download as an English receipt titled in Urdu.
+        from app.blueprints.sales._bills_download_invoice import _urdu_bill_response
+        response = _urdu_bill_response(
+            bill_type='Payment',
+            bill=bill_view,
+            items=[],
+            client=None,
+            previous_balance=0,
+            client_balance=0,
+            delivery_people=[],
+            driver_name_ur='',
+            client_name_ur='',
+            transaction_label='',
+            transaction_note='',
+            terms=None,
+            grn_bd=None,
+            action=action,
+            disposition=disposition,
+        )
+        if response is not None:
+            return response
     if action == 'download':
         pdf_response = _try_render_weasy_pdf(
             rendered,

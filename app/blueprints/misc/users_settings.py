@@ -184,6 +184,9 @@ def update_settings():
     settings_obj.company_name = request.form.get('company_name', settings_obj.company_name or 'FAZAL BUILDING MATERIALS')
     settings_obj.company_address = request.form.get('company_address', settings_obj.company_address or 'JALAL PUR SOBTIAN')
     settings_obj.company_phone = request.form.get('company_phone', settings_obj.company_phone or '+92331-0000993 | +92340-3872722')
+    # Urdu bill branding - optional, printed only on the Urdu sheet.
+    settings_obj.proprietor_name_ur = (request.form.get('proprietor_name_ur') or '').strip()
+    settings_obj.company_note_ur = (request.form.get('company_note_ur') or '').strip()
     settings_obj.currency = request.form.get('currency', settings_obj.currency or 'PKR')
     settings_obj.allow_global_negative_stock = 'allow_global_negative_stock' in request.form
 
