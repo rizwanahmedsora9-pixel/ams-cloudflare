@@ -73,6 +73,17 @@ def verify_bill(token):
                getattr(bill, 'invoice_no', '') or
                getattr(bill, 'bill_no', '') or claim.get('no') or '')
     delivery = (getattr(bill, 'driver_name', '') or '').strip()
+    delivery_ur = ''
+    if delivery:
+        saved_driver_ur = ''
+        try:
+            driver = DeliveryPerson.query.filter(
+                func.lower(func.trim(DeliveryPerson.name)) == delivery.lower()
+            ).first()
+            saved_driver_ur = (getattr(driver, 'name_ur', None) or '').strip()
+        except Exception:
+            saved_driver_ur = ''
+        delivery_ur = loaded['urdu_name'](delivery, saved_driver_ur)
 
     return render_template(
         'bill_verify.html',
@@ -85,6 +96,7 @@ def verify_bill(token):
         client_id=loaded['client_id'],
         client_phone=loaded['client_phone'],
         delivery=delivery,
+        delivery_ur=delivery_ur,
         lines=lines,
         money=bill_verify._money,
         amount=bill_verify._money(amount),

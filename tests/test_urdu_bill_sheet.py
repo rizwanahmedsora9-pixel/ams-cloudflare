@@ -774,7 +774,110 @@ def test_route_confirmation_defaults_to_the_single_a5_sheet(client, sale):
 def test_reference_proprietor_fallback_and_override():
     assert _document(settings=_settings(proprietor_name_ur=''))['proprietor'] == 'عدنان احمد'
     assert _document(settings=_settings(proprietor_name_ur='علی'))['proprietor'] == 'علی'
+    assert _document(settings=_settings(proprietor_name_ur='M Ahmed'))['proprietor'] == 'محمد احمد'
     assert _document(settings=_settings(company_name='Other', proprietor_name_ur=''))['proprietor'] == ''
+
+
+def test_standalone_m_is_muhammad_and_ahmed_uses_proper_urdu_spelling():
+    from app.services.urdu_names import urdu_name
+
+    # Standalone m / M (with or without abbreviation dot) stands for Muhammad.
+    assert urdu_name('m') == 'محمد'
+    assert urdu_name('M') == 'محمد'
+    assert urdu_name('m.') == 'محمد'
+    assert urdu_name('M.') == 'محمد'
+
+    # Ahmed / Ahmad always uses ح (احمد), never گول ہ (اہمد).
+    for spelling in ('ahmed', 'Ahmed', 'AHMED', 'ahmad', 'Ahmad', 'AHMAD'):
+        assert urdu_name(spelling) == 'احمد', spelling
+
+    # Real bill names combining standalone M and Ahmed / other names.
+    for full in ('m ahmed', 'M Ahmed', 'M AHMED', 'm. ahmed', 'M. Ahmed',
+                 'M. AHMED', 'm.ahmed', 'M.Ahmed', 'M.AHMED'):
+        assert urdu_name(full) == 'محمد احمد', full
+    assert urdu_name('M Shafiq') == 'محمد شفیق'
+    assert urdu_name('M.Shafiq') == 'محمد شفیق'
+    assert urdu_name('Ch. M. Ahmed Sb') == 'چوہدری. محمد احمد صاحب'
+    assert urdu_name('Adnan Ahmed') == 'عدنان احمد'
+
+    # Numeric units/grades and two-letter dotted/slashed abbreviations are not Muhammad.
+    for non_name in ('Pipe 3m', '3M Tape', '1.5m', 'Bolt M10', 'M-10', 'M.10',
+                     'M.S. Pipe', '10 A.M.'):
+        assert 'محمد' not in urdu_name(non_name), non_name
+    assert urdu_name('M/S Ahmed Traders') == 'م/س احمد ٹریڈرز'
+
+
+def test_real_bill_renders_m_ahmed_as_muhammad_ahmed_on_sheet_and_verify(client, app):
+    """A posted bill for 'M Ahmed' prints محمد احمد without needing saved name_ur."""
+    from app import db
+    from app.services import bill_verify
+    from models import Account, DirectSale, Entry, Material, Settings
+    from app.services.void_rebuild import _rebuild_material_totals
+
+    _login(client)
+    with app.app_context():
+        settings = Settings.query.first() or Settings()
+        settings.allow_global_negative_stock = True
+        db.session.add(settings)
+        db.session.commit()
+
+    client.post('/add_material',
+                data={'material_name': 'ڈی جی', 'material_unit': 'Bags'},
+                follow_redirects=True)
+    client.post('/add_client', data={'name': 'M Ahmed',
+                                     'code': 'FBMCL-00077',
+                                     'category': 'General',
+                                     'opening_balance': '0'},
+                follow_redirects=True)
+    client.post('/accounts/accounts/add', data={
+        'name': 'M AHMED CASH', 'class_category': 'Assets',
+        'class_subcategory': 'Cash', 'class_account_type': 'Main Cash',
+        'account_status': 'active', 'opening_amount': '0',
+        'opening_position': 'debit',
+        'opening_effective_date': '2026-01-01'}, follow_redirects=True)
+
+    with app.app_context():
+        mat = Material.query.filter_by(name='ڈی جی').first()
+        account = Account.query.filter(Account.name.like('%M AHMED CASH%')).first()
+        db.session.add(Entry(date='2026-06-01', time='09:00:00', type='IN',
+                             material='ڈی جی', qty=100, bill_no='MB NO.9077',
+                             client_category='Stock In'))
+        _rebuild_material_totals()
+        db.session.commit()
+        mat_id, acc_id = mat.id, account.id
+
+    resp = client.post('/add_direct_sale', data={
+        'client_code': 'FBMCL-00077',
+        'client_name': 'M Ahmed',
+        'category': 'Credit Customer',
+        'manual_bill_no': 'SB-SL-2077',
+        'driver_name': 'M. Ahmed',
+        'paid_amount': '0',
+        'product_name[]': ['ڈی جی'],
+        'material_id[]': [str(mat_id)],
+        'qty[]': ['2'],
+        'unit_rate[]': ['1500'],
+        'payment_method': 'Cash',
+        'payment_account_id': str(acc_id),
+    }, follow_redirects=True)
+    assert resp.status_code == 200
+
+    with app.app_context():
+        posted = DirectSale.query.order_by(DirectSale.id.desc()).first()
+        assert posted is not None
+        sale_id, bill_no = posted.id, posted.manual_bill_no
+        token = bill_verify.make_token('DirectSale', sale_id, bill_no)
+
+    html = client.get(
+        f'/download_invoice/{bill_no}?src=direct_sale&src_id={sale_id}'
+        '&lang=ur&action=print&tc=0'
+    ).get_data(as_text=True)
+    assert 'محمد احمد' in html
+    assert 'اہمد' not in html
+
+    verify_html = client.get(f'/verify/bill/{token}').get_data(as_text=True)
+    assert 'محمد احمد' in verify_html
+    assert 'اہمد' not in verify_html
 
 
 def test_confirmation_multiple_term_ids_are_all_used(client, sale, app):
