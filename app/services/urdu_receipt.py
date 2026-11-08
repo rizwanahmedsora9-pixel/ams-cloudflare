@@ -461,6 +461,19 @@ def qr_matrix(text):
     text = (text or '').strip()
     if not text:
         return None
+    # The bundled encoder is used first so the printed symbol is the one
+    # ``bill_urdu`` measured when it chose the payload: same version, same
+    # modules, on every host (``segno`` may pick a different version for the
+    # same text).  ``segno`` remains the fallback if the bundled encoder ever
+    # fails on a payload.
+    try:
+        from app.services import qr_code
+        for error in ('m', 'l'):
+            matrix = qr_code.make_matrix(text, error=error)
+            if matrix:
+                return matrix
+    except Exception:
+        pass
     try:
         import segno
         for error in ('m', 'l'):
@@ -469,14 +482,6 @@ def qr_matrix(text):
                 return [[bool(cell) for cell in row] for row in qr.matrix]
             except Exception:
                 continue
-    except Exception:
-        pass
-    try:
-        from app.services import qr_code
-        for error in ('m', 'l'):
-            matrix = qr_code.make_matrix(text, error=error)
-            if matrix:
-                return matrix
     except Exception:
         return None
     return None
@@ -501,10 +506,14 @@ def _draw_qr(sheet, doc):
                 start = c
                 while c < cols and row[c]:
                     c += 1
-                # A hair of overdraw hides the seams between adjacent runs and
-                # keeps the PDF/print output a solid finder pattern.
+                # Module edges must be exact.  An earlier version grew every
+                # dark run by 0.05pt to "hide the seams"; at print resolution
+                # that swallowed the light modules next to it (a 0.4mm module
+                # is 1.1pt, so 0.05pt is 5% of the symbol's smallest feature)
+                # and the code stopped being decodable - adjacent runs share
+                # their edge exactly, so no overdraw is needed.
                 sheet.rect(x0 + start * module, y0 + r * module,
-                           (c - start) * module + 0.05, module + 0.05,
+                           (c - start) * module, module,
                            fill=NAVY)
     caption = (doc.get('qr_caption') or doc.get('bill_no') or '').strip()
     if caption:
@@ -1321,23 +1330,52 @@ body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
 """
 
 
-def render_html(doc, title='Urdu Bill', auto_print=False, copies=1):
-    """Render *doc* as a print-ready HTML page (same pages as the PDF)."""
+def page_fragments(doc, copies=1):
+    """``[{'w', 'h', 'elements'}]`` - the composed pages, as plain data.
+
+    Both the print page and the page behind the bill's QR use this, so the
+    sheet a customer scans is drawn by the same primitives (and in the same
+    order) as the sheet the office prints.  Each element is
+    ``{'op': 'rect'|'line'|'text', 'attrs': {...}}`` where ``attrs`` is a style
+    dictionary (plus ``runs`` for text) - no pre-built HTML, so a template can
+    render it without ever trusting user text as markup.
+    """
     pages = compose_document(doc, copies=copies)
-    parts = [_HTML_HEAD.format(title=_escape_html(title), pw=_fmt(pages[0].w),
-                               ph=_fmt(pages[0].h),
-                               urdu_file=URDU_FONT_FILE)]
+    fragments = []
     for page in pages:
-        parts.append(f'<div class="pg" style="width:{_fmt(page.w)}pt;'
-                     f'height:{_fmt(page.h)}pt">')
+        elements = []
         for op in page.ops:
             if op['op'] == 'rect':
-                parts.append(_html_rect(op))
+                elements.append({'op': 'rect', 'attrs': html_rect_attrs(op)})
             elif op['op'] in ('line', 'seg'):
-                parts.append(_html_line(op))
+                elements.append({'op': 'line', 'attrs': html_line_attrs(op)})
         for op in page.ops:
             if op['op'] == 'text':
-                parts.append(_html_text(op, page))
+                # The page is passed so a right-anchored run knows how wide the
+                # paper is (an A4 carbon-copy leaf is twice an A5 sheet).
+                elements.append({'op': 'text',
+                                 'attrs': html_text_attrs(op, page)})
+        fragments.append({'w': _fmt(page.w), 'h': _fmt(page.h),
+                          'elements': elements})
+    return fragments
+
+
+def render_html(doc, title='Urdu Bill', auto_print=False, copies=1):
+    """Render *doc* as a print-ready HTML page (same pages as the PDF)."""
+    pages = page_fragments(doc, copies=copies)
+    parts = [_HTML_HEAD.format(title=_escape_html(title), pw=pages[0]['w'],
+                               ph=pages[0]['h'],
+                               urdu_file=URDU_FONT_FILE)]
+    for page in pages:
+        parts.append(f'<div class="pg" style="width:{page["w"]}pt;'
+                     f'height:{page["h"]}pt">')
+        for element in page['elements']:
+            if element['op'] == 'rect':
+                parts.append(_html_rect(element['attrs']))
+            elif element['op'] == 'line':
+                parts.append(_html_line(element['attrs']))
+            else:
+                parts.append(_html_text(element['attrs']))
         parts.append('</div>')
     parts.append(
         '<div class="bar no-print">'
@@ -1358,74 +1396,63 @@ def _fmt(value):
     return ('%.4f' % float(value)).rstrip('0').rstrip('.')
 
 
-def _html_rect(op):
-    style = [f"left:{_fmt(op['x'])}pt", f"top:{_fmt(op['y'])}pt",
-             f"width:{_fmt(max(op['w'], 0.6))}pt",
-             f"height:{_fmt(max(op['h'], 0.6))}pt"]
+def _style_text(style):
+    """``{'left': '1pt'}`` -> ``'left:1pt'`` for an inline ``style``."""
+    return ';'.join(f'{key}:{value}' for key, value in style.items())
+
+
+def html_rect_attrs(op):
+    """Style dictionary for one filled/stroked rectangle."""
+    style = {'left': f"{_fmt(op['x'])}pt", 'top': f"{_fmt(op['y'])}pt",
+             'width': f"{_fmt(max(op['w'], 0.6))}pt",
+             'height': f"{_fmt(max(op['h'], 0.6))}pt"}
     if op['fill']:
-        style.append(f"background:{op['fill']}")
+        style['background'] = op['fill']
     if op['stroke']:
         dash = 'dashed' if op['dash'] else 'solid'
-        style.append(f"border:{_fmt(op['width'])}pt {dash} {op['stroke']}")
-    return f'<div class="s" style="{";".join(style)}"></div>'
+        style['border'] = f"{_fmt(op['width'])}pt {dash} {op['stroke']}"
+    return style
 
 
-def _html_line(op):
+def html_line_attrs(op):
+    """Style dictionary for one hairline (dashed rules keep their dash)."""
     if op.get('dash'):
-        horizontal = abs(op['y1'] - op['y0']) < 0.01
-        if horizontal:
-            style = (f"left:{_fmt(min(op['x0'], op['x1']))}pt;"
-                     f"top:{_fmt(op['y0'] - op['width'] / 2)}pt;"
-                     f"width:{_fmt(abs(op['x1'] - op['x0']))}pt;height:0;"
-                     f"border-top:{_fmt(op['width'])}pt dashed {op['color']};")
-        else:
-            style = (f"left:{_fmt(op['x0'] - op['width'] / 2)}pt;"
-                     f"top:{_fmt(min(op['y0'], op['y1']))}pt;"
-                     f"width:0;height:{_fmt(abs(op['y1'] - op['y0']))}pt;"
-                     f"border-left:{_fmt(op['width'])}pt dashed {op['color']};")
-        return f'<div class="s" style="{style}"></div>'
+        if abs(op['y1'] - op['y0']) < 0.01:
+            return {'left': f"{_fmt(min(op['x0'], op['x1']))}pt",
+                    'top': f"{_fmt(op['y0'] - op['width'] / 2)}pt",
+                    'width': f"{_fmt(abs(op['x1'] - op['x0']))}pt",
+                    'height': '0',
+                    'border-top': f"{_fmt(op['width'])}pt dashed "
+                                  f"{op['color']}"}
+        return {'left': f"{_fmt(op['x0'] - op['width'] / 2)}pt",
+                'top': f"{_fmt(min(op['y0'], op['y1']))}pt",
+                'width': '0',
+                'height': f"{_fmt(abs(op['y1'] - op['y0']))}pt",
+                'border-left': f"{_fmt(op['width'])}pt dashed {op['color']}"}
     if abs(op['y1'] - op['y0']) < 0.01:
-        width = abs(op['x1'] - op['x0'])
-        style = (f"left:{_fmt(min(op['x0'], op['x1']))}pt;"
-                 f"top:{_fmt(op['y0'] - op['width'] / 2)}pt;"
-                 f"width:{_fmt(width)}pt;height:{_fmt(max(op['width'], 0.5))}pt;"
-                 f"background:{op['color']}")
-    else:
-        height = abs(op['y1'] - op['y0'])
-        style = (f"left:{_fmt(op['x0'] - op['width'] / 2)}pt;"
-                 f"top:{_fmt(min(op['y0'], op['y1']))}pt;"
-                 f"width:{_fmt(max(op['width'], 0.5))}pt;height:{_fmt(height)}pt;"
-                 f"background:{op['color']}")
-    return f'<div class="s" style="{style}"></div>'
+        return {'left': f"{_fmt(min(op['x0'], op['x1']))}pt",
+                'top': f"{_fmt(op['y0'] - op['width'] / 2)}pt",
+                'width': f"{_fmt(abs(op['x1'] - op['x0']))}pt",
+                'height': f"{_fmt(max(op['width'], 0.5))}pt",
+                'background': op['color']}
+    return {'left': f"{_fmt(op['x0'] - op['width'] / 2)}pt",
+            'top': f"{_fmt(min(op['y0'], op['y1']))}pt",
+            'width': f"{_fmt(max(op['width'], 0.5))}pt",
+            'height': f"{_fmt(abs(op['y1'] - op['y0']))}pt",
+            'background': op['color']}
 
 
-def _escape_html(text):
-    return (str(text).replace('&', '&amp;').replace('<', '&lt;')
-            .replace('>', '&gt;'))
+def html_text_attrs(op, page=None):
+    """Plain-data description of one text run (position, face, direction).
 
-
-def _html_urdu_markup(text):
-    """Keep embedded figures/Latin codes left-to-right inside an RTL run.
-
-    The PDF backend shapes those tokens as LTR runs; a browser would otherwise
-    let the RTL paragraph bidi reorder a figure such as ``12×18``.  Wrapping the
-    token in ``dir="ltr"`` makes the print page agree with the PDF without
-    changing the logical text.
+    ``runs`` is the text split into ``{'text', 'ltr'}`` pieces: a figure or a
+    Latin code inside an Urdu line must sit in its own left-to-right isolate,
+    otherwise the browser's bidi pass reorders it and the scanned page no
+    longer reads like the PDF.
     """
-    parts = []
-    for token in _RUN_TOKEN.findall(text or ''):
-        if re.fullmatch(_LTR_RUN, token):
-            parts.append(f'<span dir="ltr">{_escape_html(token)}</span>')
-        else:
-            parts.append(_escape_html(token))
-    return ''.join(parts)
-
-
-def _html_text(op, page=None):
     size = op['size']
     font = op['font']
     ratio = _BASELINE_RATIO.get(font, 0.85)
-    color = op['color']
     page_w = page.w if page is not None else PAGE_W
     if font == 'ur':
         family = f"{URDU_FAMILY}, 'Noto Nastaliq Urdu', serif"
@@ -1435,34 +1462,82 @@ def _html_text(op, page=None):
         family = "'DejaVu Sans', Arial, sans-serif"
         direction = 'ltr'
         weight = '700' if font == SANS_BOLD else '400'
-    anchor = []
+    style = {}
     if op['align'] == 'right':
-        anchor.append(f"right:{_fmt(page_w - op['x'])}pt")
+        style['right'] = f'{_fmt(page_w - op["x"])}pt'
         align = 'right'
     elif op['align'] == 'center':
-        anchor.append(f"left:{_fmt(op['x'])}pt")
+        style['left'] = f'{_fmt(op["x"])}pt'
         align = 'center'
-        anchor.append("transform:translateX(-50%)")
+        style['transform'] = 'translateX(-50%)'
     else:
-        anchor.append(f"left:{_fmt(op['x'])}pt")
+        style['left'] = f'{_fmt(op["x"])}pt'
         align = 'left'
-    style = ';'.join([
-        *anchor,
-        f"top:{_fmt(op['y'] - ratio * size)}pt",
-        f"font-family:{family}",
-        f"font-size:{_fmt(size)}pt",
-        f"font-weight:{weight}",
-        f"color:{color}",
-        'line-height:1',
-        f"text-align:{align}",
-        f"direction:{direction}",
-        'white-space:nowrap',
-        'padding:0',
-    ])
+    style.update({
+        'top': f'{_fmt(op["y"] - ratio * size)}pt',
+        'font-family': family,
+        'font-size': f'{_fmt(size)}pt',
+        'font-weight': weight,
+        'color': op['color'],
+        'line-height': '1',
+        'text-align': align,
+        'direction': direction,
+        'white-space': 'nowrap',
+        'padding': '0',
+    })
     if op['spacing']:
-        style += f";letter-spacing:{_fmt(op['spacing'])}pt"
+        style['letter-spacing'] = f'{_fmt(op["spacing"])}pt'
     if font == 'ur' and op['bold']:
-        style += f";-webkit-text-stroke:{_fmt(max(0.16, size * 0.024))}pt {color}"
-    text = (_html_urdu_markup(op['text']) if font == 'ur'
-            else _escape_html(op['text']))
-    return f'<div class="t" style="{style}">{text}</div>'
+        style['-webkit-text-stroke'] = (
+            f'{_fmt(max(0.16, size * 0.024))}pt {op["color"]}')
+    runs = []
+    if font != 'ur':
+        runs.append({'text': op['text'] or '', 'ltr': False})
+    else:
+        # Adjacent Urdu tokens are merged into one run with their spaces kept,
+        # so a word the markup split (``12 ملی میٹر`` is three tokens) still
+        # appears - and still searches - as the phrase printed on the paper.
+        for token in _RUN_TOKEN.findall(op['text'] or ''):
+            if re.fullmatch(_LTR_RUN, token):
+                runs.append({'text': token, 'ltr': True})
+            elif runs and not runs[-1]['ltr']:
+                runs[-1]['text'] += token
+            else:
+                runs.append({'text': token, 'ltr': False})
+    return {'style': style, 'runs': runs}
+
+
+def _html_rect(attrs):
+    return f'<div class="s" style="{_style_text(attrs)}"></div>'
+
+
+def _html_line(attrs):
+    return f'<div class="s" style="{_style_text(attrs)}"></div>'
+
+
+def _html_text(attrs):
+    text = ''.join(
+        (f'<span dir="ltr">{_escape_html(run["text"])}</span>'
+         if run['ltr'] else _escape_html(run['text']))
+        for run in attrs['runs'])
+    return f'<div class="t" style="{_style_text(attrs["style"])}">{text}</div>'
+
+
+def _escape_html(text):
+    return (str(text).replace('&', '&amp;').replace('<', '&lt;')
+            .replace('>', '&gt;'))
+
+
+def _html_urdu_markup(text):
+    """Escape an Urdu run, keeping embedded figures/Latin codes LTR.
+
+    The PDF backend shapes those tokens as left-to-right runs; a browser would
+    otherwise let the RTL paragraph bidi reorder a figure such as ``12×18``.
+    """
+    parts = []
+    for token in _RUN_TOKEN.findall(text or ''):
+        if re.fullmatch(_LTR_RUN, token):
+            parts.append(f'<span dir="ltr">{_escape_html(token)}</span>')
+        else:
+            parts.append(_escape_html(token))
+    return ''.join(parts)

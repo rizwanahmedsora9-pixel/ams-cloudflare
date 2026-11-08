@@ -54,26 +54,29 @@ def _with_urdu_item_names(items, lang):
     return rows
 
 
-@bp.route('/download_invoice/<path:bill_no>')
-@login_required
-def download_invoice(bill_no):
+def bill_document_source(bill_no, *, hint_type=None, hint_id=None,
+                         hint_client_code=None, hint_client_name=None,
+                         hint_entry_id=None):
+    """Collect everything the Urdu sheet needs for one bill reference.
+
+    Shared by the download/print route and the page behind the printed QR, so
+    a scanned bill and a re-printed bill are assembled by one code path and
+    cannot disagree.  Returns a dict, or ``None`` when the reference matches
+    no bill at all.
+    """
+    hint_type = (hint_type or '').strip().lower()
+    hint_id = str(hint_id or '').strip()
     booking, payment, invoice, sale, grn, pending = _lookup_bill(
         bill_no,
-        hint_type=request.args.get('src'),
-        hint_id=request.args.get('src_id'),
-        hint_client_code=request.args.get('client_code'),
-        hint_client_name=request.args.get('client_name'),
-        hint_entry_id=request.args.get('entry_id')
+        hint_type=hint_type,
+        hint_id=hint_id,
+        hint_client_code=hint_client_code,
+        hint_client_name=hint_client_name,
+        hint_entry_id=hint_entry_id
     )
-    entry_hint_id = request.args.get('entry_id')
-    hint_type = (request.args.get('src') or '').strip().lower()
-    hint_id = (request.args.get('src_id') or '').strip()
-
     candidates_map = _bill_lookup_candidates_map(booking, payment, invoice, sale, grn, pending)
     effective_candidates = _effective_collision_candidates(candidates_map)
-    if not hint_type and not hint_id and len(effective_candidates) > 1:
-        flash('Multiple records match this bill reference. Please choose the exact document type first.', 'warning')
-        return redirect(url_for('view_bill', bill_no=bill_no))
+    ambiguous = not hint_type and not hint_id and len(effective_candidates) > 1
 
     bill_obj = None
     grn_bd = None
@@ -351,9 +354,161 @@ def download_invoice(bill_no):
         bill_type = 'PendingBill'
         items = []
 
-    if not bill_obj:
+    return {
+        'ambiguous': ambiguous,
+        'bill': bill_obj,
+        'bill_type': bill_type,
+        'entry_hint_id': hint_entry_id,
+        'items': items,
+        'client': client,
+        'client_balance': client_balance,
+        'previous_balance': previous_balance,
+        'delivery_people': delivery_people,
+        'grn_bd': grn_bd,
+        # Context panels of the English receipt; the Urdu sheet ignores them,
+        # but the template below still receives them unchanged.
+        'recent_deliveries': recent_deliveries,
+        'material_ledger_recent': material_ledger_recent,
+        'material_stock_summary': material_stock_summary,
+        'direct_sale_rent_reconciliation': direct_sale_rent_reconciliation,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Urdu bill data
+# ---------------------------------------------------------------------------
+# Both the "Urdu PDF / Urdu Print" action and the page behind the printed QR
+# build their sheet from these two helpers, so a scanned bill lists exactly the
+# materials, names and figures the paper bill does.
+
+# Which bill number the QR token carries: the same one the sheet prints.
+def bill_number_of(bill_type, bill):
+    """The reference the Urdu sheet prints in its meta strip."""
+    if bill_type == 'PendingBill':
+        bill_no = (getattr(bill, 'bill_no', '') or '')
+        if bill_no:
+            return bill_no
+    for name in ('manual_bill_no', 'auto_bill_no', 'invoice_no', 'bill_no'):
+        value = (getattr(bill, name, '') or '').strip()
+        if value:
+            return value
+    return ''
+
+
+def _urdu_driver_name(bill):
+    """``(urdu, saved latin)`` for the bill's delivery person."""
+    driver_name = (getattr(bill, 'driver_name', None) or '').strip()
+    if not driver_name:
+        return '', ''
+    driver = DeliveryPerson.query.filter(
+        func.lower(func.trim(DeliveryPerson.name)) == driver_name.lower()
+    ).first()
+    return urdu_name(driver_name, getattr(driver, 'name_ur', None)), driver_name
+
+
+def urdu_bill_data(source, *, show_terms=False, terms=None):
+    """Urdu names, items and terms for one :func:`bill_document_source` result.
+
+    Pure read: it fills in the Urdu item names the sheet prints, translates the
+    client and delivery names, and (when the user asked for them) collects the
+    selected terms and conditions.  Every figure is left as stored - the
+    document builder never recomputes a total.
+    """
+    bill_obj = source['bill']
+    client = source['client']
+    items = _with_urdu_item_names(source['items'], 'ur')
+    delivery_people = source['delivery_people']
+    client_name_ur = ''
+    if client is not None:
+        client_name_ur = (getattr(client, 'name_ur', None) or '').strip()
+    driver_name_ur, _latin = _urdu_driver_name(bill_obj)
+    client_name = (getattr(bill_obj, 'client_name', None)
+                   or getattr(client, 'name', '') or '')
+    client_name_ur = urdu_name(client_name, client_name_ur)
+    if delivery_people:
+        translated = []
+        for name in delivery_people:
+            driver = DeliveryPerson.query.filter(
+                func.lower(func.trim(DeliveryPerson.name))
+                == name.strip().lower()).first()
+            translated.append(urdu_name(name, getattr(driver, 'name_ur', None)))
+        delivery_people = translated
+    return {
+        'items': items,
+        'client_name_ur': client_name_ur,
+        'driver_name_ur': driver_name_ur,
+        'delivery_people': delivery_people,
+        'terms': get_selected_terms(terms) if show_terms else [],
+    }
+
+
+def urdu_bill_document(source, *, show_terms=False, terms=None):
+    """The complete :mod:`app.services.bill_urdu` document for one bill.
+
+    Built exactly as ``download_invoice?lang=ur`` builds it (same source data,
+    same Urdu names, same terms, same QR payload), which is what lets the
+    scanned page show the sheet that was printed.
+    """
+    from app.services import bill_urdu
+
+    bill_obj = source['bill']
+    bill_type = source['bill_type']
+    prepared = urdu_bill_data(source, show_terms=show_terms, terms=terms)
+    tx_code, tx_label, tx_note = _resolve_transaction_type(
+        bill_type, bill_obj, entry_hint_id=source.get('entry_hint_id'))
+    from app.services.bilingual import urdu_tx_label, urdu_tx_note
+    tx_label = urdu_tx_label(tx_code, tx_label)
+    tx_note = urdu_tx_note(tx_note)
+    return bill_urdu.build_document(
+        bill_type=bill_type,
+        bill=bill_obj,
+        items=prepared['items'],
+        client=source['client'],
+        previous_balance=source['previous_balance'],
+        client_balance=source['client_balance'],
+        delivery_people=prepared['delivery_people'],
+        driver_name_ur=prepared['driver_name_ur'],
+        client_name_ur=prepared['client_name_ur'],
+        transaction_label=tx_label,
+        transaction_note=tx_note,
+        settings=Settings.query.first(),
+        terms=prepared['terms'],
+        grn_bd=source['grn_bd'],
+        party_label='',
+    )
+
+
+@bp.route('/download_invoice/<path:bill_no>')
+@login_required
+def download_invoice(bill_no):
+    source = bill_document_source(
+        bill_no,
+        hint_type=request.args.get('src'),
+        hint_id=request.args.get('src_id'),
+        hint_client_code=request.args.get('client_code'),
+        hint_client_name=request.args.get('client_name'),
+        hint_entry_id=request.args.get('entry_id'),
+    )
+    if source.get('ambiguous'):
+        flash('Multiple records match this bill reference. Please choose the '
+              'exact document type first.', 'warning')
+        return redirect(url_for('view_bill', bill_no=bill_no))
+    if not source.get('bill'):
         flash('Bill not found for download', 'danger')
         return redirect(url_for('index'))
+    bill_obj = source['bill']
+    bill_type = source['bill_type']
+    items = source['items']
+    client = source['client']
+    client_balance = source['client_balance']
+    previous_balance = source['previous_balance']
+    delivery_people = source['delivery_people']
+    grn_bd = source['grn_bd']
+    recent_deliveries = source['recent_deliveries']
+    material_ledger_recent = source['material_ledger_recent']
+    material_stock_summary = source['material_stock_summary']
+    direct_sale_rent_reconciliation = source['direct_sale_rent_reconciliation']
+    entry_hint_id = request.args.get('entry_id')
 
     action = (request.args.get('action') or 'download').lower()
     disposition = 'inline' if action in ['print', 'view'] else 'attachment'
@@ -402,29 +557,15 @@ def download_invoice(bill_no):
             selected_terms_ur = get_selected_terms(tc_ids)
 
     # Prefer saved Urdu names; otherwise use a best-effort transliteration.
-    items = _with_urdu_item_names(items, lang)
-    client_name_ur = ''
-    driver_name_ur = ''
-    if lang == 'ur':
-        if client is not None:
-            client_name_ur = (getattr(client, 'name_ur', None) or '').strip()
-        driver_name = (getattr(bill_obj, 'driver_name', None) or '').strip()
-        if driver_name:
-            driver = DeliveryPerson.query.filter(
-                func.lower(func.trim(DeliveryPerson.name)) == driver_name.lower()
-            ).first()
-            driver_name_ur = urdu_name(driver_name, getattr(driver, 'name_ur', None))
-        client_name = getattr(bill_obj, 'client_name', None) or getattr(client, 'name', '')
-        client_name_ur = urdu_name(client_name, client_name_ur)
-        if delivery_people:
-            translated_people = []
-            for name in delivery_people:
-                driver = DeliveryPerson.query.filter(
-                    func.lower(func.trim(DeliveryPerson.name)) == name.strip().lower()
-                ).first()
-                translated_people.append(urdu_name(name, getattr(driver, 'name_ur', None)))
-            delivery_people = translated_people
-    tx_code, tx_label, tx_note = _resolve_transaction_type(bill_type, bill_obj, entry_hint_id=entry_hint_id)
+    # Shared with the scanned-bill page so both show the same Urdu names.
+    prepared = urdu_bill_data(source, show_terms=show_terms_ur,
+                              terms=selected_terms_ur)
+    items = prepared['items']
+    client_name_ur = prepared['client_name_ur']
+    driver_name_ur = prepared['driver_name_ur']
+    delivery_people = prepared['delivery_people']
+    tx_code, tx_label, tx_note = _resolve_transaction_type(
+        bill_type, bill_obj, entry_hint_id=source.get('entry_hint_id'))
     if lang == 'ur':
         from app.services.bilingual import urdu_tx_label, urdu_tx_note
         tx_label = urdu_tx_label(tx_code, tx_label)

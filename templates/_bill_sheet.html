@@ -1,0 +1,17 @@
+{#
+  Draws one wide-primitive of the Urdu sheet from plain data.
+
+  ``urdu_receipt.page_fragments()`` returns pages as
+  ``{'op': 'rect'|'line'|'text', 'attrs': {...}}``.  This macro turns one such
+  element into the same ``<div>`` the print page emits, so the page behind the
+  bill's QR is the printed sheet - drawn from data, never from pre-built HTML.
+  Text is always escaped by Jinja; a Latin figure inside an Urdu run is wrapped
+  in its own left-to-right isolate so the browser's bidi pass cannot reorder it.
+#}
+{% macro sheet_element(element) -%}
+{%- if element.op == 'text' -%}
+<div class="t" style="{% for key, value in element.attrs.style.items() %}{{ key }}:{{ value }};{% endfor %}">{% for run in element.attrs.runs %}{% if run.ltr %}<span dir="ltr">{{ run.text }}</span>{% else %}{{ run.text }}{% endif %}{% endfor %}</div>
+{%- else -%}
+<div class="s" style="{% for key, value in element.attrs.items() %}{{ key }}:{{ value }};{% endfor %}"></div>
+{%- endif -%}
+{%- endmacro %}

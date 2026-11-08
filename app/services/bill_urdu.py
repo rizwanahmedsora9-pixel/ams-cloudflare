@@ -259,17 +259,43 @@ def _panel_fields(bill_type, party_label, party_name, party_code, detail_rows):
 # ---------------------------------------------------------------------------
 # The code in the sheet's header is what a customer's phone reads.  The
 # reference receipt carried only the bill number there, so a scan showed
-# nothing useful; the approved sheet's QR is therefore a *bill summary*: shop,
-# bill number and type, date and time, the client's name and ID, the delivery
-# person, the line items and the money figures.  Scanning the printed sheet
-# (or the PDF on a phone) therefore shows the bill itself.
+# nothing useful.  The approved sheet's QR is now the *bill itself*: a short
+# signed link (see :mod:`app.services.bill_verify`) to a public page that shows
+# the identical receipt - shop, bill number and type, date and time, client
+# name and ID, delivery person, every line item and the money figures.
 #
-# Size discipline: the block is 51pt wide on an A5 sheet, so the symbol must
-# not grow past ~61 modules (about 0.26mm per module) or a phone camera stops
-# resolving it.  :func:`_qr_payload` therefore shrinks the content - item lines
-# first, then to the compact reference line - until the *actual* encoded
-# symbol fits that budget.  That is measured with the real encoder below, so
-# the printed code is always the scannable one.
+# Size discipline is the whole game here.  The block is 51pt (18mm) wide, so
+# every extra byte of payload shrinks every module:
+#
+#   * an 81-byte link  -> 37 modules -> 0.40mm modules -> scans from an
+#     ordinary 300dpi laser print and from a phone photo of it;
+#   * a 166-byte Urdu text summary (what this module used to print) -> 61
+#     modules -> 0.26mm modules -> a phone camera simply found no code, which
+#     is the "scanned the QR, nothing found" report this replaced;
+#   * 200+ bytes -> past the QR versions a 18mm block can hold at all.
+#
+# So the link is the payload, and the text summary below is only the fallback
+# for a context with no reachable host (a unit test, a frozen PDF).  Either way
+# the *actual* encoded symbol is measured with the real encoder before it is
+# printed, so the sheet never carries a code that is too dense to scan.
+#
+# The budgets below were measured by rasterising the real sheet and decoding it
+# with OpenCV at 200/300/600dpi, with and without simulated camera blur:
+#
+#   payload      symbol   module   200dpi   300dpi   600dpi
+#   64- 84 chars  37 mods  0.400mm   ok       ok       ok
+#   94-104 chars  41 mods  0.367mm   blurry   ok       ok
+#  114-124 chars  45 mods  0.340mm   blurry   blurry   ok
+#  166 chars     61 mods  0.261mm   no code found at any resolution
+#
+# So a link is preferred at 37 modules, accepted at 41, and dropped for the
+# text summary beyond that: a code a phone cannot read is worse than a summary.
+QR_LINK_MODULES = 37
+QR_LINK_MODULES_MAX = 41
+# A host-less fallback has no link to offer at all, so the choice is between
+# the densest readable summary and no information: ``QR_MAX_MODULES`` allows
+# the bigger symbol an Urdu summary needs to keep the bill number, the client
+# and every money figure.
 QR_MAX_MODULES = 61
 QR_SEPARATOR = '|'
 _QR_LINE_WIDTH = 44
@@ -304,19 +330,20 @@ def _qr_item(item):
                     width=_QR_ITEM_WIDTH)
 
 
-def qr_symbol(text):
+def qr_symbol(text, max_modules=None):
     """``(matrix, error_level)`` for *text* at the most robust level that fits.
 
     ``m`` is preferred (more damage tolerance on a paper bill); ``l`` is used
     only when ``m`` would need a bigger symbol than the printed block can
-    resolve.  ``None`` when even ``l`` does not fit.
+    resolve.  ``None`` when even ``l`` does not fit ``max_modules``.
     """
     from app.services import qr_code
+    budget = max_modules or QR_MAX_MODULES
     for error in ('m', 'l'):
         for attempt in (error, error.upper()):
             matrix = qr_code.make_matrix(text, error=attempt)
             if matrix:
-                return (matrix, error) if len(matrix) <= QR_MAX_MODULES else None
+                return (matrix, error) if len(matrix) <= budget else None
     return None
 
 
@@ -359,7 +386,9 @@ def _qr_payload(doc, item_rows, *, company_name='', client_name='',
         found = qr_symbol(text)
         return found[1] if found else None
 
-    # The signed verify link opens the whole bill, so it is the best payload.
+    # The signed verify link opens the whole bill - the same sheet, every
+    # material line and every total - and is by far the shortest payload, so
+    # it always wins when the app knows a host the customer's phone can reach.
     if bill_id is not None:
         try:
             from app.services import bill_verify
@@ -368,9 +397,10 @@ def _qr_payload(doc, item_rows, *, company_name='', client_name='',
         except Exception:
             link = ''
         if link:
-            error = encode(link)
-            if error:
-                return link, error
+            for budget in (QR_LINK_MODULES, QR_LINK_MODULES_MAX):
+                found = qr_symbol(link, budget)
+                if found:
+                    return link, found[1]
 
     # Text payload: keep the essentials, then fit as many *real* line items as
     # the symbol allows.  The optional extras (shop name, bill type, delivery)
