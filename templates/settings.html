@@ -74,6 +74,16 @@
                             <label class="form-label small text-white-50">Currency Symbol</label>
                             <input type="text" name="currency" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.currency or '' }}">
                         </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small text-white-50">Proprietor Name (Urdu bill)</label>
+                            <input type="text" name="proprietor_name_ur" dir="rtl" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.proprietor_name_ur or '' }}" placeholder="عدنان احمد">
+                            <div class="form-text text-white-50">Printed under the address on the Urdu bill.</div>
+                        </div>
+                        <div class="col-12 mb-2">
+                            <label class="form-label small text-white-50">Shop Note (Urdu bill)</label>
+                            <input type="text" name="company_note_ur" dir="rtl" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.company_note_ur or '' }}" placeholder="سیمنٹ، سریا، اینٹ ... تعمیراتی سامان دستیاب ہے">
+                            <div class="form-text text-white-50">The availability strip above the bill panel. Left blank, the bill's own note is used.</div>
+                        </div>
                     </div>
                     <hr class="border-secondary my-2">
                     <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" name="allow_global_negative_stock" id="globalNegativeStock" {% if settings.allow_global_negative_stock %}checked{% endif %}><label class="form-check-label text-danger small" for="globalNegativeStock">Always Allow Negative Stock</label></div>

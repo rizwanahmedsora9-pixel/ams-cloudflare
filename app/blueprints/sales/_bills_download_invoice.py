@@ -425,6 +425,27 @@ def download_invoice(bill_no):
         from app.services.bilingual import urdu_tx_label, urdu_tx_note
         tx_label = urdu_tx_label(tx_code, tx_label)
         tx_note = urdu_tx_note(tx_note)
+        # An Urdu bill is its own document (app/services/urdu_receipt.py), not
+        # the English receipt with swapped labels: it has its own sheet,
+        # header, panel, table and footer, and the print view is that same
+        # sheet.  Both "Urdu PDF" and "Urdu Print" return it here.
+        return _urdu_bill_response(
+            bill_type=bill_type,
+            bill=bill_obj,
+            items=items,
+            client=client,
+            previous_balance=previous_balance,
+            client_balance=client_balance,
+            delivery_people=delivery_people,
+            driver_name_ur=driver_name_ur,
+            client_name_ur=client_name_ur,
+            transaction_label=tx_label,
+            transaction_note=tx_note,
+            terms=selected_terms_ur,
+            grn_bd=grn_bd,
+            action=action,
+            disposition=disposition,
+        )
     section_map = {
         'Booking': 'BOOKING',
         'Payment': 'PAYMENT',
@@ -492,3 +513,90 @@ def download_invoice(bill_no):
     response.headers['Content-Type'] = 'text/html; charset=utf-8'
     return response
 
+
+# ---------------------------------------------------------------------------
+# Urdu bill
+# ---------------------------------------------------------------------------
+# The Urdu bill is a fixed sheet defined in ``app/services/urdu_receipt.py``;
+# this route only collects the bill's data and hands it over.  Keeping the
+# document out of ``view_bill.html`` is deliberate: the Urdu sheet must not
+# inherit the English receipt's layout (or its black rules, ``INVOICE`` badge
+# and English table header) when a label is translated.
+
+_URDU_SECTION = {
+    'Booking': 'BOOKING',
+    'Payment': 'PAYMENT',
+    'DirectSale': 'DIRECTSALE',
+    'Invoice': 'INVOICE',
+    'GRN': 'GRN',
+    'PendingBill': 'PENDINGBILL',
+}
+
+
+def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
+                        client_balance, delivery_people, driver_name_ur,
+                        client_name_ur, transaction_label, transaction_note,
+                        terms, grn_bd, action, disposition):
+    """Return the Urdu bill as a PDF (download) or as the print page."""
+    from app.services import bill_urdu
+    from app.services.files_pdf import _safe_download_name
+    from app.services.time_money import pk_now
+
+    settings_obj = Settings.query.first()
+    client_name = getattr(bill, 'client_name', '') or (
+        getattr(client, 'name', '') if client is not None else '')
+    party_label = ''
+
+    document = bill_urdu.build_document(
+        bill_type=bill_type,
+        bill=bill,
+        items=items,
+        client=client,
+        previous_balance=previous_balance,
+        client_balance=client_balance,
+        delivery_people=delivery_people,
+        driver_name_ur=driver_name_ur,
+        client_name_ur=client_name_ur,
+        transaction_label=transaction_label,
+        transaction_note=transaction_note,
+        settings=settings_obj,
+        terms=terms,
+        grn_bd=grn_bd,
+        party_label=party_label,
+    )
+
+    stamp = pk_now().strftime('%d-%m-%Y_%I-%M%p')
+    section = _URDU_SECTION.get(bill_type, 'BILL')
+    title = f"Urdu {bill_type or 'Bill'} - {document.get('bill_no') or ''}".strip()
+
+    if action == 'print':
+        html = bill_urdu.render_html(document, title=title,
+                                     auto_print=False)
+        response = make_response(html)
+        name = _safe_download_name(f'{section}-{stamp}-UR.html', 'bill-ur.html')
+        response.headers['Content-Disposition'] = f'{disposition}; filename={name}'
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
+
+    data = bill_urdu.render_pdf(document, title=title)
+    if not data:
+        # ReportLab is a hard dependency of the PDF path; if it is missing the
+        # printable page is still a correct Urdu bill, so serve that instead of
+        # an error.
+        html = bill_urdu.render_html(document, title=title)
+        response = make_response(html)
+        name = _safe_download_name(f'{section}-{stamp}-UR.html', 'bill-ur.html')
+        response.headers['Content-Disposition'] = f'{disposition}; filename={name}'
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        return response
+
+    name = _safe_download_name(f'{section}-{stamp}-UR.pdf', 'bill-ur.pdf')
+    response = make_response(data)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Length'] = str(len(data))
+    response.headers['Content-Disposition'] = f'{disposition}; filename={name}'
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response

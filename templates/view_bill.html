@@ -419,10 +419,10 @@
         </div>
         <div class="rcpt-header-right">
             <div class="rcpt-doc-type">
-                {% if type == 'Payment' %}{{ 'RECEIPT'|bill_label(bill_lang) }}
-                {% elif type == 'MaterialReturn' %}{{ 'MATERIAL RETURN'|bill_label(bill_lang) }}
-                {% elif type == 'GRN' %}{{ 'GOODS RECEIVED'|bill_label(bill_lang) }}
-                {% else %}{{ 'INVOICE'|bill_label(bill_lang) }}{% endif %}
+                {% if type == 'Payment' %}RECEIPT
+                {% elif type == 'MaterialReturn' %}MATERIAL RETURN
+                {% elif type == 'GRN' %}GOODS RECEIVED
+                {% else %}INVOICE{% endif %}
             </div>
             {% if transaction_type_label %}
             <div class="rcpt-tx-badge">{{ transaction_type_label|bill_label(bill_lang) }}</div>
@@ -431,7 +431,7 @@
             <div class="rcpt-doc-no">{{ bill.auto_bill_no }}</div>
             {% endif %}
             {% if bill.manual_bill_no is defined and bill.manual_bill_no %}
-            <div style="font-size:11px; font-weight:700; margin-top:2px;">{{ 'MB:'|bill_label(bill_lang) }} {{ bill.manual_bill_no }}</div>
+            <div style="font-size:11px; font-weight:700; margin-top:2px;">MB: {{ bill.manual_bill_no }}</div>
             {% elif bill.invoice_no is defined and bill.invoice_no %}
             <div style="font-size:11px; font-weight:700; margin-top:2px;">{{ bill.invoice_no }}</div>
             {% endif %}
@@ -449,9 +449,9 @@
         <div class="rcpt-parties">
             <div>
                 {% if type == 'GRN' %}
-                <div class="rcpt-party-label">{{ 'Supplier'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-party-label">Supplier</div>
                 {% else %}
-                <div class="rcpt-party-label">{{ 'Bill To'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-party-label">Bill To</div>
                 {% endif %}
                 {% if type == 'GRN' %}
                 <div class="rcpt-party-name">{{ bill.supplier_name or ('N/A'|bill_label(bill_lang)) }}</div>
@@ -462,7 +462,7 @@
                 <div class="rcpt-party-name">{{ bill.client_name or (client.name if client else ('N/A'|bill_label(bill_lang))) }}</div>
                 {% endif %}
                 {% if client and client.code %}
-                <div class="rcpt-party-sub">{{ 'Code:'|bill_label(bill_lang) }} {{ client.code }}</div>
+                <div class="rcpt-party-sub">Code: {{ client.code }}</div>
                 {% endif %}
                 {% if client and client.address %}
                 <div class="rcpt-party-sub">{{ client.address }}</div>
@@ -474,7 +474,7 @@
             </div>
             {% if transaction_type_note %}
             <div style="text-align:right;">
-                <div class="rcpt-party-label">{{ 'Note'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-party-label">Note</div>
                 <div style="font-size:11px; font-weight:700; max-width:180px;">{{ transaction_type_note|bill_label(bill_lang) }}</div>
             </div>
             {% endif %}
@@ -494,34 +494,34 @@
             (bill_note)
         %}
         {% if has_tx_details %}
-        <div class="rcpt-section-title">{{ 'Transaction Details'|bill_label(bill_lang) }}</div>
+        <div class="rcpt-section-title">Transaction Details</div>
         <div class="rcpt-detail-box" style="margin-bottom:8px;">
             {% if bill.method is defined and bill.method %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Method'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.method|bill_label(bill_lang) }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Method</span><span class="rcpt-detail-val">{{ bill.method|bill_label(bill_lang) }}</span></div>
             {% endif %}
             {% if bill.payment_type is defined and bill.payment_type %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Payment Type'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.payment_type|bill_label(bill_lang) }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Payment Type</span><span class="rcpt-detail-val">{{ bill.payment_type|bill_label(bill_lang) }}</span></div>
             {% endif %}
             {% if bill.bank_name is defined and bill.bank_name %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Bank'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.bank_name }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Bank</span><span class="rcpt-detail-val">{{ bill.bank_name }}</span></div>
             {% endif %}
             {% if bill.account_name is defined and bill.account_name %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Account Name'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.account_name }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Account Name</span><span class="rcpt-detail-val">{{ bill.account_name }}</span></div>
             {% endif %}
             {% if bill.account_no is defined and bill.account_no %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Account No.'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.account_no }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Account No.</span><span class="rcpt-detail-val">{{ bill.account_no }}</span></div>
             {% endif %}
             {% if delivery_people is defined and delivery_people %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ ('Delivery Persons' if delivery_people|length > 1 else 'Delivery Person')|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ ", ".join(delivery_people)|bill_label(bill_lang) }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Delivery Persons' if delivery_people|length > 1 else 'Delivery Person' }}</span><span class="rcpt-detail-val">{{ ", ".join(delivery_people)|bill_label(bill_lang) }}</span></div>
             {% elif bill.driver_name is defined and bill.driver_name %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Delivery Person'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{% if bill_lang == 'ur' and driver_name_ur %}{{ driver_name_ur|bill_label(bill_lang) }}{% else %}{{ bill.driver_name }}{% endif %}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Delivery Person</span><span class="rcpt-detail-val">{% if bill_lang == 'ur' and driver_name_ur %}{{ driver_name_ur|bill_label(bill_lang) }}{% else %}{{ bill.driver_name }}{% endif %}</span></div>
             {% endif %}
             {% if bill.supplier_invoice_no is defined and bill.supplier_invoice_no %}
-            <div class="rcpt-detail-row"><span class="rcpt-detail-label">{{ 'Supplier Invoice #'|bill_label(bill_lang) }}</span><span class="rcpt-detail-val">{{ bill.supplier_invoice_no }}</span></div>
+            <div class="rcpt-detail-row"><span class="rcpt-detail-label">Supplier Invoice #</span><span class="rcpt-detail-val">{{ bill.supplier_invoice_no }}</span></div>
             {% endif %}
             {% if bill_note %}
             <div class="rcpt-detail-row" style="flex-direction:column; gap:2px;">
-                <span class="rcpt-detail-label">{{ 'Notes'|bill_label(bill_lang) }}</span>
+                <span class="rcpt-detail-label">Notes</span>
                 <span style="font-weight:700;">{{ bill_note }}</span>
             </div>
             {% endif %}
@@ -529,14 +529,14 @@
         {% endif %}
 
         <!-- Items Table -->
-        <div class="rcpt-section-title">{{ 'Items'|bill_label(bill_lang) }}</div>
+        <div class="rcpt-section-title">Items</div>
         <table class="rcpt-table">
             <thead>
                 <tr>
-                    <th class="text-start">{{ 'Description / Material'|bill_label(bill_lang) }}</th>
-                    <th class="text-end" style="width:60px;">{{ 'Qty'|bill_label(bill_lang) }}</th>
-                    <th class="text-end" style="width:70px;">{{ 'Rate'|bill_label(bill_lang) }}</th>
-                    <th class="text-end" style="width:80px;">{{ 'Amount'|bill_label(bill_lang) }}</th>
+                    <th class="text-start">Description / Material</th>
+                    <th class="text-end" style="width:60px;">Qty</th>
+                    <th class="text-end" style="width:70px;">Rate</th>
+                    <th class="text-end" style="width:80px;">Amount</th>
                 </tr>
             </thead>
             <tbody>
@@ -555,7 +555,7 @@
                 {% if not items and type == 'Payment' %}
                 <tr>
                     <td colspan="4" class="text-center" style="padding:6px; font-style:italic;">
-                        {{ 'Payment Received'|bill_label(bill_lang) }}{% if bill.method %} {{ 'via'|bill_label(bill_lang) }} {{ bill.method|bill_label(bill_lang) }}{% endif %}
+                        Payment Received{% if bill.method %} via {{ bill.method|bill_label(bill_lang) }}{% endif %}
                         {% if bill.bank_name %} ({{ bill.bank_name }}){% endif %}
                     </td>
                 </tr>
@@ -563,7 +563,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Current Bill Total:'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Current Bill Total:</td>
                     <td class="text-end">{{ fmt_num(safe_bill_amount) }}</td>
                 </tr>
                 {% set bill_discount = (bill.discount|default(0, true)|float) if (bill.discount is defined) else 0 %}
@@ -573,49 +573,49 @@
                 {% set net_change = (safe_bill_amount - safe_bill_paid - bill_discount) %}
                 {% set total_outstanding = (safe_previous_balance + net_change) %}
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Previous Balance:'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Previous Balance:</td>
                     <td class="text-end">{{ fmt_num(safe_previous_balance) }}</td>
                 </tr>
                 {% if bill_discount > 0 %}
                 <tr>
-                    <td colspan="3" class="text-end" style="white-space:nowrap;">{{ 'Discount'|bill_label(bill_lang) }}{% if bill_discount_reason %}: {{ bill_discount_reason }}{% endif %}:</td>
+                    <td colspan="3" class="text-end" style="white-space:nowrap;">Discount{% if bill_discount_reason %}: {{ bill_discount_reason }}{% endif %}:</td>
                     <td class="text-end">{{ fmt_num(bill_discount) }}</td>
                 </tr>
                 {% endif %}
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Paid Amount:'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Paid Amount:</td>
                     <td class="text-end">{{ fmt_num(safe_bill_paid) }}</td>
                 </tr>
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Total Outstanding Balance:'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Total Outstanding Balance:</td>
                     <td class="text-end">{{ fmt_num(total_outstanding) }}</td>
                 </tr>
                 {% else %}
                 {% set show_prev_flow = (type in ['Booking', 'DirectSale', 'Invoice', 'PendingBill']) and (safe_previous_balance > 0.009) %}
                 {% if show_prev_flow %}
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Previous Balance Pending:'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Previous Balance Pending:</td>
                     <td class="text-end">{{ fmt_num(safe_previous_balance) }}</td>
                 </tr>
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Total (Previous + Current):'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Total (Previous + Current):</td>
                     <td class="text-end">{{ fmt_num(safe_previous_balance + safe_bill_amount) }}</td>
                 </tr>
                 {% endif %}
                 {% if bill_discount > 0 %}
                 <tr>
-                    <td colspan="3" class="text-end" style="white-space:nowrap;">{{ 'Discount'|bill_label(bill_lang) }}{% if bill_discount_reason %}: {{ bill_discount_reason }}{% endif %}:</td>
+                    <td colspan="3" class="text-end" style="white-space:nowrap;">Discount{% if bill_discount_reason %}: {{ bill_discount_reason }}{% endif %}:</td>
                     <td class="text-end">- {{ fmt_num(bill_discount) }}</td>
                 </tr>
                 {% endif %}
                 {% if type in ['Booking', 'DirectSale', 'Invoice', 'GRN'] %}
                 <tr>
-                    <td colspan="3" class="text-end">{{ 'Paid Amount:'|bill_label(bill_lang) }}</td>
+                    <td colspan="3" class="text-end">Paid Amount:</td>
                     <td class="text-end">- {{ fmt_num(safe_bill_paid) }}</td>
                 </tr>
                 <tr>
                     <td colspan="3" class="text-end" style="font-size:1.05em;">
-                        {% if show_prev_flow %}{{ 'Total Due (Carry Forward):'|bill_label(bill_lang) }}{% else %}{{ 'Bill Pending:'|bill_label(bill_lang) }}{% endif %}
+                        {% if show_prev_flow %}Total Due (Carry Forward):{% else %}Bill Pending:{% endif %}
                     </td>
                     {% if type == 'GRN' %}
                     <td class="text-end">{{ fmt_num(safe_bill_amount - safe_bill_paid) }}</td>
@@ -632,27 +632,27 @@
 
         {% if type == 'GRN' and grn_bd %}
         <!-- GRN actual cost, obligations and payments -->
-        <div class="rcpt-section-title" style="margin-top:6px;">{{ 'Actual Purchase Cost & Payments'|bill_label(bill_lang) }}</div>
+        <div class="rcpt-section-title" style="margin-top:6px;">Actual Purchase Cost & Payments</div>
         <table class="rcpt-table">
             <tbody>
-                <tr><td colspan="3" class="text-end">{{ 'Supplier Material Amount'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.supplier_material_amount) }}</td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'GRN Costs Billed to Supplier'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.supplier_billed_charges) }}</td></tr>
-                <tr><td colspan="3" class="text-end"><b>{{ 'Supplier Ledger Bill'|bill_label(bill_lang) }}</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.supplier_bill_amount) }}</b></td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Vehicle Fare'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.vehicle_fare) }}</td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Loading'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.loading) }}</td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Unloading'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.unloading) }}</td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Other Charges'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.other_charges) }}</td></tr>
-                <tr><td colspan="3" class="text-end"><b>{{ 'Total Actual Purchase Cost'|bill_label(bill_lang) }}</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.landed_cost_total) }}</b></td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Average Actual Cost / Unit'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.average_actual_rate) }}</td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Supplier Paid / Remaining'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.supplier_paid) }} / {{ fmt_num(grn_bd.supplier_remaining) }}</td></tr>
-                <tr><td colspan="3" class="text-end">{{ 'Additional Charges Paid / Remaining'|bill_label(bill_lang) }}</td><td class="text-end">{{ fmt_num(grn_bd.additional_paid) }} / {{ fmt_num(grn_bd.additional_remaining) }}</td></tr>
-                <tr><td colspan="3" class="text-end"><b>{{ 'Total Cash Actually Paid'|bill_label(bill_lang) }}</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.total_cash_paid) }}</b></td></tr>
+                <tr><td colspan="3" class="text-end">Supplier Material Amount</td><td class="text-end">{{ fmt_num(grn_bd.supplier_material_amount) }}</td></tr>
+                <tr><td colspan="3" class="text-end">GRN Costs Billed to Supplier</td><td class="text-end">{{ fmt_num(grn_bd.supplier_billed_charges) }}</td></tr>
+                <tr><td colspan="3" class="text-end"><b>Supplier Ledger Bill</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.supplier_bill_amount) }}</b></td></tr>
+                <tr><td colspan="3" class="text-end">Vehicle Fare</td><td class="text-end">{{ fmt_num(grn_bd.vehicle_fare) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Loading</td><td class="text-end">{{ fmt_num(grn_bd.loading) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Unloading</td><td class="text-end">{{ fmt_num(grn_bd.unloading) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Other Charges</td><td class="text-end">{{ fmt_num(grn_bd.other_charges) }}</td></tr>
+                <tr><td colspan="3" class="text-end"><b>Total Actual Purchase Cost</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.landed_cost_total) }}</b></td></tr>
+                <tr><td colspan="3" class="text-end">Average Actual Cost / Unit</td><td class="text-end">{{ fmt_num(grn_bd.average_actual_rate) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Supplier Paid / Remaining</td><td class="text-end">{{ fmt_num(grn_bd.supplier_paid) }} / {{ fmt_num(grn_bd.supplier_remaining) }}</td></tr>
+                <tr><td colspan="3" class="text-end">Additional Charges Paid / Remaining</td><td class="text-end">{{ fmt_num(grn_bd.additional_paid) }} / {{ fmt_num(grn_bd.additional_remaining) }}</td></tr>
+                <tr><td colspan="3" class="text-end"><b>Total Cash Actually Paid</b></td><td class="text-end"><b>{{ fmt_num(grn_bd.total_cash_paid) }}</b></td></tr>
             </tbody>
         </table>
         {% if grn_bd.obligations %}
-        <div class="rcpt-section-title" style="margin-top:6px;">{{ 'Payment Obligations & History'|bill_label(bill_lang) }}</div>
+        <div class="rcpt-section-title" style="margin-top:6px;">Payment Obligations & History</div>
         <table class="rcpt-table">
-            <thead><tr><th class="text-start">{{ 'Recipient / Charge'|bill_label(bill_lang) }}</th><th class="text-end">{{ 'Original'|bill_label(bill_lang) }}</th><th class="text-end">{{ 'Paid'|bill_label(bill_lang) }}</th><th class="text-end">{{ 'Remaining'|bill_label(bill_lang) }}</th></tr></thead>
+            <thead><tr><th class="text-start">Recipient / Charge</th><th class="text-end">Original</th><th class="text-end">Paid</th><th class="text-end">Remaining</th></tr></thead>
             <tbody>
             {% for ob in grn_bd.obligations %}
                 <tr><td class="text-start">{{ ob.label|bill_label(bill_lang) }} &rarr; {{ ob.recipient_name or (ob.recipient_label|bill_label(bill_lang)) }}</td><td class="text-end">{{ fmt_num(ob.original) }}</td><td class="text-end">{{ fmt_num(ob.paid) }}</td><td class="text-end">{{ fmt_num(ob.remaining) }}</td></tr>
@@ -664,14 +664,14 @@
 
         <!-- Material Delivery Summary -->
         {% if material_stock_summary %}
-        <div class="rcpt-section-title" style="margin-top:6px;">{{ 'Material Delivery Summary'|bill_label(bill_lang) }}</div>
+        <div class="rcpt-section-title" style="margin-top:6px;">Material Delivery Summary</div>
         <table class="rcpt-table">
             <thead>
                 <tr>
-                    <th class="text-start">{{ 'Material'|bill_label(bill_lang) }}</th>
-                    <th class="text-end" style="width:75px;">{{ 'Prev. Stock'|bill_label(bill_lang) }}</th>
-                    <th class="text-end" style="width:75px;">{{ 'Delivered'|bill_label(bill_lang) }}</th>
-                    <th class="text-end" style="width:80px;">{{ 'Remaining'|bill_label(bill_lang) }}</th>
+                    <th class="text-start">Material</th>
+                    <th class="text-end" style="width:75px;">Prev. Stock</th>
+                    <th class="text-end" style="width:75px;">Delivered</th>
+                    <th class="text-end" style="width:80px;">Remaining</th>
                 </tr>
             </thead>
             <tbody>
@@ -692,7 +692,7 @@
     <!-- Terms & Conditions (Urdu receipt only) -->
     {% if bill_lang == 'ur' and selected_terms_ur %}
     <div class="rcpt-terms">
-        <div class="rcpt-terms-title">{{ 'Terms & Conditions'|bill_label(bill_lang) }}</div>
+        <div class="rcpt-terms-title">Terms & Conditions</div>
         {% for term in selected_terms_ur %}
         <div class="rcpt-term">
             <div class="rcpt-term-title">{{ term.title|bill_label(bill_lang) }}</div>
@@ -706,16 +706,16 @@
     <div class="rcpt-footer">
         <div class="rcpt-sig-row">
             <div class="rcpt-sig-block">
-                <div class="rcpt-sig-label">{{ 'Receiver / Authorized Sign'|bill_label(bill_lang) }}</div>
-                <div class="rcpt-sig-sub">{{ 'Sign Here'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-sig-label">Receiver / Authorized Sign</div>
+                <div class="rcpt-sig-sub">Sign Here</div>
             </div>
             <div class="rcpt-sig-block right-align">
-                <div class="rcpt-sig-label">{{ 'Company Stamp'|bill_label(bill_lang) }}</div>
-                <div class="rcpt-sig-sub">{{ 'Stamp Here'|bill_label(bill_lang) }}</div>
+                <div class="rcpt-sig-label">Company Stamp</div>
+                <div class="rcpt-sig-sub">Stamp Here</div>
             </div>
         </div>
         <div class="rcpt-credits">
-            {{ 'Thank you for your business!'|bill_label(bill_lang) }} &nbsp;&bull;&nbsp; {{ 'Software by AMS SYSTEM FOR EASE'|bill_label(bill_lang) }}
+            Thank you for your business! &nbsp;&bull;&nbsp; Software by AMS SYSTEM FOR EASE
         </div>
     </div>
 

@@ -96,6 +96,11 @@ class Settings(db.Model):
     company_name = db.Column(db.String(100), default='FAZAL BUILDING MATERIALS')
     company_address = db.Column(db.String(200), default='JALAL PUR SOBTIAN')
     company_phone = db.Column(db.String(50), default='+92302-0000993 +92331-0000993')
+    # Urdu bill branding.  The proprietor signs the sheet (printed under the
+    # address) and the shop note is the standing availability strip above the
+    # bill panel.  Both optional; an empty value simply omits that line.
+    proprietor_name_ur = db.Column(db.String(120), default='')
+    company_note_ur = db.Column(db.String(500), default='')
     company_email = db.Column(db.String(100))
     tax_rate = db.Column(db.Float, default=0)
     invoice_prefix = db.Column(db.String(10), default='INV-')
