@@ -65,6 +65,9 @@
 }
 .rcpt-doc-no   { font-size:14px; font-weight:900; margin-top:5px; white-space:nowrap; }
 .rcpt-doc-date { font-size:10px; font-weight:600; margin-top:2px; color:#444 !important; white-space:nowrap; }
+/* Manual-bill reference line (class instead of an inline style so the print
+   sheet scales it with everything else). */
+.rcpt-doc-ref { font-size:11px; font-weight:700; margin-top:2px; }
 
 /* ---- BODY ---- */
 .rcpt-body { padding: 10px 20px 6px; }
@@ -168,64 +171,9 @@
 }
 
 /* ============================================================
-   PRINT STYLES
+   PRINT STYLES - shared with view_bill.html
    ============================================================ */
-@media print {
-    @page { size: A5 portrait; margin: 0; }
-    html, body {
-        margin:0 !important; padding:0 !important; background:#fff !important;
-        -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
-    }
-    .d-print-none { display:none !important; }
-
-    .rcpt-wrapper { max-width:100% !important; width:148mm !important; font-size:8.5pt !important; }
-
-    .rcpt-header {
-        position:fixed; top:0; left:0; right:0;
-        padding:6mm 10mm 5mm; background:#fff !important;
-        border-bottom:2.5px solid #000 !important;
-        box-sizing:border-box; z-index:100;
-    }
-    .rcpt-footer {
-        position:fixed; bottom:0; left:0; right:0;
-        padding:4mm 10mm 6mm; background:#fff !important;
-        border-top:2.5px solid #000 !important;
-        box-sizing:border-box; z-index:100;
-    }
-    .rcpt-body { margin-top:50mm; margin-bottom:48mm; padding:3mm 10mm 2mm; }
-
-    .rcpt-co-name  { font-size:14pt !important; }
-    .rcpt-co-sub, .rcpt-co-phone { font-size:7.5pt !important; }
-    .rcpt-doc-type { font-size:12pt !important; padding:2px 8px !important; }
-    .rcpt-tx-badge { font-size:7pt !important; }
-    .rcpt-doc-no   { font-size:10pt !important; }
-    .rcpt-doc-date { font-size:7.5pt !important; }
-    .rcpt-party-name  { font-size:11pt !important; }
-    .rcpt-party-label, .rcpt-party-sub { font-size:7pt !important; }
-    .rcpt-amount-val  { font-size:18pt !important; }
-    .rcpt-amount-label { font-size:7pt !important; }
-    .rcpt-section-title { font-size:7pt !important; }
-    .rcpt-detail-row  { font-size:7.5pt !important; padding:2px 5px !important; }
-    .rcpt-table  { font-size:7.5pt !important; }
-    .rcpt-table th { font-size:6.5pt !important; padding:2px 4px !important; }
-    .rcpt-table td, .rcpt-table tfoot td { padding:2px 4px !important; }
-    .rcpt-sig-label  { font-size:7.5pt !important; }
-    .rcpt-sig-sub    { font-size:6.5pt !important; }
-    .rcpt-credits    { font-size:6.5pt !important; }
-    .rcpt-sig-block  { padding-top:8px !important; }
-    .rcpt-sig-row    { margin-bottom:4px !important; }
-    .rcpt-terms { font-size: 7pt !important; padding: 4px 6px !important; margin-top: 6px !important; }
-    .rcpt-terms-title { font-size: 6.5pt !important; }
-    .rcpt-term { margin-bottom: 5px !important; }
-    .rcpt-term-title { font-size: 7pt !important; }
-    .rcpt-term-text { font-size: 7pt !important; line-height: 1.5 !important; }
-    .rcpt-wrapper, .rcpt-wrapper * { color:#000 !important; font-weight:700 !important; text-shadow:none !important; }
-    .rcpt-table th { background:#eee !important; }
-    .rcpt-table tfoot td { background:#f4f4f4 !important; }
-    .rcpt-table thead { display:table-header-group; }
-    .rcpt-table tfoot { display:table-footer-group; }
-    .rcpt-table tr { page-break-inside:avoid; }
-}
+{% include 'partials/_receipt_print_css.html' %}
 </style>
 
 <!-- Screen toolbar -->
@@ -280,7 +228,7 @@
             <div class="rcpt-doc-no">{{ bill.auto_bill_no }}</div>
             {% endif %}
             {% if bill.manual_bill_no is defined and bill.manual_bill_no %}
-            <div style="font-size:11px; font-weight:700; margin-top:2px;">{{ 'MB:'|bill_label(bill_lang) }} {{ bill.manual_bill_no }}</div>
+            <div class="rcpt-doc-ref">{{ 'MB:'|bill_label(bill_lang) }} {{ bill.manual_bill_no }}</div>
             {% endif %}
             {% if not (bill.auto_bill_no is defined and bill.auto_bill_no) and not (bill.manual_bill_no is defined and bill.manual_bill_no) %}
             <div class="rcpt-doc-no">---</div>
@@ -419,10 +367,6 @@
 {% include 'partials/urdu_terms_modal.html' %}
 
 {% if auto_print %}
-<script>
-    window.addEventListener('load', function () {
-        setTimeout(function () { window.print(); }, 150);
-    });
-</script>
+{% include 'partials/_receipt_auto_print.html' %}
 {% endif %}
 {% endblock %}

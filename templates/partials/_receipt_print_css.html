@@ -1,0 +1,145 @@
+{#
+  Print geometry for the A5 bill / receipt sheet.
+
+  Included inside the ``<style>`` block of ``view_bill.html`` and
+  ``payment_receipt.html`` so the two documents cannot drift apart.
+
+  The printed sheet is the bill view, printed.  One scale factor turns the
+  600px screen design into the A5 text block: the browser prints 13px as
+  8.5pt, and every size below is the design value scaled by that same
+  8.5 / 13, so type, padding, rules and column widths keep their ratios.
+
+  What this replaced: each class was re-sized by hand in pt, every text run
+  was forced bold (``font-weight: 700 !important`` on ``*``) and the header and
+  footer were ``position: fixed`` above a body that reserved a guessed 50mm /
+  48mm.  Page 1 therefore opened with a blank band under the letterhead, and a
+  bill longer than one page started page 2 *beneath* the fixed header and ended
+  it *under* the fixed footer - the rows printed on top of each other.  The
+  sheet now flows like the page the user approved, and browser print,
+  WeasyPrint and the ReportLab fallback all get the same document.
+#}
+@media print {
+    /* A5 plus a real printer margin: the sheet no longer bleeds to the paper
+       edge, so nothing is clipped by the printer's non-printable border. */
+    @page { size: A5 portrait; margin: 5mm; }
+
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .d-print-none { display: none !important; }
+
+    /* ---- the sheet ---- */
+    .rcpt-wrapper {
+        max-width: none !important;
+        width: 100% !important;
+        margin: 0 !important;
+        background: #fff !important;
+        font-size: 8.5pt;
+    }
+    /* Ink stays black and flat, but the design's own weights are kept: the old
+       blanket ``font-weight: 700`` is what made the print look heavier than
+       the bill on screen. */
+    .rcpt-wrapper, .rcpt-wrapper * {
+        color: #000 !important;
+        text-shadow: none !important;
+    }
+
+    /* ---- header ---- */
+    .rcpt-header {
+        padding: 9.2pt 13.1pt 6.5pt;
+        gap: 7.8pt;
+        border-bottom-width: 2.6px;
+    }
+    .rcpt-co-name { font-size: 14.4pt; letter-spacing: -0.44px; }
+    .rcpt-co-sub { font-size: 7.2pt; margin-top: 2pt; }
+    .rcpt-co-phone { font-size: 7.2pt; margin-top: 1.3pt; }
+    .rcpt-doc-type { font-size: 10.5pt; padding: 2.6pt 7.8pt; border-width: 2.2px; }
+    .rcpt-tx-badge { font-size: 6.5pt; padding: 1.3pt 4.6pt; margin-top: 2.6pt; }
+    .rcpt-doc-no { font-size: 9.2pt; margin-top: 3.3pt; }
+    .rcpt-doc-ref { font-size: 7.2pt; margin-top: 1.3pt; }
+    .rcpt-doc-date { font-size: 6.5pt; margin-top: 1.3pt; }
+
+    /* ---- body ---- */
+    .rcpt-body {
+        padding: 6.5pt 13.1pt 3.9pt;
+        margin: 0;
+    }
+    .rcpt-parties {
+        gap: 7.8pt;
+        margin-bottom: 6.5pt;
+        padding-bottom: 5.2pt;
+    }
+    .rcpt-party-label {
+        font-size: 5.9pt;
+        letter-spacing: 0.87px;
+        margin-bottom: 1.3pt;
+    }
+    .rcpt-party-name { font-size: 9.8pt; }
+    .rcpt-party-sub { font-size: 6.5pt; margin-top: 0.65pt; }
+    .rcpt-note-text { font-size: 7.2pt; max-width: 117.7pt; }
+    .rcpt-amount-label { font-size: 5.9pt; }
+    .rcpt-amount-val { font-size: 17pt; }
+
+    .rcpt-section-title {
+        font-size: 5.9pt;
+        letter-spacing: 0.87px;
+        padding-bottom: 1.3pt;
+        margin-bottom: 3.3pt;
+    }
+    .rcpt-detail-box { font-size: 7.2pt; margin-bottom: 5.2pt; }
+    .rcpt-detail-row { padding: 2pt 5.2pt; }
+
+    /* ---- items table ---- */
+    .rcpt-table { font-size: 7.5pt; margin-bottom: 5.2pt; }
+    .rcpt-table th { font-size: 6.5pt; padding: 2.6pt 3.9pt; letter-spacing: 0.44px; }
+    .rcpt-table td, .rcpt-table tfoot td { padding: 2.6pt 3.9pt; }
+    .rcpt-col-qty { width: 39.2pt; }
+    .rcpt-col-rate { width: 45.8pt; }
+    .rcpt-col-amount,
+    .rcpt-col-remaining { width: 52.3pt; }
+    .rcpt-col-stock,
+    .rcpt-col-sent { width: 49pt; }
+
+    /* ---- footer ---- */
+    .rcpt-footer {
+        padding: 5.2pt 13.1pt 7.8pt;
+        border-top-width: 2.6px;
+    }
+    .rcpt-sig-row { gap: 13.1pt; margin-bottom: 5.2pt; }
+    .rcpt-sig-block { padding-top: 5.2pt; }
+    .rcpt-sig-label { font-size: 6.5pt; }
+    .rcpt-sig-sub { font-size: 5.9pt; margin-top: 0.65pt; }
+    .rcpt-credits {
+        font-size: 6.2pt;
+        padding-top: 3.3pt;
+        margin-top: 3.9pt;
+    }
+
+    /* ---- terms (Urdu receipts) ---- */
+    .rcpt-terms { font-size: 7.2pt; padding: 3.9pt 5.2pt; margin-top: 5.2pt; }
+    .rcpt-terms-title { font-size: 5.9pt; margin-bottom: 2.6pt; padding-bottom: 1.3pt; }
+    .rcpt-term { margin-bottom: 3.9pt; }
+    .rcpt-term-title { font-size: 6.9pt; }
+    .rcpt-term-text { font-size: 6.9pt; line-height: 1.55; }
+
+    /* ---- pagination ---- */
+    .rcpt-table thead { display: table-header-group; }
+    .rcpt-table tfoot { display: table-footer-group; }
+    .rcpt-table tr,
+    .rcpt-parties,
+    .rcpt-detail-box,
+    .rcpt-detail-row,
+    .rcpt-sig-row,
+    .rcpt-sig-block,
+    .rcpt-terms,
+    .rcpt-term { break-inside: avoid; page-break-inside: avoid; }
+    .rcpt-section-title { break-after: avoid; page-break-after: avoid; }
+    .rcpt-table th { background: #eee !important; }
+    .rcpt-table tfoot td { background: #f4f4f4 !important; }
+    a[href]::after { content: none !important; }
+}
