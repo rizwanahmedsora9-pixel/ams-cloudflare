@@ -342,7 +342,6 @@ def register_hooks(app):
                         'services': Service.query.filter_by(is_active=True).order_by(Service.name.asc()).all(),
                         'delivery_persons': DeliveryPerson.query.filter_by(is_active=True).order_by(DeliveryPerson.name.asc()).all(),
                         'settings': Settings.query.first(),
-                        'terms': get_active_terms(),
                     }
                     app._dropdown_cache = cache_obj
                 except Exception:
@@ -377,9 +376,8 @@ def register_hooks(app):
                 delivery_persons=cache_obj.get('delivery_persons') or [],
                 settings=cache_obj.get('settings'),
                 # Terms & Conditions feed the Urdu print/download dialog on the
-                # bill views.  They were cached above but never handed to the
-                # templates, so that dialog listed no terms at all.
-                terms=cache_obj.get('terms') or [],
+                # bill views. Fetch them fresh so settings edits appear immediately.
+                terms=get_active_terms(),
                 user_can=_user_can,
                 sidebar_nav=sidebar_nav,
                 ui_theme_preference=session.get('ui_theme')
