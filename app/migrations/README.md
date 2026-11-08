@@ -81,4 +81,17 @@ helper function.
   The migration only fills NULL values, so explicit choices are never reset.
   Inventory/COGS and payment history are untouched.
 
-The next schema change should ship as `0006_*.sql`.
+- `0007_terms_and_conditions.sql` / `0008_reference_receipt_terms.sql` create
+  the admin-managed receipt terms and seed the reference receipt's clauses
+  (retiring only the unmodified legacy seed text).
+
+- `0009_receipt_terms_booking.sql` corrects the three opening clauses seeded
+  by `0008`: they are about a **booking** (بکنگ), not a bank (بینک).  Only the
+  exact old wording is rewritten, so admin edits, ordering and the
+  enabled/disabled choice are preserved; nothing is inserted or deleted.
+
+- `0010_company_address_gujrat.sql` completes the untouched legacy address
+  default `JALAL PUR SOBTIAN` to `JALAL PUR SOBTIAN GUJRAT`.  An address an
+  admin has edited is never rewritten.
+
+The next schema change should ship as `0011_*.sql`.

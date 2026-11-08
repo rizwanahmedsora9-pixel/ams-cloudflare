@@ -176,8 +176,8 @@ def test_the_fonttools_fallback_keeps_word_order():
 def test_a_wrapped_clause_never_spills_the_terms_onto_another_sheet():
     from types import SimpleNamespace
 
-    long_clause = ('بینک پر خریدار کو دیا گیا ریٹ صرف اسی صورت میں لاگو ہوگا '
-                   'جب وہ اس بینک کی پوری رقم ادا کرے اور پوری رقم کی ادائیگی '
+    long_clause = ('بکنگ پر خریدار کو دیا گیا ریٹ صرف اسی صورت میں لاگو ہوگا '
+                   'جب وہ اس بکنگ کی پوری رقم ادا کرے اور پوری رقم کی ادائیگی '
                    'کے بعد ہی رعایت جاری رہے گی۔')
     terms = [SimpleNamespace(title='', content_ur=long_clause) for _ in range(7)]
     doc = base._document(terms=terms)
