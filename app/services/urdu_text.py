@@ -86,9 +86,13 @@ def shape_glyphs(text: str):
     shaped = B._shape_with_fonttools(text)
     if not shaped:
         return None
+    # The fallback keeps the word separator as a real space; it is the font's
+    # own ``space`` glyph, not a private-use glyph id.
+    loaded = B._fallback_font()
+    space_gid = loaded[1].get('space', 3) if loaded else 3
     out = []
     for ch in shaped:
-        gid = ord(ch) - PUA_BASE
+        gid = space_gid if ch == ' ' else ord(ch) - PUA_BASE
         out.append((gid, _gid_advance(gid), 0, 0))
     return out
 

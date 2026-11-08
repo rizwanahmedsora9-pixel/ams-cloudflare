@@ -694,12 +694,21 @@ def render_supplier_ledger_pdf(*, supplier, rows, settings=None,
             self.drawRightString(page_w - margin, margin - 8 * mm, page_en)
             ur_font = _ur_font()
             if ur_font:
-                from app.services.bilingual import shape_urdu
+                from app.services.bilingual import shape_urdu, draw_shaped_urdu
                 from reportlab.pdfbase import pdfmetrics as _pm
                 urdu_page = shape_urdu(_UR['page'] + f' {self._pageNumber} ' + _UR['of'] + f' {total}')
                 gap = _pm.stringWidth(page_en, body, 6.8) + 3 * mm
-                self.setFont(ur_font, 6.8)
-                self.drawRightString(page_w - margin - gap, margin - 8 * mm, urdu_page)
+                # Drawn glyph by glyph: the shaper's word separators become
+                # real gaps, which a plain drawRightString would collapse
+                # (the bundled face's space is a quarter of a point wide).
+                from app.services.bilingual import URDU_FONT_REPORTLAB
+                from app.services.urdu_text import UPEM as _UPEM
+                width = 0.0
+                for ch in urdu_page:
+                    width += (max(6.8 * 0.24, 1.4) if ch == '\u2009' else
+                              _pm.stringWidth(ch, URDU_FONT_REPORTLAB, 6.8))
+                draw_shaped_urdu(self, page_w - margin - gap - width,
+                                 margin - 8 * mm, urdu_page, 6.8)
                 self.setFont(body, 6.8)
             self.restoreState()
 

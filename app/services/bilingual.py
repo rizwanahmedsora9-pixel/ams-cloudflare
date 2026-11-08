@@ -190,6 +190,19 @@ def _hb():
         return None
 
 
+# The bundled face maps U+0020 to a 5-unit advance in a 2048-unit em, so a
+# shaped string drawn by ReportLab glued its Urdu words together.  Shaped runs
+# therefore separate their words with this codepoint, which
+# :func:`draw_shaped_urdu` turns back into a word gap when it draws.
+WORD_GAP_CODEPOINT = '\u2009'      # thin space (never inside a shaped glyph run)
+
+
+def _join_shaped(codepoints):
+    """PUA string for shaped glyph ids, with word gaps kept as thin spaces."""
+    return ''.join(WORD_GAP_CODEPOINT if cp == _SPACE_GLYPH
+                   else chr(_PUA_BASE + cp) for cp in codepoints)
+
+
 def _hb_shape(text: str):
     """HarfBuzz shape of *text*, or ``None`` when uharfbuzz is unavailable."""
     font = _hb()
@@ -203,9 +216,43 @@ def _hb_shape(text: str):
         buf.script = 'Arab'
         buf.language = 'ur'
         hb.shape(font, buf, {})
-        return ''.join(chr(_PUA_BASE + info.codepoint) for info in buf.glyph_infos)
+        return _join_shaped([info.codepoint for info in buf.glyph_infos])
     except Exception:
         return None
+
+
+def draw_shaped_urdu(canvas, x, baseline, shaped, size, color=None):
+    """Draw a :func:`shape_urdu` string glyph by glyph (word gaps included).
+
+    Used where Urdu is rendered through ReportLab's drawing API rather than a
+    paragraph: the thin-space separators become real word gaps, so the text
+    reads as words instead of one glued string.
+    """
+    from app.services.urdu_text import UPEM
+    _register_urdu_font_safe = register_urdu_font()
+    if not _register_urdu_font_safe:
+        return
+    scale = float(size) / UPEM
+    pen = float(x)
+    canvas.saveState()
+    if color is not None:
+        try:
+            from reportlab.lib import colors
+            canvas.setFillColor(colors.HexColor(color))
+        except Exception:
+            pass
+    canvas.setFont(_register_urdu_font_safe, size)
+    if hasattr(canvas, 'setFillAlpha'):
+        pass
+    for ch in shaped:
+        if ch == WORD_GAP_CODEPOINT:
+            pen += max(size * 0.24, 1.4)
+            continue
+        gid = ord(ch) - _PUA_BASE
+        canvas.drawString(pen, baseline, chr(_PUA_BASE + gid))
+        pen += canvas.stringWidth(chr(_PUA_BASE + gid),
+                                  _register_urdu_font_safe, size)
+    canvas.restoreState()
 
 
 # --- fontTools fallback shaping -------------------------------------------
@@ -489,6 +536,11 @@ def _joining_forms(chars, cmap, shapes):
     return forms
 
 
+_SPACE_PLACEHOLDER = re.compile(r'^\.notdef(293)?$')
+# glyph id of U+0020 in the bundled face (advance 5/2048 em)
+_SPACE_GLYPH = 296
+
+
 def _shape_with_fonttools(text: str):
     """Fallback shaper: returns PUA glyph ids in visual order, or ``None``.
 
@@ -523,12 +575,30 @@ def _shape_with_fonttools(text: str):
         if not glyphs:
             return None
         glyphs = _apply_gsub(tt, glyphs, order)
-        out = []
-        for name in reversed(glyphs):
-            g = gid.get(name)
-            if g is not None:
-                out.append(chr(_PUA_BASE + g))
-        return ''.join(out) or None
+        # Reverse each *word* on its own, never the whole line: a full string
+        # reversal also reverses the word order, so ``کل فروخت`` came out as
+        # ``فروخت کل`` and the sheet read backwards wherever uharfbuzz was
+        # missing.  Spaces (and the narrow ``.notdef`` this face maps U+0020
+        # to) stay between the words, exactly where the renderer puts its own
+        # word gap.
+        # A space is the font's ``space`` glyph (512 units) or - after the
+        # font's own ccmp pass - the narrow 5-unit ``notdef`` placeholder the
+        # face substitutes for it.  Both are word separators here, and both
+        # take an advance of their own so the words do not touch.
+        words, word = [], []
+        for name in glyphs:
+            if name == 'space' or _SPACE_PLACEHOLDER.match(name or ''):
+                words.append(word)
+                word = []
+            else:
+                word.append(name)
+        words.append(word)
+        rendered = [''.join(chr(_PUA_BASE + gid[c]) for c in reversed(chunk)
+                            if c in gid)
+                    for chunk in words]
+        # Re-join the words in their original order with a single space.
+        text_out = ' '.join(part for part in rendered)
+        return text_out or None
     except Exception:
         return None
 
