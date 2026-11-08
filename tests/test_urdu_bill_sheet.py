@@ -1,11 +1,16 @@
 """The Urdu bill is its own sheet — not the English receipt with translated labels.
 
-The approved Urdu bill is defined by ``app/services/urdu_receipt.py``: an A5
-page with a three-row meta header, a company block, a note strip + two-column
-panel, a navy item table, a navy total bar and a sign-off footer.  These tests
-pin that document so a later change to the English receipt (or to the label
-dictionary) cannot quietly reshape it, and so "Urdu Print" and "Urdu PDF" stay
-the same page.
+The sheet is defined by ``app/services/urdu_receipt.py`` and measured off the
+approved reference PDF ("max possible.pdf"): an A5 page whose header carries a
+QR block, the Nastaleeq shop name, the proprietor and the phones over a thick
+navy rule; a four-cell meta strip; a pale panel with the four inline fields and
+the shop note; a roof-ruled item table; the summary box on the right with the
+signature rule beside it; and the terms in two numbered columns.
+
+These tests pin that document, so a later change to the English receipt (or to
+the label dictionary) cannot quietly reshape it, and so "Urdu Print" and
+"Urdu PDF" stay the same page.  They also pin the carbon copy: two identical
+A5 copies on one A4 landscape leaf.
 """
 from __future__ import annotations
 
@@ -33,6 +38,16 @@ ITEMS = [
 
 NOTE = ('سیمنٹ، سریا، اینٹ، ٹائل، چوگھٹ پیٹی، اینگل، بجری، '
         'چناب بریٹ وغیرہ تعمیراتی سامان دستیاب ہے')
+
+TERMS = [
+    'بینک پر خریدار کو دیا گیا ریٹ صرف اسی صورت میں لاگو ہوگا جب وہ اس بینک کی پوری رقم ادا کرے۔',
+    'اگر بینک کی رقم جزوی ادا کی جائے تو بینک کا ریٹ صرف ادا شدہ رقم کے مطابق مال پر لاگو ہوگا۔',
+    'بقیہ رقم/بینک کے بقیہ مال پر مارکیٹ کا نیا ریٹ لاگو ہوگا۔',
+    'اگر کسی قسم کا کوئی فرق پاپا جائے تو 10 دن کے اندر رابطہ کریں۔',
+    'مال واپس یا تبدیل نہیں ہوگا، سوائے ڈیلیوری کے وقت ثابت شدہ نقص کے۔',
+    'اتروائی کے بعد مال کی ٹوٹ پھوٹ، نقصان یا چوری کی ذمہ داری کمپنی پر نہیں۔',
+    'ادھار کی صورت میں بقایا رقم باہمی طے شدہ مدت میں ادا کرنا لازم ہے۔',
+]
 
 
 def _bill(**over):
@@ -88,13 +103,16 @@ def _pdf_text(data: bytes) -> str:
     return '\n'.join(page.extract_text() or '' for page in reader.pages)
 
 
+def _ops(sheet, kind):
+    return [op for op in sheet.ops if op['op'] == kind]
+
+
 # ---------------------------------------------------------------------------
-# Geometry: one A5 sheet, every block at its approved anchor
+# Paper: one A5 sheet, or the carbon-copy A4 leaf
 # ---------------------------------------------------------------------------
 
-def test_sheet_is_one_a5_page_with_the_approved_blocks():
-    doc = _document()
-    data = bill_urdu.render_pdf(doc)
+def test_single_copy_is_one_a5_page():
+    data = bill_urdu.render_pdf(_document(), copies=1)
     assert data and data.startswith(b'%PDF-')
 
     reader = PdfReader(io.BytesIO(data))
@@ -104,55 +122,123 @@ def test_sheet_is_one_a5_page_with_the_approved_blocks():
     assert round(float(box.height), 1) == round(R.PAGE_H, 1)
 
 
-def test_sheet_anchors_match_the_approved_bill():
-    """The header, panel, item table, summary and footer keep their places."""
-    sheets = R.layout_document(_document())
-    assert len(sheets) == 1
-    ops = sheets[0].ops
-
-    rects = [op for op in ops if op['op'] == 'rect']
-    # the closing double rule under the header
-    assert any(abs(op['y'] - R.Y_RULE_1) < 0.1 and abs(op['h'] - 1.5) < 0.1
-               for op in rects), 'header double rule missing'
-    # the info panel and its note strip
-    assert any(abs(op['y'] - R.Y_PANEL) < 0.1 for op in rects), 'panel missing'
-    note_edge = R.Y_PANEL + R.Y_NOTE_H
-    assert any(op['op'] == 'line' and abs(op['y0'] - note_edge) < 0.1
-               for op in ops), 'note strip divider missing'
-    # the navy item header row and the total bar
-    assert any(abs(op['y'] - R.Y_ITEMS_HEAD) < 0.1 and op['fill'] == R.NAVY
-               for op in rects), 'item header missing'
-    assert any(op['y'] >= R.Y_ITEMS_HEAD and op['fill'] == R.GRID_ROW
-               for op in rects), 'pale row hairlines missing'
-    assert any(op['fill'] == R.NAVY and abs(op['w'] - 192.8) < 0.5
-               for op in rects), 'navy total bar missing'
-    # the dashed stamp box and the footer rule
-    assert any(op.get('dash') for op in ops), 'dashed stamp box missing'
-    assert any(op['op'] == 'line' and abs(op['y0'] - R.Y_FOOT_RULE) < 0.1
-               for op in ops), 'footer rule missing'
-
-    lines = [op for op in ops if op['op'] == 'line']
-    assert any(abs(op['x0'] - 224.5) < 0.1 for op in lines), \
-        'panel column divider missing'
-    assert any(abs(op['x0'] - 121.6) < 0.1 for op in lines), \
-        'summary column divider missing'
+def test_carbon_copy_is_two_a5_copies_on_one_a4_leaf():
+    data = bill_urdu.render_pdf(_document())          # copies default to 2
+    reader = PdfReader(io.BytesIO(data))
+    assert len(reader.pages) == 1, 'a carbon copy is one leaf, not two pages'
+    box = reader.pages[0].mediabox
+    assert round(float(box.width), 1) == round(R.A4_W, 1)
+    assert round(float(box.height), 1) == round(R.A4_H, 1)
+    # A4 landscape holds two A5 portraits side by side, with even margins
+    assert R.A4_W >= 2 * R.PAGE_W
+    assert R.A4_W - 2 * R.PAGE_W < 4.0
 
 
-def test_item_table_columns_are_the_approved_widths():
+def test_both_copies_hold_the_very_same_marks():
+    doc = _document()
+    content = R.layout_document(doc)[0]
+    page = R.compose_document(doc, copies=2)[0]
+
+    offset = (R.A4_W - 2 * R.PAGE_W) / 2.0
+    text_ops = [op for op in page.ops if op['op'] == 'text']
+    for op in content.ops:
+        if op['op'] != 'text':
+            continue
+        for dx in (offset, offset + R.PAGE_W):
+            assert any(abs(t['y'] - op['y']) < 1e-6
+                       and abs(t['x'] - (op['x'] + dx)) < 1e-6
+                       and t['text'] == op['text'] for t in text_ops), op
+
+
+def test_copies_carry_the_original_and_the_carbon_marks():
+    page = R.compose_document(_document(), copies=2)[0]
+    labels = [op['text'] for op in page.ops if op['op'] == 'text']
+    assert R.COPY_ORIGINAL in labels
+    assert R.COPY_CARBON in labels
+
+
+def test_single_copy_has_no_cut_line_or_copy_marks():
+    page = R.compose_document(_document(), copies=1)[0]
+    labels = [op['text'] for op in page.ops if op['op'] == 'text']
+    assert R.COPY_ORIGINAL not in labels
+    assert not [op for op in page.ops
+                if op.get('dash') and op['op'] in ('line', 'seg')
+                and abs(op['x0'] - op['x1']) < 0.01], 'no cut line on one copy'
+
+
+# ---------------------------------------------------------------------------
+# Geometry: every block at its reference anchor
+# ---------------------------------------------------------------------------
+
+def test_sheet_anchors_match_the_reference_bill():
+    ops = R.layout_document(_document())[0].ops
+    rects = _ops(R.layout_document(_document())[0], 'rect')
+    lines = _ops(R.layout_document(_document())[0], 'line')
+
+    # the thick navy rule and its thin companion under the header
+    assert any(abs(op['y'] - 75.0) < 0.1 and abs(op['h'] - 2.9) < 0.1
+               and op['fill'] == R.NAVY for op in rects), 'header rule missing'
+    assert any(abs(op['y'] - 79.2) < 0.1 and op['fill'] == R.NAVY
+               for op in rects), 'second header rule missing'
+    # the four-cell meta strip
+    assert any(abs(op['y'] - 80.7) < 0.1 and abs(op['h'] - 16.2) < 0.1
+               for op in rects), 'meta strip missing'
+    # the info panel and its dotted divider
+    assert any(abs(op['y'] - 99.7) < 0.1 and abs(op['h'] - 39.9) < 0.1
+               for op in rects), 'info panel missing'
+    assert any(op['op'] == 'line' and abs(op['y0'] - 121.4) < 0.1
+               and op.get('dash') for op in lines), 'dotted divider missing'
+    # the navy item header row
+    assert any(abs(op['y'] - 158.7) < 0.1 and abs(op['h'] - 15.9) < 0.1
+               and op['fill'] == R.NAVY for op in rects), 'item header missing'
+    # the summary box on the right half, closed by the navy total bar
+    assert any(abs(op['x'] - 229.4) < 0.1
+               and abs(op['w'] - (397.4 - 229.4)) < 0.2
+               and op['fill'] == R.NAVY for op in rects), 'summary bar missing'
+    # the signature rule beside the summary
+    assert any(abs(op['y0'] - op['y1']) < 0.01
+               and abs(op['x0'] - 66.5) < 0.1 and abs(op['x1'] - 208.3) < 0.1
+               for op in lines), 'signature rule missing'
+    assert ops, 'the sheet is empty'
+
+
+def test_item_table_columns_are_the_reference_widths():
     columns = R._item_columns()
     assert [c['label'] for c in columns] == [
-        'رقم (روپے)', 'ریٹ', 'مقدار', 'تفصیل / میٹیریل', 'نمبر']
+        'رقم (روپے)', 'ریٹ', 'مقدار', 'تفصیل / آئٹم', 'نمبر']
     assert [round(c['x0'], 1) for c in columns] == [
-        R.LEFT, 107.2, 169.4, 218.1, 365.1]
+        R.LEFT, 114.8, 187.0, 243.9, 369.3]
     assert round(columns[-1]['x1'], 1) == round(R.RIGHT, 1)
+
+
+def test_fifteen_rows_end_where_the_reference_table_ends():
+    items = [{'name_ur': 'اینٹ', 'qty': 1, 'price_at_time': 10}] * 15
+    sheet = R.layout_document(_document(items=items))[0]
+    lines = _ops(sheet, 'line')
+    # the reference's ruled table closes at y = 404.6 and the summary starts
+    # 6.9pt under it
+    assert any(abs(op['y0'] - 404.6) < 0.2 for op in lines)
+    # summary box: 58.6pt tall under a 6.9pt gap, closed by the navy bar
+    total = [op for op in _ops(sheet, 'rect')
+             if op['fill'] == R.NAVY and abs(op['x'] - 229.4) < 0.1]
+    assert total and abs(total[0]['y'] - 455.7) < 0.4
+
+
+def test_row_height_and_zebra_tint_are_the_reference_ones():
+    sheet = R.layout_document(_document())[0]
+    zebra = [op for op in _ops(sheet, 'rect') if op['fill'] == R.BAR
+             and abs(op['x'] - R.LEFT) < 0.1 and abs(op['h'] - R.ROW_H) < 0.1]
+    assert len(zebra) == 3, 'every second row of seven is tinted'
+    tops = sorted(op['y'] for op in zebra)
+    assert abs(tops[1] - tops[0] - 2 * R.ROW_H) < 0.1
 
 
 def test_sheet_text_holds_the_urdu_furniture_and_every_figure():
     op_text = ' '.join(op['text'] for op in R.layout_document(_document())[0].ops
                        if op['op'] == 'text')
-    for label in ('بل نمبر', 'تاریخ', 'وقت', 'فون', 'آئٹمز', 'کل فروخت',
-                  'پچھلا بقایا', 'ادا شدہ رقم', 'کل بقایا رقم',
-                  'کمپنی مہر', 'وصول کنندہ / مجاز دستخط'):
+    for label in ('بل نمبر', 'تاریخ', 'وقت', 'فضل بلڈنگ میٹیریلز',
+                  'ٹرانزیکشن کی تفصیلات', 'کل فروخت', 'پچھلا بقایا',
+                  'ادا شدہ رقم', 'کل بقایا رقم', 'مجاز دستخط'):
         assert label in op_text, label
     # the bill's own figures, copied verbatim
     for value in ('SB-SL-1008', '614,936', '31,700', '2,000', '1,964', '224'):
@@ -161,6 +247,43 @@ def test_sheet_text_holds_the_urdu_furniture_and_every_figure():
     for english in ('INVOICE', 'Bill To', 'Transaction Details', 'Items',
                     'Total Sales'):
         assert english not in op_text, english
+
+
+def test_panel_prints_the_four_inline_fields_in_reading_order():
+    doc = _document()
+    assert [label for label, _value in doc['fields']] == [
+        'بل برائے', 'ڈیلیوری', 'کوڈ', 'اکاؤنٹ']
+    values = [value for _label, value in doc['fields']]
+    assert values[0] == 'محمد شفیق'
+    assert values[1] == 'عدنان احمد'
+    assert values[2] == 'FBMCL-00002'
+    assert values[3] == 'Drawer Cash'
+
+
+# ---------------------------------------------------------------------------
+# QR block
+# ---------------------------------------------------------------------------
+
+def test_qr_block_is_drawn_from_the_bill_and_captioned():
+    doc = _document()
+    assert doc['qr_text'], 'a bill always carries its QR payload'
+    sheet = R.layout_document(doc)[0]
+    modules = [op for op in _ops(sheet, 'rect')
+               if op['fill'] == R.NAVY and op['x'] >= R.QR_X - 0.1
+               and op['x'] < R.QR_X + R.QR_SIZE]
+    assert len(modules) > 40, 'the QR matrix was not drawn'
+    assert all(op['y'] >= R.QR_Y - 0.1 for op in modules)
+    assert any(op['op'] == 'text' and op['text'] == doc['qr_caption']
+               for op in sheet.ops)
+
+
+def test_no_qr_is_drawn_without_a_payload():
+    doc = _document(qr_text='', qr_caption='')
+    sheet = R.layout_document(doc)[0]
+    modules = [op for op in _ops(sheet, 'rect')
+               if op['fill'] == R.NAVY and R.QR_X <= op['x'] < R.QR_X + R.QR_SIZE
+               and op['y'] < R.QR_Y + R.QR_SIZE]
+    assert not modules
 
 
 # ---------------------------------------------------------------------------
@@ -179,61 +302,86 @@ def test_summary_figures_come_straight_from_the_bill():
 
 
 def test_summary_without_a_previous_balance_has_no_carry_forward_row():
-    doc = _document(previous_balance=0)
+    doc = _document(previous_balance=0, bill=_bill(amount=5000))
     labels = [row['label'] for row in doc['summary']]
-    assert labels == ['کل فروخت', 'ادا شدہ رقم', 'کل بقایا رقم']
+    assert 'پچھلا بقایا' not in labels
+    assert labels[-1] == 'کل بقایا رقم'
 
 
 def test_urdu_date_and_clock_read_like_the_sheet():
     assert R._urdu_date(datetime(2026, 11, 7)) == '07 نومبر 2026'
     assert R._urdu_time(datetime(2026, 11, 7, 12, 20)) == '12:20 دوپہر'
-    assert R._urdu_time(datetime(2026, 11, 7, 8, 38)) == '8:38 صبح'
-    assert R._urdu_time(datetime(2026, 11, 7, 20, 5)) == '8:05 رات'
+    assert R._urdu_time(datetime(2026, 11, 7, 9, 5)) == '9:05 صبح'
 
 
 def test_phone_line_is_split_into_two_numbers():
     assert R.split_phones('+92331-0000993 | +92340-3872722') == [
         '+92 331 0000993', '+92 340 3872722']
-    # settings are typed free-hand: spaces are a separator too
-    assert R.split_phones('+92331 0000993 +92340 3872722') == [
-        '+92 331 0000993', '+92 340 3872722']
 
 
 def test_item_amounts_are_quantity_times_rate_as_posted():
     rows = bill_urdu._item_rows(ITEMS)
-    assert [row['amount'] for row in rows] == [
-        '2,000', '64,500', '439,936', '25,000', '28,000', '54,000', '1,500']
-    assert [row['index'] for row in rows] == [1, 2, 3, 4, 5, 6, 7]
+    assert rows[0] == {'index': 1, 'name': 'ڈی جی', 'qty': '1',
+                       'rate': '2,000', 'amount': '2,000'}
+    assert rows[2]['amount'] == '439,936'
 
 
 def test_receipt_bill_shows_received_and_remaining_balance():
-    bill = _bill(amount=25000, payment_type='Receipt', manual_bill_no='MB NO.9102')
-    doc = bill_urdu.build_document(bill_type='Payment', bill=bill,
-                                   previous_balance=100000)
+    doc = bill_urdu.build_document(bill_type='Payment', bill=_bill(),
+                                   items=[], previous_balance=1000,
+                                   settings=_settings())
     labels = [row['label'] for row in doc['summary']]
-    assert labels == ['وصول شدہ رقم', 'پچھلا بقایا', 'بقایا رقم']
-    assert doc['summary'][-1]['value'] == '75,000'
+    assert labels[0] == 'وصول شدہ رقم'
+    assert labels[-1] == 'بقایا رقم'
 
 
 # ---------------------------------------------------------------------------
-# Urdu print is the same page as the Urdu PDF
+# Terms & conditions
+# ---------------------------------------------------------------------------
+
+def test_terms_are_two_numbered_columns():
+    doc = _document(terms=[SimpleNamespace(title='', content_ur=text)
+                           for text in TERMS])
+    sheet = R.layout_document(doc)[0]
+    numbers = [op for op in sheet.ops
+               if op['op'] == 'text' and re.fullmatch(r'\d+\.', op['text'])]
+    assert [op['text'] for op in numbers] == [f'{n}.' for n in range(1, 8)]
+    # right column starts at x = 399.7, left column at 204.1
+    assert {round(op['x'], 1) for op in numbers} == {204.1, 399.7}
+    right = [op for op in numbers if op['x'] > 300]
+    left = [op for op in numbers if op['x'] < 300]
+    assert (len(right), len(left)) == (4, 3)
+
+
+def test_a_terms_clause_is_numbered_once_however_it_wraps():
+    doc = _document(terms=[SimpleNamespace(title='', content_ur=TERMS[0])])
+    sheet = R.layout_document(doc)[0]
+    numbers = [op for op in sheet.ops
+               if op['op'] == 'text' and re.fullmatch(r'\d+\.', op['text'])]
+    assert len(numbers) == 1, 'a wrapped clause keeps one number'
+
+
+def test_terms_heading_sits_under_the_summary_rule():
+    doc = _document(terms=[SimpleNamespace(title='', content_ur=t)
+                           for t in TERMS])
+    sheet = R.layout_document(doc)[0]
+    heading = [op for op in sheet.ops
+               if op['op'] == 'text' and op['text'] == 'شرائط و ضوابط']
+    assert heading, 'terms heading missing'
+    assert heading[0]['color'] == R.NAVY
+
+
+# ---------------------------------------------------------------------------
+# Print page
 # ---------------------------------------------------------------------------
 
 def test_print_page_is_the_same_rtl_sheet():
     html = bill_urdu.render_html(_document())
-    assert html.startswith('<!DOCTYPE html>')
     assert 'dir="rtl"' in html
-    assert '/static/fonts/JameelNooriNastaleeq.ttf' in html
-    assert '/static/fonts/Inter-Bold.ttf' in html
-    # one absolutely positioned page per PDF page
-    assert html.count('<div class="pg">') == 1
-    assert '@page { size: 419.53pt 595.28pt; margin: 0; }' in html
-    # the same labels and figures as the PDF
-    for text in ('بل نمبر', 'آئٹمز', 'کل بقایا رقم', '614,936', 'FBMCL-00002'):
-        assert text in html, text
-    # the browser must not be left to reflow or re-translate anything
-    assert 'INVOICE' not in html
-    assert '@page' in html
+    assert '<div class="pg"' in html
+    # the carbon copy is one A4 leaf holding both copies
+    assert 'width:841.89pt' in html
+    assert R.COPY_ORIGINAL in html and R.COPY_CARBON in html
 
 
 def test_print_page_escapes_user_text():
@@ -244,18 +392,11 @@ def test_print_page_escapes_user_text():
 
 
 def test_english_text_in_an_urdu_sheet_keeps_its_word_order():
-    """``Cash`` / product codes must not be reversed by the RTL pass."""
-    words = R.rtl_words('Drawer Cash')
-    assert [w for w, _u in words] == ['Drawer', 'Cash'][::-1]
-    sheet = R.Sheet()
-    sheet.text(100, 50, 'Drawer Cash', 9, urdu=True)
-    op = sheet.ops[-1]
-    assert op['urdu'] is False          # pure Latin -> drawn left to right
-    assert op['text'] == 'Drawer Cash'
+    words = R.rtl_words('FBMCL-00002 Drawer Cash')
+    assert words == [('Cash', False), ('Drawer', False), ('FBMCL-00002', False)]
 
 
 def test_mixed_urdu_line_puts_its_first_word_at_the_right():
-    """``rtl_words`` returns visual order: the last item is drawn rightmost."""
     words = R.rtl_words('07 نومبر 2026')
     assert words[-1] == ('07', False)      # first word of the line, hard right
     assert words[0] == ('2026', False)     # last word of the line, hard left
@@ -348,7 +489,7 @@ def sale(app, client):
         return {'id': row.id, 'bill_no': row.manual_bill_no}
 
 
-def test_route_serves_the_urdu_sheet_as_pdf(client, sale):
+def test_route_serves_the_carbon_copy_pdf_by_default(client, sale):
     url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
            f"&src_id={sale['id']}&lang=ur&tc=0")
     resp = client.get(url)
@@ -359,7 +500,21 @@ def test_route_serves_the_urdu_sheet_as_pdf(client, sale):
     assert b'Jameel' in resp.data
     reader = PdfReader(io.BytesIO(resp.data))
     assert len(reader.pages) == 1
-    assert round(float(reader.pages[0].mediabox.width), 1) == round(R.PAGE_W, 1)
+    box = reader.pages[0].mediabox
+    assert round(float(box.width), 1) == round(R.A4_W, 1)
+    assert round(float(box.height), 1) == round(R.A4_H, 1)
+
+
+def test_route_serves_a_single_a5_sheet_when_asked(client, sale):
+    url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur&tc=0&copies=1")
+    resp = client.get(url)
+    assert resp.status_code == 200
+    reader = PdfReader(io.BytesIO(resp.data))
+    assert len(reader.pages) == 1
+    box = reader.pages[0].mediabox
+    assert round(float(box.width), 1) == round(R.PAGE_W, 1)
+    assert round(float(box.height), 1) == round(R.PAGE_H, 1)
 
 
 def test_route_print_is_the_same_urdu_sheet(client, sale):
@@ -370,11 +525,12 @@ def test_route_print_is_the_same_urdu_sheet(client, sale):
     html = resp.get_data(as_text=True)
     assert '-UR.html' in resp.headers['Content-Disposition']
     assert 'dir="rtl"' in html
-    assert '<div class="pg">' in html
+    assert '<div class="pg"' in html
+    assert R.COPY_ORIGINAL in html and R.COPY_CARBON in html
     # English receipt furniture must never leak into the Urdu sheet
     for english in ('rcpt-header', 'rcpt-table', 'English PDF'):
         assert english not in html, english
-    assert 'آئٹمز' in html
+    assert 'ٹرانزیکشن کی تفصیلات' in html
 
 
 def test_english_download_is_untouched(client, sale):

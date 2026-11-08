@@ -30,6 +30,30 @@
                             </label>
                         </div>
 
+                        <div class="mb-3 border rounded p-3 bg-dark-subtle">
+                            <div class="small text-warning fw-bold text-uppercase mb-2">
+                                <i class="bi bi-copy me-1"></i> Copies
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="copies" id="copies2" value="2"
+                                       {% if copies != 1 %}checked{% endif %}>
+                                <label class="form-check-label text-white fw-bold" for="copies2">
+                                    <bdi dir="rtl">کاربن کاپی</bdi> — 2 copies on one A4 (carbon copy)
+                                </label>
+                                <div class="text-white-50 small">
+                                    <bdi dir="rtl">اصل</bdi> for the customer on the right,
+                                    <bdi dir="rtl">نقل</bdi> for the office on the left.
+                                </div>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="radio" name="copies" id="copies1" value="1"
+                                       {% if copies == 1 %}checked{% endif %}>
+                                <label class="form-check-label text-white-50" for="copies1">
+                                    <i class="bi bi-file-earmark me-1"></i> Single copy — one A5 sheet
+                                </label>
+                            </div>
+                        </div>
+
                         <div id="tcOptions" class="mb-3 border rounded p-3 bg-dark-subtle">
                             <div class="small text-warning fw-bold text-uppercase mb-2">
                                 <i class="bi bi-menu-button-wide me-1"></i> Choose terms to display (Urdu receipt only)

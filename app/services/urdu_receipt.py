@@ -6,20 +6,34 @@ template and merely swapped labels, so the Urdu sheet inherited an English
 layout (black rules, a right-hand ``INVOICE`` badge, an English table header)
 and looked like a translation of the English bill instead of its own document.
 
-The approved Urdu sheet is a fixed design:
+The sheet is the approved Urdu bill, measured off the reference PDF:
 
-* A5 portrait, 419.53 x 595.28 pt, white paper, 28pt side margins.
-* Header: three meta rows on the left (``بل نمبر`` / ``تاریخ`` / ``وقت``) over
-  hairline rules, the company block on the right (name, address, proprietor,
-  phones separated by a vertical hairline), closed by a double navy rule.
-* Info panel: a light note strip on top, then two columns split by a hairline -
-  transaction details on the left, the paying party on the right.
-* ``آئٹمز`` section: navy header row, airy rows, amounts right aligned.
-* Summary box on the left half: sales / previous balance / paid, with the
-  outstanding total in a navy bar.
-* Dashed stamp box and signature rule, then the thank-you footer.
+* A5 portrait, 419.53 x 595.28 pt, white paper, 19.8pt side margins.
+* Header: QR block on the left, the company name centred in Nastaleeq with the
+  address under it, the proprietor and the phone numbers hard right, closed by
+  the thick navy rule and its thin companion.
+* Meta strip: one bordered row of four cells - time / date / document type /
+  bill number - split by hairlines.
+* Info panel: a pale two-row panel.  The first row carries the four inline
+  fields (bill to / delivery / code / account) read right to left; a dotted
+  rule closes it and the shop note sits underneath.
+* ``ٹرانزیکشن کی تفصیلات`` heading, then the navy item header and the ruled
+  item rows (zebra tinted, amounts right aligned, quantities centred).
+* Summary box on the right: sales / previous balance / paid, closed by the
+  solid navy total bar, with the signature rule to its left.
+* Terms & conditions in two numbered columns under a hairline.
 
-Geometry is written once, in points, as a list of drawing primitives.  Two
+Carbon copy
+-----------
+A carbon-copy receipt book prints the same bill twice.  The sheet is therefore
+*paged*: :func:`layout_document` returns the A5 content pages and
+:func:`compose_document` places them on the paper.  With ``copies=2`` (the
+default) two identical A5 copies sit side by side on one A4 landscape leaf -
+the original (``اصل``, for the customer) on the right, the carbon copy
+(``نقل``, for the office) on the left - with a dashed cut line between them.
+``copies=1`` prints a single A5 sheet.
+
+Geometry is written once, in points, as a list of drawing primitives.  Both
 backends consume that list:
 
 * :func:`render_pdf` draws it on a ReportLab canvas (used for "Urdu PDF").
@@ -41,42 +55,69 @@ import re
 # Palette / geometry of the approved sheet
 # ---------------------------------------------------------------------------
 
-NAVY = '#1F3A5E'
-INK = '#16212E'
-MUTED = '#5D6874'
-HAIRLINE = '#E1E4E8'
-BORDER = '#C7CFD5'
-# The item table's grid is the deep ink; its row separators are the pale
-# hairline.  Two different inks, exactly as the sheet prints them.
-GRID = '#0D1F40'
-GRID_ROW = '#E1E4E8'
-RULE = '#C7CFD5'
-PANEL = '#F4F5F7'
-PANEL_HEAD = '#EEF1F6'
+NAVY = '#1A3A5C'
+INK = '#14263B'
+MUTED = '#66788D'
+SUBTLE = '#788A9D'
+ADDRESS = '#33465C'
+PANEL = '#EEF3F9'
+BAR = '#F4F7FB'
+BORDER = '#C4D1E0'
+GRID = '#AEBDCF'
+DOT = '#B5C4D6'
 WHITE = '#FFFFFF'
+
+# Older names for two palette entries, kept because other modules read them.
+HAIRLINE = BORDER
+GRID_ROW = BAR
 
 PAGE_W = 419.53          # A5 portrait, the size the sheet was approved on
 PAGE_H = 595.28
-LEFT = 28.0
-RIGHT = 391.0
-CONTENT_W = RIGHT - LEFT
+A4_W = 841.89            # A4 landscape: two A5 copies side by side
+A4_H = 595.28
 
-# Vertical anchors of the fixed blocks (measured off the approved sheet).
-Y_META_1 = 32.2
-META_STEP = 16.5
-Y_RULE_1 = 84.0
-Y_RULE_2 = 87.8
-Y_PANEL = 97.9
-Y_NOTE_H = 18.6
-Y_PANEL_BOTTOM = 177.0
-Y_ITEMS_TITLE = 191.0
-Y_ITEMS_HEAD = 199.1
-Y_SUMMARY = 394.2
-ROW_H = 23.4
-ROWS_PER_PAGE = 10
-Y_SIG_BOX = 483.7
-Y_SIG_BOX_H = 33.1
-Y_FOOT_RULE = 540.4
+LEFT = 19.8
+RIGHT = 399.7
+CONTENT_W = RIGHT - LEFT
+PAGE_BOTTOM = 575.0      # nothing is printed below this line
+
+# -- header ---------------------------------------------------------------
+QR_X, QR_Y, QR_SIZE = 20.6, 15.0, 47.0
+Y_COMPANY = 43.4
+Y_ADDRESS = 62.8
+Y_PROPRIETOR = 32.3
+Y_PHONE_1 = 45.2
+PHONE_STEP = 12.9
+Y_RULE_1, RULE_1_H = 75.0, 2.9
+Y_RULE_2, RULE_2_H = 79.2, 0.9
+Y_META, META_H = 80.7, 16.2
+META_BASELINE = 90.9
+META_CELLS = ((111.2, 110.5), (217.3, 216.6), (278.0, 277.3), (RIGHT, 393.3))
+
+# -- info panel -----------------------------------------------------------
+Y_PANEL, PANEL_H = 99.7, 39.9
+Y_PANEL_DOTS = 121.4
+PANEL_BASELINE = 114.5
+NOTE_BASELINE = 131.6
+FIELD_WIDTH = CONTENT_W / 4.0
+
+# -- items ----------------------------------------------------------------
+Y_SECTION_TITLE = 152.3
+Y_ITEMS_HEAD, ITEMS_HEAD_H = 158.7, 15.9
+Y_ITEMS_ROWS = 174.6
+ROW_H = 15.33
+CONT_HEAD_TOP = 74.0     # continuation pages start their table here
+ROWS_FIRST_PAGE = 15
+ROWS_CONT_PAGE = 23
+ITEMS_TITLE = 'ٹرانزیکشن کی تفصیلات'
+
+# -- summary / signature / terms -----------------------------------------
+SUMMARY_GAP = 6.9
+SUM_LEFT, SUM_RIGHT, SUM_DIVIDER = 229.4, 397.4, 328.7
+SUM_LABEL_X, SUM_VALUE_X = 391.0, 235.9
+SIG_LINE_X0, SIG_LINE_X1 = 66.5, 208.3
+SIG_OFFSET = 44.6
+TERMS_GAP = 6.5
 
 FONT_DIR = os.path.normpath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'static', 'fonts')
@@ -107,6 +148,10 @@ _BASELINE_RATIO = {
     'Inter-Bold': 0.864, 'Inter-ExtraBold': 0.864,
     'ur': 0.7627,          # Jameel Noori Nastaleeq: 1976 / 2048 upem
 }
+
+# Copy marks printed round each half of a carbon-copy leaf.
+COPY_ORIGINAL = 'اصل'
+COPY_CARBON = 'نقل'
 
 _inter_registered = False
 
@@ -152,7 +197,6 @@ def _urdu_size(base):
 # ---------------------------------------------------------------------------
 
 _ARABIC = re.compile(r'[\u0600-\u06FF\u0750-\u077F\uFB50-\uFEFE]')
-_NUMERIC = re.compile(r'^[\s0-9+.,:/()%#\-\u2013]+$')
 
 
 def _is_arabic_word(word):
@@ -215,6 +259,19 @@ def _latin_width(text, font, size):
         return len(text or '') * size * 0.45
 
 
+def _fit(text, size, width, urdu=True):
+    """*text* on one line, ellipsised when it cannot fit *width*."""
+    text = (text or '').strip()
+    if not text:
+        return ''
+    measure = _urdu_width if urdu else (lambda t, s: _latin_width(t, 'Inter-SemiBold', s))
+    if measure(text, size) <= width:
+        return text
+    while text and measure(text + '…', size) > width:
+        text = text.rsplit(' ', 1)[0] if ' ' in text else text[:-1]
+    return (text + '…') if text else ''
+
+
 # ---------------------------------------------------------------------------
 # Primitive canvas
 # ---------------------------------------------------------------------------
@@ -222,7 +279,9 @@ def _latin_width(text, font, size):
 class Sheet:
     """One physical page: an ordered list of drawing primitives."""
 
-    def __init__(self):
+    def __init__(self, w=PAGE_W, h=PAGE_H):
+        self.w = float(w)
+        self.h = float(h)
         self.ops = []
 
     # -- shapes ---------------------------------------------------------
@@ -232,13 +291,9 @@ class Sheet:
                          'fill': fill, 'stroke': stroke, 'width': width,
                          'dash': dash, 'radius': radius})
 
-    def outline(self, x, y, w, h, color=HAIRLINE, width=0.9, dash=(3, 3),
+    def outline(self, x, y, w, h, color=BORDER, width=0.9, dash=(3, 3),
                 radius=0.0):
-        """A hollow, dashed box — four hairlines, no fill at all.
-
-        The reference's stamp box is exactly this: a dashed outline with the
-        paper showing through, not a box with a pale background.
-        """
+        """A hollow, dashed box - four hairlines, no fill at all."""
         for y0, y1 in ((y, y), (y + h, y + h)):
             self.ops.append({'op': 'seg', 'x0': x, 'y0': y0, 'x1': x + w,
                              'y1': y1, 'color': color, 'width': width,
@@ -248,13 +303,15 @@ class Sheet:
                              'y1': y + h, 'color': color, 'width': width,
                              'dash': dash})
 
-    def hline(self, x0, x1, y, color=HAIRLINE, width=0.8):
+    def hline(self, x0, x1, y, color=BORDER, width=0.8, dash=None):
         self.ops.append({'op': 'line', 'x0': x0, 'y0': y, 'x1': x1,
-                         'y1': y, 'color': color, 'width': width})
+                         'y1': y, 'color': color, 'width': width,
+                         'dash': dash})
 
-    def vline(self, x, y0, y1, color=HAIRLINE, width=0.8):
+    def vline(self, x, y0, y1, color=BORDER, width=0.8, dash=None):
         self.ops.append({'op': 'line', 'x0': x, 'y0': y0, 'x1': x,
-                         'y1': y1, 'color': color, 'width': width})
+                         'y1': y1, 'color': color, 'width': width,
+                         'dash': dash})
 
     # -- text -----------------------------------------------------------
     def text(self, x, baseline, value, size, color=INK, font='Inter',
@@ -281,24 +338,22 @@ class Sheet:
             'spacing': float(spacing or 0.0), 'nowrap': bool(nowrap),
         })
 
-    def block(self, x, top, w, value, size, color=INK, align='right',
-              urdu=True, bold=False, leading=None, max_lines=2):
-        """Draw a paragraph that may wrap (notes, terms), right to left.
-
-        Returns the height used.  Manual wrapping keeps both backends on the
-        same line breaks - the browser never has to reflow by itself.
-        """
-        leading = leading or size * (1.75 if urdu else 1.30)
-        lines = wrap_urdu(value, size, w, max_lines=max_lines)
-        used = 0.0
-        first_urdu = True
-        for line in lines:
-            baseline = top + used + (size * (0.86 if urdu else 0.80))
-            self.text(x, baseline, line, size, color=color, align=align,
-                      urdu=urdu, bold=bold)
-            used += leading
-            first_urdu = False
-        return used or leading
+    def copy_to(self, page, dx=0.0, dy=0.0):
+        """Draw this sheet's marks onto *page*, shifted by (dx, dy)."""
+        for op in self.ops:
+            moved = dict(op)
+            if op['op'] == 'rect':
+                moved['x'] = op['x'] + dx
+                moved['y'] = op['y'] + dy
+            elif op['op'] in ('line', 'seg'):
+                moved['x0'] = op['x0'] + dx
+                moved['x1'] = op['x1'] + dx
+                moved['y0'] = op['y0'] + dy
+                moved['y1'] = op['y1'] + dy
+            else:
+                moved['x'] = op['x'] + dx
+                moved['y'] = op['y'] + dy
+            page.ops.append(moved)
 
 
 def wrap_urdu(text, size, width, max_lines=3):
@@ -329,13 +384,57 @@ def wrap_urdu(text, size, width, max_lines=3):
 
 
 # ---------------------------------------------------------------------------
-# The document model
+# QR code (vector modules, drawn by both backends)
 # ---------------------------------------------------------------------------
 
-def _u(value):
-    """Urdu text with Urdu punctuation tidied ('' when empty)."""
-    return ('' if value is None else str(value)).strip()
+def qr_matrix(text):
+    """Booleans matrix for *text*, or ``None`` when no encoder is installed."""
+    text = (text or '').strip()
+    if not text:
+        return None
+    try:
+        import segno
+        for error in ('m', 'l'):
+            try:
+                qr = segno.make(text, error=error)
+                return [[bool(cell) for cell in row] for row in qr.matrix]
+            except Exception:
+                continue
+    except Exception:
+        return None
+    return None
 
+
+def _draw_qr(sheet, doc):
+    """The square QR block on the left of the header, with its caption."""
+    matrix = qr_matrix(doc.get('qr_text'))
+    if matrix:
+        rows, cols = len(matrix), len(matrix[0])
+        pad = 2.6
+        side = QR_SIZE - 2 * pad
+        module = side / max(rows, cols)
+        x0, y0 = QR_X + pad, QR_Y + pad
+        for r, row in enumerate(matrix):
+            c = 0
+            while c < cols:
+                if not row[c]:
+                    c += 1
+                    continue
+                start = c
+                while c < cols and row[c]:
+                    c += 1
+                sheet.rect(x0 + start * module, y0 + r * module,
+                           (c - start) * module + 0.06, module + 0.06,
+                           fill=NAVY)
+    caption = (doc.get('qr_caption') or doc.get('bill_no') or '').strip()
+    if caption:
+        sheet.text(QR_X, 70.6, caption, 5.5, color=INK, align='left',
+                   urdu=has_arabic(caption), spacing=0.4)
+
+
+# ---------------------------------------------------------------------------
+# The document model
+# ---------------------------------------------------------------------------
 
 def _qty(value):
     """Quantities/amounts exactly as the bill stores them."""
@@ -408,21 +507,43 @@ def _urdu_time(dt):
     return f'{dt.strftime("%I:%M").lstrip("0")} {period}'
 
 
+def _default_fields(party_label, party_name, party_code, detail_rows):
+    """The four inline panel fields, read right to left.
+
+    Order on the sheet: bill-to, delivery, code, account - exactly the run of
+    fields the approved bill prints.
+    """
+    rows = [r for r in (detail_rows or []) if r and r[1]]
+    delivery = [r for r in rows if 'ڈلیوری' in r[0] or 'ڈیلیوری' in r[0]]
+    account = [r for r in rows if 'اکاؤنٹ' in r[0] or 'بینک' in r[0]]
+    middle = [r for r in rows if r not in delivery and r not in account]
+    fields = []
+    if party_name:
+        fields.append((party_label or 'بل برائے', party_name))
+    fields.extend(delivery)
+    fields.extend(middle)
+    if party_code:
+        fields.append(('کوڈ', party_code))
+    fields.extend(account)
+    return fields[:4]
+
+
 def build_document(*, bill_no='', date_posted=None, company_name='',
                    company_address='', company_phone='', proprietor='',
                    note='', party_name='', party_code='', party_label='بل برائے',
-                   detail_rows=None, items=None, summary=None,
-                   terms=None, footer_thanks='آپ کے کاروبار کا شکریہ',
-                   footer_credit='سافٹ ویئر: اے ایم ایس سسٹم فار ایز',
-                   signature_left='کمپنی مہر',
-                   signature_right='وصول کنندہ / مجاز دستخط',
-                   show_items=True, items_title='آئٹمز',
-                   continuation_label='جاری'):
+                   fields=None, detail_rows=None, items=None, summary=None,
+                   terms=None, type_label='', qr_text='', qr_caption='',
+                   signature_label='مجاز دستخط', items_title=ITEMS_TITLE,
+                   continuation_label='جاری', show_items=True,
+                   footer_thanks='', footer_credit='', signature_left='',
+                   signature_right=''):
     """Assemble the data the sheet needs.
 
     Every value is copied from the bill as stored - nothing is recomputed
     here, so the Urdu sheet can never disagree with the ledger about a figure.
     """
+    if fields is None:
+        fields = _default_fields(party_label, party_name, party_code, detail_rows)
     return {
         'bill_no': bill_no or '',
         'date': _urdu_date(date_posted),
@@ -435,16 +556,19 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
         'party_name': party_name or '',
         'party_code': party_code or '',
         'party_label': party_label or 'بل برائے',
+        'fields': [f for f in (fields or []) if f and f[1]],
+        'type_label': type_label or '',
+        'qr_text': qr_text or '',
+        'qr_caption': qr_caption or '',
         'detail_rows': [r for r in (detail_rows or []) if r and r[1]],
         'items': list(items or []),
         'summary': list(summary or []),
         'terms': list(terms or []),
+        'signature_label': signature_label or signature_right or 'مجاز دستخط',
         'footer_thanks': footer_thanks,
         'footer_credit': footer_credit,
-        'signature_left': signature_left,
-        'signature_right': signature_right,
         'show_items': bool(show_items and items),
-        'items_title': items_title,
+        'items_title': items_title or ITEMS_TITLE,
         'continuation_label': continuation_label,
     }
 
@@ -454,427 +578,447 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
 # ---------------------------------------------------------------------------
 
 def layout_document(doc):
-    """Return ``[Sheet, ...]`` - the exact page(s) both backends draw."""
+    """Return ``[Sheet, ...]`` - the A5 content pages both backends draw."""
     sheets = []
     sheet = _new_sheet()
     sheets.append(sheet)
 
-    state = {'sheet': sheet, 'y': 0.0}
+    state = {'sheet': sheet, 'y': 0.0, 'summary_top': 0.0, 'summary_h': 0.0}
     _draw_header(state, doc, first=True)
     _draw_panel(state, doc)
     if doc['show_items']:
         _draw_items(state, doc, sheets)
     _draw_summary(state, doc, sheets)
+    _draw_signature(state, doc)
     if doc.get('terms'):
         _draw_terms(state, doc, sheets)
-    _draw_signatures(state, doc, sheets)
-    _draw_footer(state, doc, sheets)
     return sheets
 
 
-def _new_sheet():
-    sheet = Sheet()
-    sheet.rect(0, 0, PAGE_W, PAGE_H, fill=WHITE)
+def compose_document(doc, copies=2):
+    """Physical pages: one A5 sheet, or two A5 copies on one A4 leaf."""
+    content = layout_document(doc)
+    copies = 2 if int(copies or 1) >= 2 else 1
+    if copies == 1:
+        pages = []
+        for sheet in content:
+            page = Sheet(PAGE_W, PAGE_H)
+            page.rect(0, 0, PAGE_W, PAGE_H, fill=WHITE)
+            sheet.copy_to(page)
+            pages.append(page)
+        return pages
+
+    # Two A5 copies side by side; centred on the slightly wider A4 leaf so
+    # the paper margins stay equal.  The original sits on the right because
+    # the sheet reads right to left.
+    offset = (A4_W - 2 * PAGE_W) / 2.0
+    pages = []
+    for sheet in content:
+        page = Sheet(A4_W, A4_H)
+        page.rect(0, 0, A4_W, A4_H, fill=WHITE)
+        left_x = offset
+        right_x = offset + PAGE_W
+        sheet.copy_to(page, dx=left_x)
+        sheet.copy_to(page, dx=right_x)
+        seam = offset + PAGE_W
+        page.vline(seam, 10.0, PAGE_H - 10.0, color=BORDER, width=0.6,
+                   dash=(2, 3))
+        _copy_label(page, right_x, COPY_ORIGINAL, 'گاہک کے لیے')
+        _copy_label(page, left_x, COPY_CARBON, 'دفتر کے لیے')
+        pages.append(page)
+    return pages
+
+
+def _copy_label(page, dx, title, subtitle):
+    """Mark a copy in the blank strip under the terms."""
+    page.text(dx + RIGHT, 579.0, title, 7.6, color=NAVY, align='right',
+              urdu=True, bold=True)
+    page.text(dx + RIGHT, 587.0, subtitle, 6.2, color=MUTED, align='right',
+              urdu=True)
+
+
+def _new_sheet(w=PAGE_W, h=PAGE_H):
+    sheet = Sheet(w, h)
+    sheet.rect(0, 0, w, h, fill=WHITE)
     return sheet
 
 
-def _ensure_space(state, sheets, needed, doc):
-    """Start a continuation page when *needed* points do not fit."""
-    bottom = PAGE_H - 30.0
-    if state['y'] + needed <= bottom:
-        return False
-    sheet = _new_sheet()
-    sheets.append(sheet)
-    state['sheet'] = sheet
-    _draw_header(state, doc, first=False)
-    return True
+def _content_bottom():
+    return PAGE_BOTTOM
 
 
 def _draw_header(state, doc, first=True):
-    """Meta rows + company block + the double navy rule."""
+    """QR + company block + the double navy rule + the four-cell meta strip."""
     sheet = state['sheet']
 
     if first:
-        # --- left: bill number / date / time over hairline rules ----------
-        rows = [
-            ('بل نمبر', doc['bill_no'], 'Inter-Bold', 9.4),
-            ('تاریخ', doc['date'], 'Inter-SemiBold', 8.6),
-            ('وقت', doc['time'], 'Inter-SemiBold', 8.6),
-        ]
-        y = Y_META_1
-        for index, (label, value, font, size) in enumerate(rows):
-            sheet.text(158.5, y, label, _urdu_size(8.6), color=MUTED,
-                       align='right', urdu=True)
-            if value:
-                sheet.text(28.3, y, value, size, color=INK, font=font,
-                           align='left', urdu=_is_arabic_word(value))
-            if index < len(rows) - 1:
-                sheet.hline(LEFT, 158.5, y + 6.3, color=HAIRLINE, width=0.8)
-            y += META_STEP
+        _draw_qr(sheet, doc)
 
-        # --- right: company block ----------------------------------------
-        sheet.text(390.8, 33.0, doc['company_name'], 14.0, color=NAVY,
-                   font='Inter-Bold', align='right')
-        sheet.text(390.2, 47.2, doc['company_address'], 7.8, color=MUTED,
-                   font='Inter-Medium', align='right', spacing=0.55)
+        # --- company block, centred on the sheet --------------------------
+        # The name shares its row with the QR block and the proprietor, so a
+        # long shop name is set a little smaller instead of running into
+        # either of them.
+        name = doc['company_name']
+        name_size = 25.0
+        if has_arabic(name):
+            while name_size > 13.0 and _urdu_width(name, name_size) > 232.0:
+                name_size -= 0.5
+        sheet.text(200.3, Y_COMPANY, name, name_size, color=NAVY,
+                   align='center', urdu=True)
+        if doc['company_address']:
+            sheet.text(200.3, Y_ADDRESS, doc['company_address'], 8.0,
+                       color=ADDRESS, align='center', urdu=True, spacing=0.15)
+
+        # --- proprietor and phones, hard right ----------------------------
         if doc['proprietor']:
-            sheet.text(391.0, 61.0, 'پروپرائٹر: ' + doc['proprietor'],
-                       _urdu_size(9.2), color=MUTED, align='right', urdu=True)
-        phones = doc['phones'][:2]
-        if phones:
-            cursor = 391.0
-            sheet.text(cursor, 73.0, 'فون', _urdu_size(8.8), color=MUTED,
+            sheet.text(RIGHT - 0.8, Y_PROPRIETOR,
+                       'پروپرائٹر: ' + doc['proprietor'], 7.6, color=INK,
                        align='right', urdu=True)
-            cursor -= _urdu_width('فون', _urdu_size(8.8)) + 5.0
-            for index, phone in enumerate(phones):
-                sheet.text(cursor, 73.0, phone, 8.4, color=INK,
-                           font='Inter-SemiBold', align='right')
-                cursor -= _latin_width(phone, 'Inter-SemiBold', 8.4)
-                if index < len(phones) - 1:
-                    sheet.vline(cursor - 5.0, 66.2, 75.2, color=BORDER,
-                                width=0.7)
-                    cursor -= 11.0
+        for index, phone in enumerate(doc['phones'][:2]):
+            sheet.text(RIGHT - 0.8, Y_PHONE_1 + index * PHONE_STEP, phone,
+                       6.6, color=INK, font='Inter-SemiBold', align='right')
 
-        # --- closing double rule -----------------------------------------
-        # closing double rule: a 1.5pt bar, then a 0.8pt one beneath it
-        sheet.rect(LEFT, Y_RULE_1, CONTENT_W, 1.5, fill=NAVY)
-        sheet.rect(LEFT, Y_RULE_2 - 0.4, CONTENT_W, 0.8, fill=NAVY)
+        # --- closing rules -------------------------------------------------
+        sheet.rect(LEFT, Y_RULE_1, CONTENT_W, RULE_1_H, fill=NAVY)
+        sheet.rect(LEFT, Y_RULE_2, CONTENT_W, RULE_2_H, fill=NAVY)
 
     else:
         # Continuation page: a slim running head, same rules.
-        sheet.text(390.8, 33.0, doc['company_name'], 10.0, color=NAVY,
-                   font='Inter-Bold', align='right')
+        sheet.text(RIGHT - 0.8, 33.0, doc['company_name'], 10.0, color=NAVY,
+                   align='right', urdu=True)
         if doc['bill_no']:
             sheet.text(LEFT, 33.0, doc['bill_no'], 8.6, color=INK,
                        font='Inter-SemiBold', align='left')
             sheet.text(LEFT + _latin_width(doc['bill_no'], 'Inter-SemiBold', 8.6) + 8,
-                       33.0, doc['continuation_label'], _urdu_size(8.6),
-                       color=MUTED, align='left', urdu=True)
+                       33.0, doc['continuation_label'], 9.2, color=MUTED,
+                       align='left', urdu=True)
         sheet.rect(LEFT, 42.0, CONTENT_W, 1.5, fill=NAVY)
         sheet.rect(LEFT, 45.8, CONTENT_W, 0.8, fill=NAVY)
 
-    state['y'] = Y_RULE_2 + 0.8 if first else 46.6
+    _draw_meta_strip(sheet, doc)
+    state['y'] = Y_META + META_H
+
+
+def _draw_meta_strip(sheet, doc):
+    """Time / date / type / bill number in one bordered strip."""
+    sheet.rect(LEFT, Y_META, CONTENT_W, META_H, fill=BAR, stroke=BORDER,
+               width=0.75)
+    for x, _right in META_CELLS[:-1]:
+        sheet.vline(x, Y_META, Y_META + META_H, color=BORDER, width=0.75)
+
+    time_right = META_CELLS[0][1]
+    date_right = META_CELLS[1][1]
+    type_right = META_CELLS[2][1]
+    bill_right = META_CELLS[3][1]
+
+    _label_value(sheet, time_right, META_BASELINE, 'وقت', doc['time'],
+                 value_size=8.0)
+    _label_value(sheet, date_right, META_BASELINE, 'تاریخ', doc['date'],
+                 value_size=8.0)
+    if doc.get('type_label'):
+        sheet.text(type_right, META_BASELINE, doc['type_label'], 7.4,
+                   color=INK, font='Inter-SemiBold', align='right')
+    _label_value(sheet, bill_right, META_BASELINE, 'بل نمبر', doc['bill_no'],
+                 value_size=7.4)
+
+
+def _label_value(sheet, right_x, baseline, label, value, value_size=8.0):
+    """``label: value`` read right to left, anchored on *right_x*."""
+    cursor = right_x
+    if label:
+        label_text = label if label.endswith(':') else label + ':'
+        sheet.text(cursor, baseline, label_text, 8.0, color=INK,
+                   align='right', urdu=True)
+        cursor -= _urdu_width(label_text, 8.0) + 2.0
+    if value:
+        urdu = has_arabic(value)
+        sheet.text(cursor, baseline, value, value_size if not urdu else 8.0,
+                   color=INK, font='Inter-SemiBold', align='right', urdu=urdu)
 
 
 def _draw_panel(state, doc):
-    """Note strip + two columns (transaction details / paying party)."""
+    """The pale panel: four inline fields, a dotted rule, then the shop note."""
     sheet = state['sheet']
-    top = Y_PANEL if state['y'] < Y_PANEL else state['y'] + 10.0
-    note_h = Y_NOTE_H if doc['note'] else 0.0
-    # The sheet's panel body is 59.1pt under an 18.6pt note strip.  A receipt
-    # carries more detail rows (method / type / bank / account), so the body
-    # grows by one 13pt line per extra row and nothing is ever clipped.
-    body_h = max(60.5, 60.5 + 13.0 * (len(doc['detail_rows']) - 3))
-    height = note_h + body_h
-    bottom = top + height
+    sheet.rect(LEFT, Y_PANEL, CONTENT_W, PANEL_H, fill=PANEL, stroke=BORDER,
+               width=0.75)
+    sheet.hline(LEFT + 6.5, RIGHT - 6.4, Y_PANEL_DOTS, color=DOT, width=0.9,
+                dash=(1.1, 1.9))
 
-    sheet.rect(LEFT + 0.4, top, CONTENT_W - 0.4, height, fill=PANEL,
-               stroke=BORDER, width=1.0)
+    fields = doc['fields'][:4]
+    for index, (label, value) in enumerate(fields):
+        cell_right = RIGHT - index * FIELD_WIDTH - 8.5
+        cell_left = cell_right - FIELD_WIDTH + 6.0
+        label_text = label if label.endswith(':') else label + ':'
+        sheet.text(cell_right, PANEL_BASELINE, label_text, 8.0, color=MUTED,
+                   align='right', urdu=True)
+        label_w = _urdu_width(label_text, 8.0)
+        value_size = 8.0 if has_arabic(value) else 6.4
+        available = cell_right - label_w - cell_left - 2.0
+        value_text = _fit(value, value_size, available,
+                          urdu=has_arabic(value))
+        sheet.text(cell_right - label_w - 3.0, PANEL_BASELINE, value_text,
+                   value_size, color=INK, font='Inter-SemiBold',
+                   align='right', urdu=has_arabic(value_text))
 
     if doc['note']:
-        sheet.rect(LEFT + 1.15, top + 0.75, CONTENT_W - 1.55, note_h - 0.75,
-                   fill=PANEL_HEAD)
-        sheet.hline(LEFT + 1.15, RIGHT - 0.75, top + note_h, color=BORDER,
-                    width=0.8)
-        note_lines = wrap_urdu(doc['note'], 9.02, CONTENT_W - 26.0, max_lines=1)
-        if note_lines:
-            sheet.text(RIGHT - 8.0, top + 13.0, note_lines[0], 9.02,
-                       color=MUTED, align='right', urdu=True)
-
-    body_top = top + note_h
-    divider = 224.5
-    sheet.vline(divider, body_top, bottom - 0.4, color=BORDER, width=0.8)
-
-    # -- left column: transaction details --------------------------------
-    left_x = divider - 10.5
-    y = body_top + 13.5
-    if doc['detail_rows']:
-        sheet.text(left_x, y, 'ٹرانزیکشن کی تفصیلات', 10.56,
-                   color=INK, align='right', urdu=True, bold=True)
-        y += 13.7
-        for label, value in doc['detail_rows']:
-            label_text = label if label.endswith(':') else label + ':'
-            sheet.text(left_x, y, label_text, _urdu_size(9.2), color=MUTED,
+        note = wrap_urdu(doc['note'], 7.5, RIGHT - 6.4 - (LEFT + 12.0),
+                         max_lines=1)
+        if note:
+            sheet.text(RIGHT - 6.4, NOTE_BASELINE, note[0], 7.5, color=INK,
                        align='right', urdu=True)
-            label_w = _urdu_width(label_text, _urdu_size(9.2))
-            # A Latin value (``Cash``, ``Drawer Cash``) starts where the label
-            # ends, so the colon sits between the two the way the sheet reads.
-            sheet.text(left_x - label_w - 3.5, y, value, 9.4, color=INK,
-                       font='Inter-SemiBold', align='right',
-                       urdu=has_arabic(value))
-            y += 13.0
-    else:
-        sheet.text(left_x, y, 'ٹرانزیکشن کی تفصیلات', 10.56,
-                   color=INK, align='right', urdu=True, bold=True)
 
-    # -- right column: the paying party ----------------------------------
-    right_x = RIGHT - 9.5
-    sheet.text(right_x, body_top + 14.6, doc['party_label'], 9.9,
-               color=MUTED, align='right', urdu=True)
-    if doc['party_name']:
-        sheet.text(right_x, body_top + 35.0, doc['party_name'], 14.3,
-                   color=INK, align='right', urdu=True, bold=True)
-    if doc['party_code']:
-        code_y = body_top + 53.5
-        sheet.text(right_x, code_y, 'کوڈ', _urdu_size(9.2), color=MUTED,
-                   align='right', urdu=True)
-        code_w = _urdu_width('کوڈ', _urdu_size(9.2))
-        sheet.text(right_x - code_w - 4.5, code_y, doc['party_code'], 8.6,
-                   color=INK, font='Inter-SemiBold', align='right')
-
-    state['y'] = bottom
+    state['y'] = Y_PANEL + PANEL_H
 
 
 def _draw_items(state, doc, sheets):
-    """``آئٹمز`` title, navy header row and the item rows."""
+    """Section heading, navy header row and the ruled item rows."""
     items = doc['items']
     if not items:
-        # A payment or a plain receipt has no material lines, so the whole
-        # table is skipped rather than printed as an empty grid that leaves a
-        # large blank in the middle of the page.
         return
-    columns = _item_columns()
 
-    sheet = state['sheet']
-    # On a clean bill the section keeps the sheet's own anchors; a long bill
-    # (or one whose panel grew) simply continues into a new page.
-    title_y = max(Y_ITEMS_TITLE, state['y'] + 14.0)
-    if state['y'] + 40.0 + ROW_H * 2 > PAGE_H - 30:
-        _ensure_space(state, sheets, 40.0 + ROW_H * 2, doc)
-        sheet = state['sheet']
-        title_y = state['y'] + 16.0
-    _draw_items_title(sheet, doc, title_y)
-
-    state['y'] = title_y + 8.1
     pending = list(items)
+    index = 0
+    first = True
     while pending:
-        chunk = pending[:ROWS_PER_PAGE]
-        pending = pending[ROWS_PER_PAGE:]
-        if state['y'] + 19.5 + len(chunk) * ROW_H > PAGE_H - 32:
-            _ensure_space(state, sheets, 60.0, doc)
-            sheet = state['sheet']
-            title_y = state['y'] + 16.0
-            _draw_items_title(sheet, doc, title_y)
-            state['y'] = title_y + 8.1
-            sheet = state['sheet']
-        top = state['y']
-        _draw_item_header(sheet, columns, top)
-        _draw_item_rows(sheet, columns, top + 19.5, chunk)
-        state['y'] = top + 19.5 + len(chunk) * ROW_H + 4.9
+        sheet = state['sheet']
+        title_y = Y_SECTION_TITLE if first else CONT_HEAD_TOP - 6.4
+        capacity = ROWS_FIRST_PAGE if first else ROWS_CONT_PAGE
+        chunk = pending[:capacity]
+        pending = pending[capacity:]
 
-    sheet = state['sheet']
-    # the closing rule is a 0.8pt bar, exactly like every other rule
-    sheet.rect(LEFT, state['y'] - 0.5, CONTENT_W, 0.8, fill=NAVY)
+        sheet.text(RIGHT, title_y, doc['items_title'], 9.0, color=NAVY,
+                   align='right', urdu=True)
+        head_top = Y_ITEMS_HEAD if first else CONT_HEAD_TOP
+        _draw_item_header(sheet, head_top)
+        top = head_top + ITEMS_HEAD_H
+        _draw_item_rows(sheet, top, chunk, index)
+        index += len(chunk)
+        state['y'] = top + len(chunk) * ROW_H
 
-
-def _draw_items_title(sheet, doc, title_y):
-    sheet.text(RIGHT - 9.0, title_y + 2.0, doc['items_title'], 10.56,
-               color=INK, align='right', urdu=True, bold=True)
-    sheet.rect(RIGHT - 3.0, title_y - 7.3, 3.0, 11.2, fill=NAVY)
+        if pending:
+            first = False
+            sheet = _new_sheet()
+            sheets.append(sheet)
+            state['sheet'] = sheet
+            _draw_header(state, doc, first=False)
 
 
 def _item_columns():
     """Physical column geometry, left to right, for the items table."""
     return [
-        {'key': 'amount', 'x0': LEFT, 'x1': 107.2, 'pad': 5.7,
-         'label': 'رقم (روپے)'},
-        {'key': 'rate', 'x0': 107.2, 'x1': 169.4, 'pad': 5.6, 'label': 'ریٹ'},
-        {'key': 'qty', 'x0': 169.4, 'x1': 218.1, 'pad': 15.4,
-         'label': 'مقدار'},
-        {'key': 'name', 'x0': 218.1, 'x1': 365.1, 'pad': 8.2,
-         'label': 'تفصیل / میٹیریل'},
-        {'key': 'index', 'x0': 365.1, 'x1': RIGHT, 'pad': 9.3,
-         'label': 'نمبر'},
+        {'key': 'amount', 'x0': LEFT, 'x1': 114.8, 'align': 'right',
+         'x': 110.2, 'label': 'رقم (روپے)', 'label_x': 114.1},
+        {'key': 'rate', 'x0': 114.8, 'x1': 187.0, 'align': 'center',
+         'x': 150.9, 'label': 'ریٹ', 'label_x': 186.2},
+        {'key': 'qty', 'x0': 187.0, 'x1': 243.9, 'align': 'center',
+         'x': 215.45, 'label': 'مقدار', 'label_x': 243.2},
+        {'key': 'name', 'x0': 243.9, 'x1': 369.3, 'align': 'right',
+         'x': 364.7, 'label': 'تفصیل / آئٹم', 'label_x': 368.6},
+        {'key': 'index', 'x0': 369.3, 'x1': RIGHT, 'align': 'center',
+         'x': 384.5, 'label': 'نمبر', 'label_x': 398.9},
     ]
 
 
-def _draw_item_header(sheet, columns, top):
-    sheet.rect(LEFT, top, CONTENT_W, 19.5, fill=NAVY)
-    for column in columns:
-        if column['x0'] > LEFT:
-            # white hairlines between the navy header cells
-            sheet.vline(column['x0'], top, top + 19.5, color=WHITE, width=0.8)
-        sheet.text(column['x1'] - column['pad'], top + 16.5,
-                   column['label'], 9.9, color=WHITE, align='right', urdu=True,
-                   bold=True)
+def _draw_item_header(sheet, top):
+    sheet.rect(LEFT, top, CONTENT_W, ITEMS_HEAD_H, fill=NAVY)
+    for column in _item_columns()[1:]:
+        sheet.vline(column['x0'], top, top + ITEMS_HEAD_H, color=WHITE,
+                    width=0.75)
+    for column in _item_columns():
+        sheet.text(column['label_x'], top + 9.9, column['label'], 8.0,
+                   color=WHITE, align='right', urdu=True)
 
 
-def _draw_item_rows(sheet, columns, top, rows):
-    for index, item in enumerate(rows):
-        y = top + index * ROW_H
-        if index:
-            # the pale hairline sits 0.9pt above the row's own box
-            sheet.rect(LEFT, y - 0.9, CONTENT_W, 0.8, fill=GRID_ROW)
-        baseline = y + 14.2
-        for column in columns:
-            right = column['x1'] - column['pad']
-            if column['key'] == 'index':
-                sheet.text(right, y + 14.2, str(item.get('index', '')), 8.4,
-                           color=MUTED, align='right')
-            elif column['key'] == 'name':
-                name = item.get('name', '')
-                sheet.text(right, baseline, name, 10.56, color=INK,
-                           align='right', urdu=_is_arabic_word(name),
-                           bold=True)
-            elif column['key'] == 'qty':
-                sheet.text(right, baseline, item.get('qty', ''), 8.8,
-                           color=INK, align='right')
-            elif column['key'] == 'rate':
-                sheet.text(right, baseline, item.get('rate', ''), 8.8,
-                           color=INK, align='right')
+def _draw_item_rows(sheet, top, rows, start_index=0):
+    if not rows:
+        return
+    height = len(rows) * ROW_H
+    # zebra tint on every second row, exactly as the approved sheet prints it
+    for offset in range(len(rows)):
+        if (start_index + offset) % 2 == 1:
+            sheet.rect(LEFT, top + offset * ROW_H, CONTENT_W, ROW_H, fill=BAR)
+    # the ruled grid
+    for offset in range(len(rows) + 1):
+        sheet.hline(LEFT, RIGHT, top + offset * ROW_H, color=GRID, width=0.75)
+    for column in _item_columns()[1:]:
+        sheet.vline(column['x0'], top, top + height, color=GRID, width=0.75)
+    sheet.rect(LEFT, top, CONTENT_W, height, stroke=GRID, width=0.75)
+
+    for offset, item in enumerate(rows):
+        baseline = top + offset * ROW_H + 10.0
+        for column in _item_columns():
+            key = column['key']
+            if key == 'index':
+                sheet.text(column['x'], baseline, str(item.get('index', '')),
+                           7.4, color=INK, align='center')
+            elif key == 'name':
+                name = str(item.get('name') or '')
+                urdu = has_arabic(name)
+                size = 8.5 if urdu else 7.4
+                # a long material name is ellipsised inside its own column
+                # instead of running over the quantity beside it
+                name = _fit(name, size, column['x'] - column['x0'] - 4.0,
+                            urdu=urdu)
+                sheet.text(column['x'], baseline, name, size,
+                           color=INK, align='right', urdu=urdu)
+            elif key in ('qty', 'rate'):
+                sheet.text(column['x'], baseline, item.get(key, ''), 7.4,
+                           color=INK, align='center')
             else:
-                sheet.text(right, baseline, item.get('amount', ''), 8.8,
+                sheet.text(column['x'], baseline, item.get('amount', ''), 7.4,
                            color=INK, font='Inter-Bold', align='right')
-    bottom = top + len(rows) * ROW_H
-    if rows:
-        # the last row's own separator closes the table
-        sheet.rect(LEFT, bottom - 0.9, CONTENT_W, 0.8, fill=GRID_ROW)
-    sheet.rect(LEFT, top, CONTENT_W, bottom - top, stroke=GRID, width=0.9)
-    for column in columns[1:]:
-        sheet.vline(column['x0'], top, bottom, color=GRID, width=0.9)
 
 
 def _draw_summary(state, doc, sheets):
-    """The summary box on the left half, closed by the navy total bar.
-
-    The reference draws this as stacked bands: a navy top edge, pale hairlines
-    between plain rows, a solid navy bar for the total, then the box outline.
-    The vertical divider stops at the total bar and continues in white, so the
-    bar reads as one unbroken block from the left edge to the right.
-    """
+    """The summary box on the right half, closed by the navy total bar."""
     if not doc['summary']:
+        state['summary_top'] = state['y']
+        state['summary_h'] = 0.0
         return
+
     rows = doc['summary']
-    heights = [20.2 if row.get('total') else 17.5 for row in rows]
+    heights = [15.2] + [14.5] * (len(rows) - 1)
     box_h = sum(heights)
 
-    # With no item table above it (a payment or a plain receipt) the totals
-    # follow the panel directly, instead of hanging off the bottom anchor and
-    # leaving a hole in the middle of the sheet.
-    top = max(Y_SUMMARY, state['y']) if doc['items'] else state['y'] + 24.0
-    if top + box_h > PAGE_H - 118:
-        _ensure_space(state, sheets, box_h + 22.0, doc)
-        top = state['y'] + 16.0
+    top = (state['y'] + SUMMARY_GAP) if doc['show_items'] else (state['y'] + 12.0)
+    needed = box_h + TERMS_GAP + (62.0 if doc.get('terms') else 0.0)
+    if top + needed > _content_bottom():
+        sheet = _new_sheet()
+        sheets.append(sheet)
+        state['sheet'] = sheet
+        _draw_header(state, doc, first=False)
+        top = state['y'] + 12.0
     sheet = state['sheet']
 
-    box_right = 220.8
-    box_w = box_right - LEFT
-    divider = 121.6
-    total_h = heights[-1] if rows[-1].get('total') else 0.0
-
-    # top edge of the box
-    sheet.rect(LEFT, top, box_w, 0.9, fill=NAVY)
-
+    box_w = SUM_RIGHT - SUM_LEFT
     y = top
     for index, row in enumerate(rows):
         row_h = heights[index]
         is_total = bool(row.get('total'))
         if is_total:
-            sheet.rect(LEFT, y, box_w, row_h, fill=NAVY)
+            sheet.rect(SUM_LEFT, y, box_w, row_h, fill=NAVY)
         if index:
-            # every row is closed by a navy hairline (the total bar's own lid
-            # is drawn again below so it reads as one solid block)
-            sheet.rect(LEFT, y, box_w, 0.9, fill=NAVY)
-        band = y + (14.3 if is_total else 12.4)
-        sheet.text(214.5, band, row.get('label', ''),
-                   11.0 if is_total else 10.12,
-                   color=WHITE if is_total else INK,
-                   align='right', urdu=True, bold=is_total)
-        sheet.text(101.6, band, row.get('value', ''),
-                   11.0 if is_total else 9.2,
-                   color=WHITE if is_total else INK, font='Inter-Bold',
-                   align='right')
+            sheet.hline(SUM_LEFT, SUM_RIGHT, y, color=BORDER, width=0.75)
+        label_color = WHITE if is_total else INK
+        sheet.text(SUM_LABEL_X, y + 8.2, row.get('label', ''), 8.0,
+                   color=label_color, align='right', urdu=True)
+        sheet.text(SUM_VALUE_X, y + 9.1, row.get('value', ''), 7.4,
+                   color=label_color, font='Inter-Bold', align='left')
         y += row_h
 
-    bottom = top + box_h
-    # navy lid on the total bar, then its closing edge
-    if total_h:
-        sheet.rect(LEFT, bottom - total_h, box_w, 0.9, fill=NAVY)
-    sheet.rect(LEFT, bottom - 0.9, box_w, 0.9, fill=NAVY)
+    sheet.rect(SUM_LEFT, top, box_w, box_h, stroke=BORDER, width=0.75)
+    sheet.vline(SUM_DIVIDER, top, top + box_h - heights[-1], color=BORDER,
+                width=0.75)
 
-    sheet.rect(LEFT, top, box_w, box_h, stroke=NAVY, width=0.9)
-    sheet.vline(divider, top, bottom - total_h, color=NAVY, width=0.9)
-    if total_h:
-        # the divider becomes a white gap alongside the total bar
-        sheet.rect(divider, bottom - total_h, 0.9, total_h, fill=WHITE)
-    state['y'] = bottom
+    state['summary_top'] = top
+    state['summary_h'] = box_h
+    state['y'] = top + box_h
+
+
+def _draw_signature(state, doc):
+    """The signature rule and its label, to the left of the summary box."""
+    sheet = state['sheet']
+    top = state.get('summary_top') or state['y']
+    height = state.get('summary_h') or 0.0
+    offset = min(SIG_OFFSET, max(10.0, height - 14.0)) if height else 0.0
+    line_y = top + offset
+    sheet.hline(SIG_LINE_X0, SIG_LINE_X1, line_y, color=NAVY, width=0.9)
+    sheet.text((SIG_LINE_X0 + SIG_LINE_X1) / 2, line_y + 7.9,
+               doc['signature_label'], 8.0, color=INK, align='center',
+               urdu=True)
 
 
 def _draw_terms(state, doc, sheets):
-    """Terms & conditions, when the user asked for them on the Urdu bill."""
+    """Terms & conditions, numbered, in two right-to-left columns.
+
+    The right column carries the first half of the clauses and the left
+    column the rest - the reading order of the sheet.  A clause that wraps
+    keeps its number once, on the first line, and a clause that will not fit
+    the remaining height continues on the next page rather than being clipped.
+    """
     terms = doc['terms']
     if not terms:
         return
-    sheet = state['sheet']
-    size = 8.6
-    line_h = size * 1.62
-    width = RIGHT - LEFT - 12.0
+    # The sheet sets the clauses a shade under body size so a whole clause
+    # holds one line in the right column, exactly like the approved bill.
+    size = 6.6
+    step = 11.7
+    right_text_x, right_num_x = 392.7, 399.7
+    left_text_x, left_num_x = 197.1, 204.1
+    right_width, left_width = 188.0, 122.0
+    bottom = _content_bottom() - 8.0
 
-    blocks = [(term.get('title', ''),
-               wrap_urdu(term.get('text', ''), size, width, max_lines=4))
-              for term in terms]
-    height = 20.0 + sum(13.0 + len(lines) * line_h + 4.0
-                        for _t, lines in blocks)
-    if state['y'] + height + 118.0 > PAGE_H:
-        _ensure_space(state, sheets, 30.0, doc)
+    entries = []
+    for number, term in enumerate(terms, start=1):
+        text = (term.get('text') or term.get('title') or '').strip()
+        if text:
+            entries.append((number, text))
+    if not entries:
+        return
+
+    def lines_of(items, width):
+        return sum(max(1, len(wrap_urdu(text, size, width, max_lines=3)))
+                   for _n, text in items)
+
+    pending = entries
+    while pending:
         sheet = state['sheet']
+        rule_y = state['y'] + TERMS_GAP
+        heading_baseline = rule_y + 8.3
+        first_baseline = rule_y + 19.1
+        capacity = max(1, int((bottom - first_baseline) / step) + 1)
 
-    top = state['y'] + 12.0
-    sheet.text(RIGHT, top + 7.0, 'شرائط و ضوابط', _urdu_size(9.2), color=INK,
-               align='right', urdu=True, bold=True)
-    sheet.hline(LEFT, RIGHT, top + 12.0, color=NAVY, width=0.8)
-    y = top + 12.0
-    for title, lines in blocks:
-        y += 12.0
-        if title:
-            sheet.text(RIGHT, y, title, _urdu_size(8.6), color=INK,
-                       align='right', urdu=True, bold=True)
-            y += 12.5
-        for line in lines:
-            sheet.text(RIGHT, y, line, size, color=MUTED, align='right',
-                       urdu=True)
-            y += line_h
-        y += 4.0
-    state['y'] = y
+        half = (len(pending) + 1) // 2 if len(pending) > 2 else len(pending)
+        right_items = pending[:half]
+        left_items = pending[half:]
+        # Never let the right column run past the page: overflow moves left.
+        while len(right_items) > 1 and lines_of(right_items,
+                                                right_width) > capacity:
+            left_items.insert(0, right_items.pop())
+        # Fill the left column only as far as the page allows.
+        kept, used = [], 0
+        for entry in left_items:
+            count = max(1, len(wrap_urdu(entry[1], size, left_width,
+                                         max_lines=3)))
+            if kept and used + count > capacity:
+                break
+            kept.append(entry)
+            used += count
+        remaining = left_items[len(kept):]
+        left_items = kept
 
+        sheet.hline(LEFT, RIGHT, rule_y, color=BORDER, width=0.8)
+        sheet.text(RIGHT, heading_baseline, 'شرائط و ضوابط', 8.0, color=NAVY,
+                   align='right', urdu=True, bold=True)
 
-def _draw_signatures(state, doc, sheets):
-    sheet = state['sheet']
-    top = max(Y_SIG_BOX, state['y'])
-    if top + Y_SIG_BOX_H + 14.0 > PAGE_H - 40:
-        _ensure_space(state, sheets, 80.0, doc)
-        sheet = state['sheet']
-        top = state['y'] + 20.0
+        for items, text_x, num_x, width in (
+                (right_items, right_text_x, right_num_x, right_width),
+                (left_items, left_text_x, left_num_x, left_width)):
+            y = first_baseline
+            for number, text in items:
+                for line_index, line in enumerate(
+                        wrap_urdu(text, size, width, max_lines=3)):
+                    sheet.text(text_x, y, line, size, color=INK, align='right',
+                               urdu=True)
+                    if line_index == 0:
+                        sheet.text(num_x, y, f'{number}.', 6.5, color=INK,
+                                   align='right')
+                    y += step
 
-    # dashed stamp box on the left, its label centred beneath it
-    box_w, box_h = 115.7, Y_SIG_BOX_H
-    sheet.outline(LEFT - 0.8, top, box_w, box_h, color=BORDER, width=0.9,
-                  dash=(3, 3))
-    sheet.text(LEFT - 0.8 + box_w / 2, top + box_h + 11.2,
-               doc['signature_left'], _urdu_size(9.2), color=MUTED,
-               align='center', urdu=True)
-
-    # signature rule on the right, its label just below
-    sheet.hline(232.8, RIGHT, top + box_h - 1.2, color=INK, width=0.9)
-    sheet.text(RIGHT, top + box_h + 10.6, doc['signature_right'],
-               _urdu_size(9.2), color=MUTED, align='right', urdu=True)
-    state['y'] = top + box_h + 13.0
-
-
-def _draw_footer(state, doc, sheets):
-    sheet = state['sheet']
-    if state['y'] + 50.0 > PAGE_H - 4:
-        _ensure_space(state, sheets, 50.0, doc)
-        sheet = state['sheet']
-    y = max(Y_FOOT_RULE, state['y'] + 6.0)
-    sheet.hline(LEFT, RIGHT, y, color=BORDER, width=0.8)
-    sheet.text(PAGE_W / 2, y + 15.7, doc['footer_thanks'], _urdu_size(10.2),
-               color=NAVY, align='center', urdu=True, bold=True)
-    sheet.text(PAGE_W / 2, y + 32.0, doc['footer_credit'], 8.58, color=MUTED,
-               align='center', urdu=True)
-    state['y'] = y + 34.0
+        state['y'] = max(rule_y, first_baseline + max(
+            lines_of(right_items, right_width) if right_items else 0,
+            lines_of(left_items, left_width) if left_items else 0) * step)
+        pending = remaining
+        if pending:
+            sheet = _new_sheet()
+            sheets.append(sheet)
+            state['sheet'] = sheet
+            _draw_header(state, doc, first=False)
 
 
+# ---------------------------------------------------------------------------
+# ReportLab backend
+# ---------------------------------------------------------------------------
 
 def _rl_colour(value):
     from reportlab.lib import colors
@@ -889,7 +1033,8 @@ def _rl_colour(value):
         return colors.black
 
 
-def _draw_latin(canvas, x, baseline, text, font, size, color, align, spacing=0.0):
+def _draw_latin(canvas, x, baseline, text, font, size, color, align,
+                spacing=0.0):
     width = _latin_width(text, font, size)
     if align == 'right':
         x -= width
@@ -931,7 +1076,7 @@ def _draw_urdu(canvas, x, baseline, text, size, color, align, bold=False):
             width = glyphs_width(glyphs) * size / UPEM if glyphs else 0.0
         else:
             glyphs = None
-            width = _latin_width(word, 'Inter-SemiBold', size)
+            width = _latin_width(word, 'Inter-SemiBold', size * 0.92)
         shaped.append((word, is_urdu, glyphs, width))
         total += width
     total += space * max(0, len(shaped) - 1)
@@ -957,40 +1102,42 @@ def _draw_urdu(canvas, x, baseline, text, size, color, align, bold=False):
                                   chr(_PUA_BASE + gid))
                 cursor += advance * scale
         elif word:
-            canvas.setFont('Inter-SemiBold', size)
+            canvas.setFont('Inter-SemiBold', size * 0.92)
             canvas.drawString(pen, baseline, word)
             canvas.setFont(font_name, size)
         pen += width + space
     canvas.restoreState()
 
 
-def render_pdf(doc, title=None, author=None):
-    """Render *doc* to PDF bytes (A5, one or more pages)."""
+def render_pdf(doc, title=None, author=None, copies=2):
+    """Render *doc* to PDF bytes (A5, or two A5 copies on an A4 leaf)."""
     register_latin_fonts()
     urdu_font_name()
     from reportlab.pdfgen import canvas as rl_canvas
 
+    pages = compose_document(doc, copies=copies)
     buf = io.BytesIO()
-    pdf = rl_canvas.Canvas(buf, pagesize=(PAGE_W, PAGE_H))
+    pdf = rl_canvas.Canvas(buf, pagesize=(pages[0].w, pages[0].h))
     if title:
         pdf.setTitle(title)
     if author:
         pdf.setAuthor(author)
 
-    for index, sheet in enumerate(layout_document(doc)):
+    for index, page in enumerate(pages):
         if index:
             pdf.showPage()
-        for op in sheet.ops:
+        pdf.setPageSize((page.w, page.h))
+        for op in page.ops:
             if op['op'] == 'rect':
-                _paint_rect(pdf, op)
+                _paint_rect(pdf, page, op)
             elif op['op'] in ('line', 'seg'):
-                _paint_line(pdf, op)
+                _paint_line(pdf, page, op)
         # Text is painted after the shapes of the same page so a filled bar or
         # a header background can never cover a label drawn before it.
-        for op in sheet.ops:
+        for op in page.ops:
             if op['op'] != 'text':
                 continue
-            baseline = PAGE_H - op['y']
+            baseline = page.h - op['y']
             if op['urdu']:
                 _draw_urdu(pdf, op['x'], baseline, op['text'], op['size'],
                            op['color'], op['align'], bold=op['bold'])
@@ -1004,7 +1151,7 @@ def render_pdf(doc, title=None, author=None):
     return data if data.startswith(b'%PDF-') else None
 
 
-def _paint_rect(canvas, op):
+def _paint_rect(canvas, page, op):
     canvas.saveState()
     if op['fill']:
         canvas.setFillColor(_rl_colour(op['fill']))
@@ -1013,7 +1160,7 @@ def _paint_rect(canvas, op):
         canvas.setLineWidth(op['width'])
         if op['dash']:
             canvas.setDash(list(op['dash']))
-    y = PAGE_H - op['y'] - op['h']
+    y = page.h - op['y'] - op['h']
     if op['fill'] and op['stroke']:
         canvas.rect(op['x'], y, op['w'], op['h'], stroke=1, fill=1)
     elif op['fill']:
@@ -1023,13 +1170,13 @@ def _paint_rect(canvas, op):
     canvas.restoreState()
 
 
-def _paint_line(canvas, op):
+def _paint_line(canvas, page, op):
     canvas.saveState()
     canvas.setStrokeColor(_rl_colour(op['color']))
     canvas.setLineWidth(op.get('width') or 1.0)
     if op.get('dash'):
         canvas.setDash(list(op['dash']))
-    canvas.line(op['x0'], PAGE_H - op['y0'], op['x1'], PAGE_H - op['y1'])
+    canvas.line(op['x0'], page.h - op['y0'], op['x1'], page.h - op['y1'])
     canvas.restoreState()
 
 
@@ -1061,7 +1208,7 @@ body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
   body {{ background: #eceff3; padding: 12px 0; }}
   .pg {{ margin: 0 auto 14px; box-shadow: 0 3px 14px rgba(0,0,0,.25); }}
   .bar {{ position: fixed; inset: auto 0 0 0; background: #16212e; padding: 8px 12px;
-         text-align: center; }}
+         text-align: center; z-index: 9; }}
   .bar button, .bar a {{ font-family: Inter, sans-serif; font-size: 13px; border: 0;
     border-radius: 6px; padding: 7px 16px; margin: 0 4px; cursor: pointer;
     text-decoration: none; display: inline-block; }}
@@ -1077,20 +1224,23 @@ body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
 """
 
 
-def render_html(doc, title='Urdu Bill', auto_print=False):
-    """Render *doc* as a print-ready HTML page (same page as the PDF)."""
-    parts = [_HTML_HEAD.format(title=title, pw=_fmt(PAGE_W), ph=_fmt(PAGE_H),
+def render_html(doc, title='Urdu Bill', auto_print=False, copies=2):
+    """Render *doc* as a print-ready HTML page (same pages as the PDF)."""
+    pages = compose_document(doc, copies=copies)
+    parts = [_HTML_HEAD.format(title=title, pw=_fmt(pages[0].w),
+                               ph=_fmt(pages[0].h),
                                urdu_file=URDU_FONT_FILE)]
-    for sheet in layout_document(doc):
-        parts.append('<div class="pg">')
-        for op in sheet.ops:
+    for page in pages:
+        parts.append(f'<div class="pg" style="width:{_fmt(page.w)}pt;'
+                     f'height:{_fmt(page.h)}pt">')
+        for op in page.ops:
             if op['op'] == 'rect':
                 parts.append(_html_rect(op))
             elif op['op'] in ('line', 'seg'):
                 parts.append(_html_line(op))
-        for op in sheet.ops:
+        for op in page.ops:
             if op['op'] == 'text':
-                parts.append(_html_text(op))
+                parts.append(_html_text(op, page))
         parts.append('</div>')
     parts.append(
         '<div class="bar no-print">'
@@ -1139,35 +1289,35 @@ def _html_line(op):
         width = abs(op['x1'] - op['x0'])
         style = (f"left:{_fmt(min(op['x0'], op['x1']))}pt;"
                  f"top:{_fmt(op['y0'] - op['width'] / 2)}pt;"
-                 f"width:{_fmt(width)}pt;height:{_fmt(op['width'])}pt;"
+                 f"width:{_fmt(width)}pt;height:{_fmt(max(op['width'], 0.5))}pt;"
                  f"background:{op['color']}")
     else:
         height = abs(op['y1'] - op['y0'])
         style = (f"left:{_fmt(op['x0'] - op['width'] / 2)}pt;"
                  f"top:{_fmt(min(op['y0'], op['y1']))}pt;"
-                 f"width:{_fmt(op['width'])}pt;height:{_fmt(height)}pt;"
+                 f"width:{_fmt(max(op['width'], 0.5))}pt;height:{_fmt(height)}pt;"
                  f"background:{op['color']}")
     return f'<div class="s" style="{style}"></div>'
 
 
-def _html_text(op):
+def _html_text(op, page=None):
     size = op['size']
     font = op['font']
     ratio = _BASELINE_RATIO.get(font, 0.85)
-    top = op['y'] - ratio * size
     color = op['color']
+    page_w = page.w if page is not None else PAGE_W
     if font == 'ur':
         family = f"{URDU_FAMILY}, 'Noto Nastaliq Urdu', serif"
         direction = 'rtl'
         weight = 'bold' if op['bold'] else 'normal'
     else:
-        family = f"Inter, Arial, sans-serif"
+        family = "Inter, Arial, sans-serif"
         direction = 'ltr'
         weight = {'Inter-Medium': '500', 'Inter-SemiBold': '600',
                   'Inter-Bold': '700', 'Inter-ExtraBold': '800'}.get(font, '400')
     anchor = []
     if op['align'] == 'right':
-        anchor.append(f"right:{_fmt(PAGE_W - op['x'])}pt")
+        anchor.append(f"right:{_fmt(page_w - op['x'])}pt")
         align = 'right'
     elif op['align'] == 'center':
         anchor.append(f"left:{_fmt(op['x'])}pt")

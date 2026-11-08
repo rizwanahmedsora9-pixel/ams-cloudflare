@@ -31,6 +31,27 @@
                     </label>
                 </div>
 
+                <div class="mb-3 border rounded p-2 bg-dark-subtle">
+                    <div class="small text-warning fw-bold text-uppercase mb-2">
+                        <i class="bi bi-copy me-1"></i> Copies
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="urduCopies" id="urduCopies2" value="2" checked>
+                        <label class="form-check-label text-white fw-bold" for="urduCopies2">
+                            <bdi dir="rtl">کاربن کاپی</bdi> — 2 copies on one A4 (carbon copy)
+                        </label>
+                        <div class="text-white-50 small">
+                            <bdi dir="rtl">اصل</bdi> for the customer on the right, <bdi dir="rtl">نقل</bdi> for the office on the left.
+                        </div>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="radio" name="urduCopies" id="urduCopies1" value="1">
+                        <label class="form-check-label text-white-50" for="urduCopies1">
+                            <i class="bi bi-file-earmark me-1"></i> Single copy — one A5 sheet
+                        </label>
+                    </div>
+                </div>
+
                 <div id="urduTcOptions" class="mb-3 border rounded p-2 bg-dark-subtle">
                     <div class="small text-warning fw-bold text-uppercase mb-2">
                         <i class="bi bi-menu-button-wide me-1"></i> Choose terms to display (Urdu receipt only)
@@ -140,6 +161,8 @@
             if (yes && ids.length) {
                 url += '&tc_ids=' + ids.join(',');
             }
+            var copies = document.querySelector('input[name="urduCopies"]:checked');
+            url += '&copies=' + (copies ? copies.value : '2');
             modal.hide();
             location.href = url;
         }
