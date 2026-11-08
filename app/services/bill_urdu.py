@@ -6,10 +6,10 @@ figure printed here is read from the bill exactly as stored - the module never
 recomputes a total, so the Urdu sheet cannot disagree with the ledger.
 
 The sheet is the *only* Urdu bill the app produces: "Urdu PDF" and "Urdu
-Print" both render this document, so what is previewed is what prints.  It is
-printed as a carbon copy by default - the same A5 receipt twice on one A4
-landscape leaf, ``اصل`` (customer) on the right and ``نقل`` (office) on the
-left - and as a single A5 page when ``copies=1``.
+Print" both render this document, so what is previewed is what prints.  The
+default is the single approved A5 sheet (``copies=1``); ``copies=2`` places the
+same receipt twice on one A4 landscape leaf, ``اصل`` (customer) on the right
+and ``نقل`` (office) on the left.
 """
 from __future__ import annotations
 
@@ -280,6 +280,14 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
             party_code = (getattr(bill, 'client_code', '') or '')
         label = label or L_PARTY
 
+    party_phone = ''
+    if client is not None:
+        party_phone = (getattr(client, 'phone', '') or '').strip()
+    if not party_phone:
+        party_phone = (getattr(bill, 'client_phone', '') or
+                       getattr(bill, 'supplier_phone', '') or '').strip()
+    party_phone = R._phone(party_phone)
+
     # The sheet's head is Urdu, so an English shop name is transliterated the
     # same way client and driver names are (a curated entry wins when the
     # settings already hold Urdu text - urdu_name keeps it untouched).
@@ -339,6 +347,7 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         note=note,
         party_name=party_name,
         party_code=party_code,
+        party_phone=party_phone,
         party_label=label,
         detail_rows=detail_rows,
         fields=_panel_fields(bill_type, label, party_name, party_code,
@@ -354,16 +363,17 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     )
 
 
-def render_pdf(document, title='Urdu Bill', copies=2):
+def render_pdf(document, title='Urdu Bill', copies=1):
     """PDF bytes for *document* (``None`` when ReportLab cannot run).
 
-    ``copies=2`` (the default) is the carbon-copy leaf: the same A5 bill twice
-    on one A4 landscape page, original on the right and copy on the left.
+    ``copies=1`` (the default) is the single approved A5 sheet.  ``copies=2``
+    is the carbon-copy leaf: the same A5 bill twice on one A4 landscape page,
+    original on the right and copy on the left.
     """
     return R.render_pdf(document, title=title, copies=copies)
 
 
-def render_html(document, title='Urdu Bill', auto_print=False, copies=2):
+def render_html(document, title='Urdu Bill', auto_print=False, copies=1):
     """Full print page for *document* (same pages as the PDF)."""
     return R.render_html(document, title=title, auto_print=auto_print,
                          copies=copies)

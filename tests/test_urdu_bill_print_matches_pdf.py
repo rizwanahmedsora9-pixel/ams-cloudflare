@@ -62,7 +62,7 @@ def _text_runs(html, page_w=R.PAGE_W):
 
 
 def test_every_shape_op_is_in_the_print_page():
-    doc = base._document()
+    doc = base._reference_document()
     sheets = R.layout_document(doc)
     html = bill_urdu.render_html(doc, copies=1)
     boxes = _boxes(html)
@@ -79,7 +79,7 @@ def test_every_shape_op_is_in_the_print_page():
 
 
 def test_every_rule_is_in_the_print_page():
-    doc = base._document()
+    doc = base._reference_document()
     sheets = R.layout_document(doc)
     html = bill_urdu.render_html(doc, copies=1)
 
@@ -99,7 +99,7 @@ def test_every_rule_is_in_the_print_page():
 
 
 def test_every_text_run_is_in_the_print_page():
-    doc = base._document()
+    doc = base._reference_document()
     sheets = R.layout_document(doc)
     html = bill_urdu.render_html(doc, copies=1)
     runs = _text_runs(html)
@@ -126,7 +126,7 @@ def test_every_text_run_is_in_the_print_page():
 
 
 def test_print_page_uses_the_same_point_sizes_and_colours():
-    doc = base._document()
+    doc = base._reference_document()
     sheets = R.layout_document(doc)
     html = bill_urdu.render_html(doc, copies=1)
     styles = [_styles(css[0]) for css in TEXT.findall(html)]
@@ -168,7 +168,7 @@ def test_print_page_has_no_flow_layout_furniture():
 
 
 def test_the_print_page_is_the_a4_landscape_carbon_copy():
-    html = bill_urdu.render_html(base._document())
+    html = bill_urdu.render_html(base._document(), copies=2)
     assert f'width:{R._fmt(R.A4_W)}pt' in html
     assert f'height:{R._fmt(R.A4_H)}pt' in html
     assert f'size: {R._fmt(R.A4_W)}pt {R._fmt(R.A4_H)}pt' in html
@@ -195,13 +195,30 @@ def test_both_print_copies_carry_every_text_run():
     assert not missing, f'copy runs missing from the print page: {missing[:6]}'
 
 
-def test_only_the_panel_rule_and_the_cut_line_are_dashed():
+def test_only_the_header_companion_and_the_cut_line_are_dashed():
     html = bill_urdu.render_html(base._document(), copies=2)
     dashed = [_styles(css) for css in SHAPE.findall(html) if 'dashed' in css]
-    # the dotted rule under the panel fields, once on each copy, then the cut
+    # the light dashed header companion, once on each copy, then the cut
     assert len(dashed) == 3
     vertical = [css for css in dashed if css.get('width') == '0']
     assert len(vertical) == 1, 'one cut line down the middle of the leaf'
     assert abs(_pt(vertical[0]['left']) - (R.A4_W / 2)) < 1.0
     for css in dashed:
         assert 'background' not in css, 'a dashed mark must let the paper show'
+
+
+def test_baseline_ratios_are_the_measured_browser_faces():
+    assert R._BASELINE_RATIO[R.SANS] == 0.8125
+    assert R._BASELINE_RATIO[R.SANS_BOLD] == 0.825
+    assert R._BASELINE_RATIO['ur'] == 0.7627
+
+
+def test_embedded_ltr_spans_do_not_change_the_logical_text():
+    items = [{'name_ur': 'ٹائل 12×18', 'qty': 40, 'price_at_time': 1950}]
+    doc = base._document(items=items)
+    sheets = R.layout_document(doc)
+    html = bill_urdu.render_html(doc, copies=1)
+    runs = _text_runs(html)
+    assert any(text == 'ٹائل 12×18' for _x, _top, text, _css in runs)
+    assert any(op['op'] == 'text' and op['text'] == 'ٹائل 12×18'
+               for op in sheets[0].ops)

@@ -357,9 +357,9 @@ def download_invoice(bill_no):
 
     action = (request.args.get('action') or 'download').lower()
     disposition = 'inline' if action in ['print', 'view'] else 'attachment'
-    # Carbon copy: an Urdu receipt prints twice on one A4 leaf by default
-    # (original + office copy).  ?copies=1 asks for a single A5 sheet.
-    copies = 1 if (request.args.get('copies') or '').strip() == '1' else 2
+    # The approved Urdu layout is a single A5 sheet by default.  ?copies=2
+    # asks for the carbon-copy leaf (original + office copy on one A4).
+    copies = 2 if (request.args.get('copies') or '').strip() == '2' else 1
     # Bills are single-language documents: ?lang=en (default) or ?lang=ur.
     lang = (request.args.get('lang') or 'en').strip().lower()
     if lang in ('ur', 'urdu', 'urd'):
@@ -432,9 +432,9 @@ def download_invoice(bill_no):
         # An Urdu bill is its own document (app/services/urdu_receipt.py), not
         # the English receipt with swapped labels: it has its own sheet,
         # header, meta strip, panel, table, summary and terms.  It is also a
-        # carbon copy by default - the same A5 receipt twice on one A4 leaf,
-        # original for the customer and copy for the office.  Both "Urdu PDF"
-        # and "Urdu Print" return it here.
+        # single approved A5 sheet by default; ?copies=2 lays the same receipt
+        # out twice on one A4 leaf.  Both "Urdu PDF" and "Urdu Print" return it
+        # here.
         return _urdu_bill_response(
             bill_type=bill_type,
             bill=bill_obj,
@@ -529,8 +529,8 @@ def download_invoice(bill_no):
 # document out of ``view_bill.html`` is deliberate: the Urdu sheet must not
 # inherit the English receipt's layout (or its black rules, ``INVOICE`` badge
 # and English table header) when a label is translated.  The sheet is composed
-# onto paper here too: ``copies=2`` (default) lays the receipt out twice on one
-# A4 landscape leaf, ``copies=1`` prints a single A5 page.
+# onto paper here too: ``copies=1`` (default) prints the single approved A5
+# sheet, ``copies=2`` lays the receipt out twice on one A4 landscape leaf.
 
 _URDU_SECTION = {
     'Booking': 'BOOKING',
@@ -545,12 +545,12 @@ _URDU_SECTION = {
 def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
                         client_balance, delivery_people, driver_name_ur,
                         client_name_ur, transaction_label, transaction_note,
-                        terms, grn_bd, action, disposition, copies=2):
+                        terms, grn_bd, action, disposition, copies=1):
     """Return the Urdu bill as a PDF (download) or as the print page.
 
-    ``copies`` is the carbon-copy switch: 2 (the default) prints the same A5
-    receipt twice on one A4 landscape leaf - original for the customer on the
-    right, office copy on the left - and 1 prints a single A5 sheet.
+    ``copies`` is the carbon-copy switch: 1 (the default) prints the single
+    approved A5 sheet; 2 prints the same receipt twice on one A4 landscape
+    leaf - original for the customer on the right, office copy on the left.
     """
     from app.services import bill_urdu
     from app.services.files_pdf import _safe_download_name
