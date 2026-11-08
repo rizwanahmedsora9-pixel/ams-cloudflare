@@ -889,14 +889,22 @@ def test_real_bill_renders_m_ahmed_as_muhammad_ahmed_on_sheet_and_verify(client,
         f'/download_invoice/{bill_no}?src=direct_sale&src_id={sale_id}'
         '&lang=ur&action=print&tc=0'
     ).get_data(as_text=True)
+    html_text = re.sub(r'<[^>]+>', '', html)
     for expected in ('محمد احمد', 'محمد حارث', 'ملی میٹر چو گھاٹ', 'اینٹ'):
-        assert expected in html, expected
+        assert expected in html_text, expected
     assert 'اہمد' not in html
 
+    # The scanned page draws the printed sheet, so a Latin figure inside an
+    # Urdu item sits in its own LTR isolate: the text is the same, the markup
+    # keeps the browser from reordering it.
     verify_html = client.get(f'/verify/bill/{token}').get_data(as_text=True)
+    verify_text = re.sub(r'<[^>]+>', '', verify_html)
     for expected in ('محمد احمد', 'محمد حارث', '12 ملی میٹر چو گھاٹ', 'اینٹ'):
-        assert expected in verify_html, expected
-    assert 'اہمد' not in verify_html
+        assert expected in verify_text, expected
+    assert 'اہمد' not in verify_text
+    # every material line and its money figures are on the scanned page too
+    for figure in ('500', '20', '1,500', '3,000', '10,000', '13,000'):
+        assert figure in verify_text, figure
 
 
 def test_confirmation_multiple_term_ids_are_all_used(client, sale, app):

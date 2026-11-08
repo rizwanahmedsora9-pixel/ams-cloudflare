@@ -212,7 +212,8 @@ def test_the_qr_on_a_real_bill_is_a_signed_link_to_that_bill(client, sale, app):
 
     decoded = _decode_from_pdf(resp.data)
     assert decoded, 'the printed QR must decode'
-    assert '/verify/bill/' in decoded, decoded
+    # the short form the printed code uses; /verify/bill/ still resolves
+    assert '/b/' in decoded or '/verify/bill/' in decoded, decoded
 
     # Follow exactly what the phone would open.
     from urllib.parse import urlsplit
@@ -220,10 +221,13 @@ def test_the_qr_on_a_real_bill_is_a_signed_link_to_that_bill(client, sale, app):
     page = client.get(path)
     assert page.status_code == 200
     html = page.get_data(as_text=True)
+    # The scanned page is the printed sheet: same bill number, client, code,
+    # delivery person, every material line and the money figures.
     assert sale['bill_no'] in html
     assert 'FBMCL-00009' in html
     assert 'ڈی جی' in html and 'سیمنٹ ٹھیکہ' in html
-    assert '1,290' in html
+    assert 'عدنان احمد' in html
+    assert '1,290' in html and '64,500' in html
     assert 'Verified' in html
 
 
@@ -271,4 +275,194 @@ def test_the_public_base_url_overrides_the_request_host(app):
             url = bill_verify.verify_url('DirectSale', 7, 'SB-7')
         finally:
             bill_verify.current_app.config['PUBLIC_BASE_URL'] = ''
-    assert url.startswith('https://erp.example.com/verify/bill/')
+    assert (url.startswith('https://erp.example.com/b/')
+            or url.startswith('https://erp.example.com/verify/bill/'))
+
+
+# ---------------------------------------------------------------------------
+# The link is short enough to print, and the symbol is drawn exactly
+# ---------------------------------------------------------------------------
+# A phone camera found no code at all on an 18mm-wide block holding a 61x61
+# symbol (0.26mm modules).  These tests pin the two things that fixed it: the
+# token is now a short link (a 37x37 symbol, 0.40mm modules) and the modules are
+# painted edge to edge with no overdraw that could eat the light ones.
+
+_LINK_HOSTS = ('https://myerp.pythonanywhere.com',
+               'http://192.168.1.10:5000',
+               'https://fzal-bills.e2b.app')
+
+
+def _link_document(host):
+    """The reference bill, built while a reachable host is being requested."""
+    from flask import Flask
+    frame = Flask(__name__)
+    frame.secret_key = 'x' * 64
+    frame.config['PUBLIC_BASE_URL'] = host
+    with frame.app_context(), frame.test_request_context('/download_invoice/X'):
+        # A database id is what makes the code a link rather than a summary.
+        return base._document(
+            bill=base._bill(amount=1105636, paid_amount=614936, id=1008),
+            items=base.REFERENCE_ITEMS,
+            terms=[__import__('types').SimpleNamespace(title='', content_ur=t)
+                   for t in base.TERMS],
+        )
+
+
+def test_the_qr_on_a_real_bill_is_a_short_link():
+    """Every deployment host still yields a link a phone can resolve."""
+    for host in _LINK_HOSTS:
+        payload = _link_document(host)['qr_text']
+        assert payload.startswith(host), payload
+        assert '/b/' in payload
+        assert len(payload) <= 90, f'{len(payload)} chars is too many for 18mm'
+        # no Urdu summary in the payload: byte mode would quadruple the cost
+        assert '|' not in payload and payload.isascii(), payload
+        matrix = qr_code.make_matrix(payload, 'm')
+        assert matrix and len(matrix) <= bill_urdu.QR_LINK_MODULES, len(matrix)
+        module_mm = R.QR_SIZE / (len(matrix) + 8) / 72 * 25.4
+        assert module_mm >= 0.38, f'{module_mm:.3f}mm modules are too fine'
+
+
+def test_the_printed_link_keeps_the_signature_and_the_bill_id():
+    """The token is signed, so a made-up link cannot show a bill."""
+    from app.services import bill_verify
+    payload = _link_document(_LINK_HOSTS[0])['qr_text']
+    token = payload.rsplit('/', 1)[-1]
+    assert token.count('.') == 3, token
+    # QR alphanumeric mode: upper-case letters, digits and a few symbols
+    assert token.isascii() and token.upper() == token
+
+
+def test_qr_modules_are_drawn_edge_to_edge():
+    """No overdraw: a 0.05pt growth per module broke the symbol.
+
+    The symbol is the one long payload the sheet can carry, and the drawn
+    rectangles must together be exactly the module grid of the symbol.
+    """
+    doc = base._reference_document()
+    sheet = R.layout_document(doc)[0]
+    matrix = R.qr_matrix(doc['qr_text'])
+    module = R.QR_SIZE / (len(matrix) + 8)
+    pad = 4 * module
+    drawn = [op for op in sheet.ops if op['op'] == 'rect'
+             and R.QR_X <= op['x'] < R.QR_X + R.QR_SIZE
+             and R.QR_Y <= op['y'] < R.QR_Y + R.QR_SIZE]
+    assert drawn, 'the QR block vanished'
+    for op in drawn:
+        assert abs(op['h'] - module) < 0.01, 'module height grew'
+        assert abs(op['w'] / module - round(op['w'] / module)) < 0.02, \
+            'module run width is not a whole number of modules'
+        assert op['x'] >= R.QR_X + pad - 0.01
+        assert op['y'] >= R.QR_Y + pad - 0.01
+
+
+# ---------------------------------------------------------------------------
+# The scanned page is the printed bill
+# ---------------------------------------------------------------------------
+
+def _visible_text(html):
+    """The text a phone shows: markup stripped, entities left to the browser."""
+    return re.sub(r'<[^>]+>', '', html)
+
+
+def test_the_scanned_page_lists_every_detail_the_paper_bill_does(client, sale, app):
+    """Client, bill number, delivery person, materials, qty/rate/amount, totals.
+
+    The paper sheet and the scanned page are built by the same loader, so this
+    compares them directly: every text run of the document must appear on the
+    page the QR opens.
+    """
+    app.config['PUBLIC_BASE_URL'] = 'http://bill-test.local'
+    body = client.get(
+        f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+        f"&src_id={sale['id']}&lang=ur&tc=0").data
+    decoded = _decode_from_pdf(body)
+    assert decoded, 'the printed QR must decode'
+    assert '/b/' in decoded or '/verify/bill/' in decoded
+
+    from app.blueprints.sales import _bills_verify as verify_blueprint
+    with app.test_request_context(decoded):
+        from urllib.parse import urlsplit
+        claim = verify_blueprint.bill_verify.read_token(
+            urlsplit(decoded).path.rsplit('/', 1)[-1])
+        source = verify_blueprint._verified_source(claim)
+        printed = verify_blueprint.urdu_bill_document(source)
+
+    page = client.get(urlsplit(decoded).path)
+    assert page.status_code == 200
+    shown = _visible_text(page.get_data(as_text=True))
+
+    def runs(document):
+        seen = []
+        for fragment in R.page_fragments(document):
+            for element in fragment['elements']:
+                if element['op'] != 'text':
+                    continue
+                seen.append(''.join(run['text']
+                                    for run in element['attrs']['runs']))
+        return seen
+
+    missing = [text for text in runs(printed) if text.strip()
+               and text.strip() not in shown]
+    assert not missing, f'not shown on the scanned page: {missing[:6]}'
+
+    # …and the facts a customer checks, spelled out, are all there
+    assert sale['bill_no'] in shown                 # bill number
+    assert 'FBMCL-00009' in shown                   # client code
+    assert 'محمد شفیق' in shown                      # client name
+    assert 'عدنان احمد' in shown                     # delivery person
+    assert 'ڈی جی' in shown and 'سیمنٹ ٹھیکہ' in shown  # materials
+    # line amounts and the bill total, exactly as the paper prints them
+    for figure in ('2,000', '64,500', '66,500', '1,290'):
+        assert figure in shown, figure
+
+
+def test_the_scanned_bill_can_be_downloaded_as_the_same_pdf(client, sale, app):
+    app.config['PUBLIC_BASE_URL'] = 'http://bill-test.local'
+    body = client.get(
+        f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+        f"&src_id={sale['id']}&lang=ur&tc=0").data
+    decoded = _decode_from_pdf(body)
+    response = client.get(decoded.split('bill-test.local')[-1] + '.pdf')
+    assert response.status_code == 200
+    assert response.data.startswith(b'%PDF-')
+    assert '-UR.pdf' in response.headers['Content-Disposition']
+
+
+# ---------------------------------------------------------------------------
+# The bundled encoder's modes
+# ---------------------------------------------------------------------------
+
+def _decode_matrix(matrix, scale=20, quiet=4):
+    """Decode a matrix the way a scanner does (no PDF in the way)."""
+    cv2 = pytest.importorskip('cv2')
+    np = pytest.importorskip('numpy')
+    size = (len(matrix) + 2 * quiet) * scale
+    image = np.full((size, size), 255, dtype=np.uint8)
+    for row_index, row in enumerate(matrix):
+        for column, dark in enumerate(row):
+            if dark:
+                y = (quiet + row_index) * scale
+                x = (quiet + column) * scale
+                image[y:y + scale, x:x + scale] = 0
+    decoded, _points, _ = cv2.QRCodeDetector().detectAndDecode(image)
+    return decoded
+
+
+def test_numeric_and_alphanumeric_payloads_round_trip():
+    """Denser modes are used where they fit, and still decode exactly."""
+    for payload in ('123456789012', 'SB-SL-1008',
+                    'HTTPS://MYERP.PYTHONANYWHERE.COM/B/S.1.SBSL1008.PAUKSPZ52HZYW',
+                    'SB-SL-1008|07 نومبر 2026|محمد شفیق', 'x' * 120):
+        matrix = qr_code.make_matrix(payload, 'm')
+        assert matrix, payload[:20]
+        assert _decode_matrix(matrix) == payload, payload[:20]
+
+
+def test_alphanumeric_mode_makes_the_symbol_smaller():
+    """5.5 bits per character is why the printed link fits an 18mm block."""
+    text = 'HTTPS://MYERP.PYTHONANYWHERE.COM/B/S.1.SBSL1008.PAUKSPZ52HZYW'
+    packed = qr_code.make_matrix(text, 'm')
+    # the same text forced through byte mode would need a bigger symbol
+    wide = qr_code.make_matrix(text.lower() + 'é', 'm')
+    assert len(packed) <= len(wide), (len(packed), len(wide))

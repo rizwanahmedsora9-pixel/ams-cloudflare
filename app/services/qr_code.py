@@ -202,32 +202,102 @@ def _capacity_bits(version: int, level: int) -> int:
     return data_codewords * 8
 
 
-def _pick_version(payload: bytes, level: int) -> tuple[int, int] | None:
-    """Smallest version (and the level actually used) that fits *payload*."""
+# Mode selectors (ISO/IEC 18004 table 2).  Byte mode is the fallback because
+# the far side must be able to read ANY payload; alphanumeric and numeric are
+# used when they fit because each packs a payload into fewer modules, i.e. a
+# coarser, easier-to-scan symbol on paper.
+MODE_NUMERIC = 0x1
+MODE_ALPHANUMERIC = 0x2
+MODE_BYTE = 0x4
+
+# The 45 characters of alphanumeric mode, in encoding order.  A printed link
+# such as ``https://shop.example.com/b/S42.SBSL1008.X7K2MQ9BT1`` is entirely
+# inside this set once the URL is upper-cased (DNS names are case-insensitive
+# and Flask routes match case-insensitively for the token we emit), so it
+# encodes at 5.5 bits per character instead of 8.
+_ALNUM = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:'
+_ALNUM_INDEX = {ch: i for i, ch in enumerate(_ALNUM)}
+
+
+def _mode_for(text: str) -> str:
+    """``'n'`` / ``'a'`` / ``'b'`` - the densest mode that can hold *text*."""
+    if not text:
+        return 'b'
+    if all(ch in '0123456789' for ch in text):
+        return 'n'
+    if all(ch in _ALNUM_INDEX for ch in text):
+        return 'a'
+    return 'b'
+
+
+def _count_bits(mode: str, version: int) -> int:
+    """Character-count indicator width for *mode* at *version*."""
+    small = version <= 9
+    if mode == 'n':
+        return 10 if small else (12 if version <= 26 else 14)
+    if mode == 'a':
+        return 9 if small else (11 if version <= 26 else 13)
+    return 8 if small else 16
+
+
+def _payload_bits(mode: str, text: str) -> tuple[int, int]:
+    """``(character count, bit length)`` of *text* in *mode*."""
+    if mode == 'n':
+        groups, rest = divmod(len(text), 3)
+        return len(text), groups * 10 + (0 if not rest else (4 if rest == 1 else 7))
+    if mode == 'a':
+        pairs, rest = divmod(len(text), 2)
+        return len(text), pairs * 11 + rest * 6
+    payload = text.encode('utf-8')
+    return len(payload), len(payload) * 8
+
+
+def _pick_version(text: str, level: int) -> tuple[int, int, str] | None:
+    """Smallest version (and the level and mode actually used) for *text*."""
+    mode = _mode_for(text)
+    length, body_bits = _payload_bits(mode, text)
     for candidate in (level, level + 1, level + 2, level + 3):
         if candidate > 3:
             break
         for version in range(1, 41):
-            count_bits = 8 if version <= 9 else 16
-            needed = 4 + count_bits + len(payload) * 8
+            needed = 4 + _count_bits(mode, version) + body_bits
             if needed <= _capacity_bits(version, candidate):
-                return version, candidate
+                return version, candidate, mode
     return None
 
 
-def _data_codewords(payload: bytes, version: int, level: int) -> list[int]:
+def _data_codewords(text: str, version: int, level: int,
+                     mode: str | None = None) -> list[int]:
     blocks = _ECC[version][level]
     capacity = sum(b[0] * b[2] for b in blocks) * 8
     bits: list[int] = []
+    mode = mode or _mode_for(text)
 
     def push(value: int, width: int) -> None:
         for shift in range(width - 1, -1, -1):
             bits.append((value >> shift) & 1)
 
-    push(MODE_BYTE, 4)
-    push(len(payload), 8 if version <= 9 else 16)
-    for byte in payload:
-        push(byte, 8)
+    if mode == 'n':
+        push(MODE_NUMERIC, 4)
+        push(len(text), _count_bits(mode, version))
+        for start in range(0, len(text), 3):
+            chunk = text[start:start + 3]
+            push(int(chunk), {3: 10, 2: 7, 1: 4}[len(chunk)])
+    elif mode == 'a':
+        push(MODE_ALPHANUMERIC, 4)
+        push(len(text), _count_bits(mode, version))
+        for start in range(0, len(text), 2):
+            chunk = text[start:start + 2]
+            if len(chunk) == 2:
+                push(_ALNUM_INDEX[chunk[0]] * 45 + _ALNUM_INDEX[chunk[1]], 11)
+            else:
+                push(_ALNUM_INDEX[chunk[0]], 6)
+    else:
+        payload = text.encode('utf-8')
+        push(MODE_BYTE, 4)
+        push(len(payload), _count_bits('b', version))
+        for byte in payload:
+            push(byte, 8)
 
     # Terminator (up to four zero bits), then pad to a byte boundary.
     for _ in range(min(4, capacity - len(bits))):
@@ -486,22 +556,22 @@ def make_matrix(text: str, error: str = 'm',
     (M -> L, Q -> M ...) only when the payload would otherwise need a bigger
     symbol, which keeps a printed code readable.
     """
-    payload = (text or '').encode('utf-8')
-    if not payload:
+    text = text or ''
+    if not text:
         return None
     level = _LEVELS.get(str(error or 'm').lower()[:1], 1)
     if level not in _LEVELS.values():
         level = 1
-    chosen = _pick_version(payload, level)
+    chosen = _pick_version(text, level)
     if chosen is None:
         return None
-    version, level = chosen
+    version, level, mode = chosen
 
     reserved = _reserved_map(version)
     base = _Grid(version)
     base.function_patterns()
     base.place_data(_bit_stream(_interleave(
-        _data_codewords(payload, version, level), version, level)))
+        _data_codewords(text, version, level, mode), version, level)))
 
     best = None
     best_score = None
