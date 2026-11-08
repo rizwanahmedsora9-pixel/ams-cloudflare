@@ -42,6 +42,7 @@ _WORDS = {
     'fahad': 'فہد', 'faiz': 'فیض',
     'faisal': 'فیصل', 'fayyaz': 'فیاض', 'ghulam': 'غلام', 'gulzar': 'گلزار',
     'hamid': 'حامد', 'hamed': 'حامد', 'hameed': 'حمید', 'hamza': 'حمزہ',
+    'haaris': 'حارث', 'haris': 'حارث',
     'haroon': 'ہارون', 'hasan': 'حسن', 'hassan': 'حسن', 'husain': 'حسین',
     'hussain': 'حسین', 'ibrahim': 'ابراہیم', 'idrees': 'ادریس',
     'iftikhar': 'افتخار', 'ilyas': 'الیاس', 'imran': 'عمران',
@@ -96,7 +97,10 @@ _WORDS = {
     'market': 'مارکیٹ', 'trader': 'ٹریڈر', 'traders': 'ٹریڈرز',
     'company': 'کمپنی', 'bank': 'بینک', 'account': 'اکاؤنٹ',
     'booking': 'بکنگ', 'delivery': 'ڈیلیوری', 'payment': 'پیمنٹ',
-    'cement': 'سیمنٹ', 'goods': 'گڈز', 'material': 'میٹیریل',
+    'cement': 'سیمنٹ', 'brick': 'اینٹ', 'bricks': 'اینٹ',
+    'chaugath': 'چو گھاٹ', 'chaughat': 'چو گھاٹ', 'chaugat': 'چو گھاٹ',
+    'choghat': 'چو گھاٹ', 'choughat': 'چو گھاٹ',
+    'mm': 'ملی میٹر', 'goods': 'گڈز', 'material': 'میٹیریل',
     'materials': 'میٹیریلز', 'building': 'بلڈنگ', 'builders': 'بلڈرز',
     'fazal': 'فضل', 'sobtian': 'صوبتیاں', 'sohtian': 'صوبتیاں',
     'driver': 'ڈریور', 'conductor': 'کنڈکٹر',
@@ -187,7 +191,10 @@ def urdu_name(name, preferred=None):
         original = match.group()
         text = original.lower()
         if text in _WORDS:
-            return _WORDS[text]
+            mapped = _WORDS[text]
+            if text == 'mm' and match.start() > 0 and name[match.start() - 1].isdigit():
+                return ' ' + mapped
+            return mapped
         # Initialisms are read as letter names rather than a single word.
         if _looks_like_initialism(original):
             letters = {'a': 'اے', 'b': 'بی', 'c': 'سی', 'd': 'ڈی', 'e': 'ای',

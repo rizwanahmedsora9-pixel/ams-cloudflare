@@ -178,11 +178,17 @@ def _item_rows(items):
                 else getattr(item, 'price_at_time', 0)) or 0
         rate = float(rate or 0)
         qty = float(qty or 0)
-        name = ''
         if isinstance(item, dict):
-            name = (item.get('name_ur') or item.get('name') or '')
+            saved = str(item.get('name_ur') or '').strip()
+            raw = (item.get('name') or item.get('product_name')
+                   or item.get('material_name') or '')
+            name = saved or urdu_name(raw)
         else:
-            name = getattr(item, 'name_ur', '') or getattr(item, 'material_name', '')
+            saved = str(getattr(item, 'name_ur', '') or '').strip()
+            raw = (getattr(item, 'material_name', '')
+                   or getattr(item, 'product_name', '')
+                   or getattr(item, 'name', '') or '')
+            name = saved or urdu_name(raw)
         rows.append({
             'index': index,
             'name': str(name).strip(),

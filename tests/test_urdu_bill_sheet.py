@@ -806,9 +806,23 @@ def test_standalone_m_is_muhammad_and_ahmed_uses_proper_urdu_spelling():
         assert 'محمد' not in urdu_name(non_name), non_name
     assert urdu_name('M/S Ahmed Traders') == 'م/س احمد ٹریڈرز'
 
+    # Requested name and building-material vocabulary.
+    for spelling in ('haris', 'Haris', 'HARIS'):
+        assert urdu_name(spelling) == 'حارث', spelling
+    assert urdu_name('M Haris') == 'محمد حارث'
+    for unit in ('mm', 'MM', 'Mm'):
+        assert urdu_name(unit) == 'ملی میٹر', unit
+    assert urdu_name('12 mm') == '12 ملی میٹر'
+    assert urdu_name('12mm') == '12 ملی میٹر'
+    assert urdu_name('12MM') == '12 ملی میٹر'
+    for frame in ('chaugath', 'Chaugath', 'CHAUGATH'):
+        assert urdu_name(frame) == 'چو گھاٹ', frame
+    for b in ('brick', 'Brick', 'BRICK'):
+        assert urdu_name(b) == 'اینٹ', b
+
 
 def test_real_bill_renders_m_ahmed_as_muhammad_ahmed_on_sheet_and_verify(client, app):
-    """A posted bill for 'M Ahmed' prints محمد احمد without needing saved name_ur."""
+    """A posted bill for 'M Ahmed' prints محمد احمد and material words in Urdu."""
     from app import db
     from app.services import bill_verify
     from models import Account, DirectSale, Entry, Material, Settings
@@ -821,9 +835,11 @@ def test_real_bill_renders_m_ahmed_as_muhammad_ahmed_on_sheet_and_verify(client,
         db.session.add(settings)
         db.session.commit()
 
-    client.post('/add_material',
-                data={'material_name': 'ڈی جی', 'material_unit': 'Bags'},
-                follow_redirects=True)
+    mat_names = ['12mm Chaugath', 'Brick']
+    for mat_name in mat_names:
+        client.post('/add_material',
+                    data={'material_name': mat_name, 'material_unit': 'Pcs'},
+                    follow_redirects=True)
     client.post('/add_client', data={'name': 'M Ahmed',
                                      'code': 'FBMCL-00077',
                                      'category': 'General',
@@ -837,26 +853,27 @@ def test_real_bill_renders_m_ahmed_as_muhammad_ahmed_on_sheet_and_verify(client,
         'opening_effective_date': '2026-01-01'}, follow_redirects=True)
 
     with app.app_context():
-        mat = Material.query.filter_by(name='ڈی جی').first()
+        mats = {m.name: m.id for m in Material.query.filter(Material.name.in_(mat_names)).all()}
         account = Account.query.filter(Account.name.like('%M AHMED CASH%')).first()
-        db.session.add(Entry(date='2026-06-01', time='09:00:00', type='IN',
-                             material='ڈی جی', qty=100, bill_no='MB NO.9077',
-                             client_category='Stock In'))
+        for mat_name in mat_names:
+            db.session.add(Entry(date='2026-06-01', time='09:00:00', type='IN',
+                                 material=mat_name, qty=100, bill_no='MB NO.9077',
+                                 client_category='Stock In'))
         _rebuild_material_totals()
         db.session.commit()
-        mat_id, acc_id = mat.id, account.id
+        acc_id = account.id
 
     resp = client.post('/add_direct_sale', data={
         'client_code': 'FBMCL-00077',
         'client_name': 'M Ahmed',
         'category': 'Credit Customer',
         'manual_bill_no': 'SB-SL-2077',
-        'driver_name': 'M. Ahmed',
+        'driver_name': 'M. Haris',
         'paid_amount': '0',
-        'product_name[]': ['ڈی جی'],
-        'material_id[]': [str(mat_id)],
-        'qty[]': ['2'],
-        'unit_rate[]': ['1500'],
+        'product_name[]': mat_names,
+        'material_id[]': [str(mats[n]) for n in mat_names],
+        'qty[]': ['2', '500'],
+        'unit_rate[]': ['1500', '20'],
         'payment_method': 'Cash',
         'payment_account_id': str(acc_id),
     }, follow_redirects=True)
@@ -872,11 +889,13 @@ def test_real_bill_renders_m_ahmed_as_muhammad_ahmed_on_sheet_and_verify(client,
         f'/download_invoice/{bill_no}?src=direct_sale&src_id={sale_id}'
         '&lang=ur&action=print&tc=0'
     ).get_data(as_text=True)
-    assert 'محمد احمد' in html
+    for expected in ('محمد احمد', 'محمد حارث', 'ملی میٹر چو گھاٹ', 'اینٹ'):
+        assert expected in html, expected
     assert 'اہمد' not in html
 
     verify_html = client.get(f'/verify/bill/{token}').get_data(as_text=True)
-    assert 'محمد احمد' in verify_html
+    for expected in ('محمد احمد', 'محمد حارث', '12 ملی میٹر چو گھاٹ', 'اینٹ'):
+        assert expected in verify_html, expected
     assert 'اہمد' not in verify_html
 
 
