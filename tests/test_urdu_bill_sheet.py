@@ -618,8 +618,62 @@ def test_reference_geometry_is_pinned():
     assert R.ROWS_FIRST_PAGE == 15
     assert round(R.SUM_LEFT, 4) == 17.5925
     assert round(R.SUM_RIGHT, 4) == 185.5866
-    assert round(R.SIG_LINE_X0, 4) == 302.3917
+    assert round(R.SIG_LINE_X0, 4) == 257.9528
+    assert round(R.SIG_LINE_X1, 4) == 399.6851
     assert round(R.TERMS_STEP, 3) == 11.670
+
+
+def test_signature_rule_aligns_with_right_margin_and_centers_label():
+    """The signature line must end flush with RIGHT (not bleed to PAGE_W)."""
+    sheet = R.layout_document(_document())[0]
+    sig_lines = [op for op in _ops(sheet, 'line')
+                 if abs(op['y0'] - op['y1']) < 0.01
+                 and abs(op['x0'] - R.SIG_LINE_X0) < 0.01]
+    assert len(sig_lines) == 1
+    sig_line = sig_lines[0]
+    assert abs(sig_line['x1'] - R.RIGHT) < 0.01
+    assert sig_line['x1'] < R.PAGE_W - 19.0
+    assert R.SUM_RIGHT < sig_line['x0'] < sig_line['x1']
+
+    sig_labels = [op for op in _ops(sheet, 'text')
+                  if op['text'] == 'مجاز دستخط']
+    assert len(sig_labels) == 1
+    sig_label = sig_labels[0]
+    midpoint = (sig_line['x0'] + sig_line['x1']) / 2.0
+    assert sig_label['align'] == 'center'
+    assert abs(sig_label['x'] - midpoint) < 0.01
+
+    # Carbon-copy A4 leaf: neither copy's signature line may touch the cut seam
+    # or bleed past its copy's right content margin.
+    a4 = R.compose_document(_document(), copies=2)[0]
+    seam = R.A4_W / 2.0
+    offset = (R.A4_W - 2 * R.PAGE_W) / 2.0
+    copy_sig_lines = [op for op in _ops(a4, 'line')
+                      if abs(op['y0'] - op['y1']) < 0.01
+                      and abs((op['x1'] - op['x0']) - R.SIG_LINE_W) < 0.05]
+    assert len(copy_sig_lines) == 2
+    left_copy_line, right_copy_line = sorted(copy_sig_lines, key=lambda o: o['x0'])
+    assert abs(left_copy_line['x1'] - (offset + R.RIGHT)) < 0.01
+    assert left_copy_line['x1'] < seam - 19.0
+    assert abs(right_copy_line['x1'] - (offset + R.PAGE_W + R.RIGHT)) < 0.01
+    assert right_copy_line['x1'] < R.A4_W - 19.0
+
+    # Single-row Payment receipt with terms keeps signing clearance above the
+    # signature rule and places the terms rule cleanly below the label.
+    pay_doc = bill_urdu.build_document(
+        bill_type='Payment', bill=_bill(amount=25000), items=[],
+        previous_balance=0, settings=_settings(),
+        terms=[SimpleNamespace(title='', content_ur=t) for t in TERMS[:4]],
+    )
+    pay_sheet = R.layout_document(pay_doc)[0]
+    pay_sig = next(op for op in _ops(pay_sheet, 'line')
+                   if abs(op['x0'] - R.SIG_LINE_X0) < 0.01)
+    pay_label = next(op for op in _ops(pay_sheet, 'text')
+                     if op['text'] == 'مجاز دستخط')
+    terms_heading = next(op for op in _ops(pay_sheet, 'text')
+                         if op['text'] == 'شرائط و ضوابط')
+    assert pay_sig['y0'] >= (R.Y_PANEL + R.PANEL_H) + R.SIG_MIN_CLEARANCE - 0.01
+    assert terms_heading['y'] > pay_label['y'] + 10.0
 
 
 def test_party_panel_carries_the_contact_placeholder_and_code():
@@ -815,6 +869,15 @@ def test_standalone_m_is_muhammad_and_ahmed_uses_proper_urdu_spelling():
     assert urdu_name('12 mm') == '12 ملی میٹر'
     assert urdu_name('12mm') == '12 ملی میٹر'
     assert urdu_name('12MM') == '12 ملی میٹر'
+    for kg_unit in ('kg', 'KG', 'Kg', 'kgs', 'KGS', 'Kgs', 'kilogram', 'Kilograms'):
+        assert urdu_name(kg_unit) == 'کلو گرام', kg_unit
+    assert urdu_name('10 kg') == '10 کلو گرام'
+    assert urdu_name('10kg') == '10 کلو گرام'
+    assert urdu_name('10KG') == '10 کلو گرام'
+    assert urdu_name('2.5kg') == '2.5 کلو گرام'
+    from app.services.bilingual import LABELS
+    for label_key in ('kg', 'Kg', 'KG', 'kgs', 'Kgs', 'KGS'):
+        assert LABELS[label_key] == 'کلو گرام', label_key
     for frame in ('chaugath', 'Chaugath', 'CHAUGATH'):
         assert urdu_name(frame) == 'چو گھاٹ', frame
     for b in ('brick', 'Brick', 'BRICK'):

@@ -125,9 +125,12 @@ SUMMARY_GAP = 6.877
 SUM_LEFT, SUM_RIGHT, SUM_DIVIDER = 17.5925, 185.5866, 116.8509
 SUM_LABEL_X, SUM_VALUE_X = 179.1732, 24.0118
 SUM_ROW_H = 14.4508
-SIG_LINE_X0, SIG_LINE_X1 = 302.3917, PAGE_W
-SIG_LABEL_X = 373.258
+SIG_LINE_W = 141.7323
+SIG_LINE_X1 = RIGHT
+SIG_LINE_X0 = RIGHT - SIG_LINE_W
+SIG_LABEL_X = (SIG_LINE_X0 + SIG_LINE_X1) / 2.0
 SIG_LABEL_OFFSET = 9.0764
+SIG_MIN_CLEARANCE = 30.0
 TERMS_GAP = 6.502
 TERMS_SIZE = 7.0
 TERMS_STEP = 11.670
@@ -972,20 +975,25 @@ def _draw_summary(state, doc, sheets):
 
     rows = doc['summary']
     box_h = _summary_box_height(rows)
-    top = (state['y'] + SUMMARY_GAP) if doc['show_items'] else (state['y'] + 12.0)
-    needed = box_h + TERMS_GAP + (62.0 if doc.get('terms') else 0.0)
+    total_index = next((i for i, r in enumerate(rows) if r.get('total')),
+                       len(rows) - 1)
+    gap = SUMMARY_GAP if doc['show_items'] else 12.0
+    top = state['y'] + gap
+    sig_rel = max(total_index * SUM_ROW_H + 1.625, SIG_MIN_CLEARANCE - gap)
+    block_h = max(box_h, sig_rel + SIG_LABEL_OFFSET + 4.0)
+    needed = block_h + TERMS_GAP + (62.0 if doc.get('terms') else 0.0)
     if top + needed > _content_bottom():
         sheet = _new_sheet()
         sheets.append(sheet)
         state['sheet'] = sheet
         _draw_header(state, doc, first=False)
-        top = state['y'] + 12.0
+        gap = 12.0
+        top = state['y'] + gap
+        sig_rel = max(total_index * SUM_ROW_H + 1.625, SIG_MIN_CLEARANCE - gap)
     sheet = state['sheet']
 
     box_w = SUM_RIGHT - SUM_LEFT
     inner_top = top + 0.375
-    total_index = next((i for i, r in enumerate(rows) if r.get('total')),
-                       len(rows) - 1)
     # total bar
     sheet.rect(SUM_LEFT + 0.375, inner_top + total_index * SUM_ROW_H,
                box_w - 0.75, SUM_ROW_H, fill=NAVY)
@@ -1007,7 +1015,7 @@ def _draw_summary(state, doc, sheets):
 
     state['summary_top'] = top
     state['summary_h'] = box_h
-    state['sig_y'] = top + total_index * SUM_ROW_H + 1.625
+    state['sig_y'] = top + sig_rel
     state['y'] = top + box_h
 
 
@@ -1021,6 +1029,7 @@ def _draw_signature(state, doc):
     sheet.text(SIG_LABEL_X, line_y + SIG_LABEL_OFFSET,
                doc['signature_label'], 8.0, color=INK, align='center',
                urdu=True)
+    state['y'] = max(state['y'], line_y + SIG_LABEL_OFFSET + 4.0)
 
 
 def _draw_terms(state, doc, sheets):

@@ -100,7 +100,9 @@ _WORDS = {
     'cement': 'سیمنٹ', 'brick': 'اینٹ', 'bricks': 'اینٹ',
     'chaugath': 'چو گھاٹ', 'chaughat': 'چو گھاٹ', 'chaugat': 'چو گھاٹ',
     'choghat': 'چو گھاٹ', 'choughat': 'چو گھاٹ',
-    'mm': 'ملی میٹر', 'goods': 'گڈز', 'material': 'میٹیریل',
+    'mm': 'ملی میٹر', 'kg': 'کلو گرام', 'kgs': 'کلو گرام',
+    'kilogram': 'کلو گرام', 'kilograms': 'کلو گرام',
+    'goods': 'گڈز', 'material': 'میٹیریل',
     'materials': 'میٹیریلز', 'building': 'بلڈنگ', 'builders': 'بلڈرز',
     'fazal': 'فضل', 'sobtian': 'صوبتیاں', 'sohtian': 'صوبتیاں',
     'driver': 'ڈریور', 'conductor': 'کنڈکٹر',
@@ -192,7 +194,7 @@ def urdu_name(name, preferred=None):
         text = original.lower()
         if text in _WORDS:
             mapped = _WORDS[text]
-            if text == 'mm' and match.start() > 0 and name[match.start() - 1].isdigit():
+            if text in ('mm', 'kg', 'kgs') and match.start() > 0 and name[match.start() - 1].isdigit():
                 return ' ' + mapped
             return mapped
         # Initialisms are read as letter names rather than a single word.
