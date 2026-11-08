@@ -1245,8 +1245,11 @@ def render_html(doc, title='Urdu Bill', auto_print=False, copies=2):
     parts.append(
         '<div class="bar no-print">'
         '<a class="back" href="javascript:history.back()">&larr; واپس</a>'
-        '<button type="button" class="go" onclick="window.print()">پرنٹ کریں</button>'
-        '</div>')
+        '<button type="button" class="go" onclick="printUrduReceipt()">پرنٹ کریں</button>'
+        '</div>'
+        '<script>function printUrduReceipt(){'
+        'var ready=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();'
+        'ready.then(function(){window.print();});}</script>')
     if auto_print:
         parts.append('<script>window.addEventListener("load",function(){'
                      'setTimeout(function(){window.print();},250);});</script>')
