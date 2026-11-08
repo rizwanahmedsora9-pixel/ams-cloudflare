@@ -466,3 +466,28 @@ def test_alphanumeric_mode_makes_the_symbol_smaller():
     # the same text forced through byte mode would need a bigger symbol
     wide = qr_code.make_matrix(text.lower() + 'é', 'm')
     assert len(packed) <= len(wide), (len(packed), len(wide))
+
+
+def test_verified_page_has_badge_and_download_below_bill(client, sale, app):
+    from app.services import bill_verify
+    with app.app_context():
+        token = bill_verify.make_token('DirectSale', sale['id'], sale['bill_no'])
+    response = client.get(f'/b/{token}')
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'Verified Bill' in html
+    assert 'prefers-reduced-motion' in html
+    assert html.index('class="sheetbox"') < html.index('class="actions"')
+    assert f'href="/b/{token}.pdf"' in html or f'href="/verify/bill/{token}.pdf"' in html
+    assert 'onclick="window.print()"' not in html
+    pdf = client.get(f'/b/{token}.pdf')
+    assert pdf.status_code == 200
+    assert pdf.headers['Content-Disposition'].startswith('attachment;')
+
+
+def test_invalid_bill_has_no_verified_badge_or_download(client):
+    response = client.get('/b/not-a-valid-token')
+    assert response.status_code == 404
+    html = response.get_data(as_text=True)
+    assert '<h1>Verified Bill</h1>' not in html
+    assert 'class="actions"' not in html

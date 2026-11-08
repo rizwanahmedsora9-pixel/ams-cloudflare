@@ -80,7 +80,7 @@ def verify_bill_pdf(token):
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Cache-Control'] = 'no-store'
     name = (source.get('bill_number') or 'bill').replace('/', '-')
-    response.headers['Content-Disposition'] = f'inline; filename={name}-UR.pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename={name}-UR.pdf'
     return response
 
 

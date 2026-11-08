@@ -33,17 +33,26 @@
       font-size: 15px; line-height: 1.45;
     }
     .wrap { max-width: 720px; margin: 0 auto; }
-    .bar { display: flex; align-items: center; justify-content: space-between;
-           gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-    .ok { background: #1E7B4B; color: #fff; border-radius: 999px;
-          padding: 5px 13px; font-size: 12.5px; font-weight: 700;
-          letter-spacing: .2px; white-space: nowrap; }
-    .ok small { font-weight: 400; opacity: .85; }
-    .actions { display: flex; gap: 8px; }
-    .btn { display: inline-block; text-decoration: none; border-radius: 8px;
-           padding: 8px 14px; font-size: 13.5px; font-weight: 700;
+    .bar { text-align: center; padding: 24px 16px; margin-bottom: 16px;
+           background: #fff; border: 1px solid #dce9e2; border-radius: 16px; }
+    .verified-icon { width: 56px; height: 56px; margin: 0 auto 12px;
+                     display: block; color: #168451; }
+    .verified-icon circle { fill: #e9f8ef; stroke: currentColor; stroke-width: 2; }
+    .verified-icon path { fill: none; stroke: currentColor; stroke-width: 3;
+                         stroke-linecap: round; stroke-linejoin: round;
+                         stroke-dasharray: 40; stroke-dashoffset: 40;
+                         animation: verified-check .65s ease-out .15s forwards; }
+    @keyframes verified-check { to { stroke-dashoffset: 0; } }
+    @media (prefers-reduced-motion: reduce) {
+      .verified-icon path { animation: none; stroke-dashoffset: 0; }
+    }
+    .bar h1 { margin: 0; font-size: 21px; color: #146c43; }
+    .bar p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .actions { text-align: center; margin-top: 20px; }
+    .btn { display: inline-block; text-decoration: none; border-radius: 10px;
+           padding: 13px 24px; font-size: 14px; font-weight: 700;
            background: var(--navy); color: #fff; border: 0; cursor: pointer; }
-    .btn.alt { background: #fff; color: var(--navy); border: 1px solid var(--line); }
+    .btn:focus-visible { outline: 3px solid #168451; outline-offset: 4px; }
     /* The sheet is an A5 document; fit it to the phone width without
        re-flowing it, so it stays the printed receipt. */
     .sheetbox { background: #fff; border: 1px solid var(--line);
@@ -65,7 +74,7 @@
     .bad p { color: var(--muted); margin: 4px 0; font-size: 13.5px; }
     @media print {
       body { background: #fff; padding: 0; }
-      .bar, .meta { display: none; }
+      .bar, .meta, .actions { display: none; }
       .sheetbox { border: 0; box-shadow: none; padding: 0; }
     }
   </style>
@@ -75,12 +84,13 @@
 {% if verified %}
   {%- from '_bill_sheet.html' import sheet_element with context %}
   <div class="bar">
-    {#- Texts come from urdu_receipt so the page speaks the sheet's language. -#}
-    <span class="ok">&#10003; {{ sheet.caption }} <small>&middot; {{ sheet.sublabel }}</small></span>
-    <span class="actions">
-      <a class="btn alt" href="{{ pdf_path }}" target="_blank" rel="noopener">{{ sheet.pdf_label }}</a>
-      <button class="btn" type="button" onclick="window.print()">{{ sheet.print_label }}</button>
-    </span>
+    <svg class="verified-icon" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="29" />
+      <path d="M19 33l9 9 18-20" />
+    </svg>
+    <h1>Verified Bill</h1>
+    <p><span lang="ur" dir="rtl">{{ sheet.caption }}</span> &middot; {{ bill_no }}</p>
+    <p>Validated against our bill records.</p>
   </div>
 
   <div class="sheetbox">
@@ -93,6 +103,9 @@
     </div>
   </div>
 
+  <div class="actions">
+    <a class="btn" href="{{ pdf_path }}" download>Download PDF · <span lang="ur" dir="rtl">{{ sheet.pdf_label }}</span></a>
+  </div>
   <p class="meta">{{ sheet.note }}</p>
 {% else %}
   <div class="bad">
