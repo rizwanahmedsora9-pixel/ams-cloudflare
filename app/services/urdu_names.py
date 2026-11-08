@@ -32,14 +32,17 @@ _WORDS = {
     'sayed': 'سید', 'haji': 'حاجی', 'nawab': 'نواب', 'sardar': 'سردار',
     'hafiz': 'حافظ', 'sahib': 'صاحب', 'sb': 'صاحب',
     # ---- Common boys' names (proper Urdu spellings) ----
-    'adnan': 'عدنان', 'aamir': 'عامر', 'amir': 'عامر', 'ajmal': 'اجمل',
-    'akhtar': 'اختر', 'akram': 'اخرم', 'ali': 'علی', 'amjad': 'امجد',
+    'adnan': 'عدنان', 'aamir': 'عامر', 'ahmad': 'احمد', 'ahmed': 'احمد',
+    'amir': 'عامر', 'ajmal': 'اجمل', 'akhtar': 'اختر', 'akram': 'اخرم',
+    'ali': 'علی', 'amjad': 'امجد',
     'anwar': 'انور', 'arif': 'عارف', 'arshad': 'ارشد', 'asghar': 'اصغر',
     'ashraf': 'اشرف', 'asif': 'آصف', 'aslam': 'اسلم', 'atif': 'عاطف',
     'awais': 'اویس', 'azam': 'اعظم', 'azhar': 'اظہر', 'babar': 'بابر',
-    'bilal': 'بلال', 'dawood': 'داؤد', 'fahad': 'فہد', 'faiz': 'فیض',
+    'bilal': 'بلال', 'dawood': 'داؤد', 'ehmad': 'احمد', 'ehmed': 'احمد',
+    'fahad': 'فہد', 'faiz': 'فیض',
     'faisal': 'فیصل', 'fayyaz': 'فیاض', 'ghulam': 'غلام', 'gulzar': 'گلزار',
     'hamid': 'حامد', 'hamed': 'حامد', 'hameed': 'حمید', 'hamza': 'حمزہ',
+    'haaris': 'حارث', 'haris': 'حارث',
     'haroon': 'ہارون', 'hasan': 'حسن', 'hassan': 'حسن', 'husain': 'حسین',
     'hussain': 'حسین', 'ibrahim': 'ابراہیم', 'idrees': 'ادریس',
     'iftikhar': 'افتخار', 'ilyas': 'الیاس', 'imran': 'عمران',
@@ -47,7 +50,8 @@ _WORDS = {
     'junaid': 'جنید', 'kamran': 'کامران', 'kashif': 'کاشف',
     'mahmood': 'محمود', 'majeed': 'مجید', 'masood': 'مسعود',
     'mudassir': 'مدثر', 'mudasir': 'مدثر', 'muhammad': 'محمد',
-    'mohammad': 'محمد', 'mohmad': 'محمد', 'mushtaq': 'مشتاق',
+    'muhammed': 'محمد', 'mohammad': 'محمد', 'mohammed': 'محمد',
+    'mohmad': 'محمد', 'mushtaq': 'مشتاق',
     'mustafa': 'مصطفیٰ', 'naeem': 'نعیم', 'naseem': 'نسیم', 'nasir': 'ناصر',
     'naveed': 'نوید', 'nawaz': 'نواز', 'noman': 'نعمان', 'omar': 'عمر',
     'osama': 'اسامہ', 'parvez': 'پرویز', 'pervez': 'پرویز', 'qaiser': 'قیصر',
@@ -93,7 +97,10 @@ _WORDS = {
     'market': 'مارکیٹ', 'trader': 'ٹریڈر', 'traders': 'ٹریڈرز',
     'company': 'کمپنی', 'bank': 'بینک', 'account': 'اکاؤنٹ',
     'booking': 'بکنگ', 'delivery': 'ڈیلیوری', 'payment': 'پیمنٹ',
-    'cement': 'سیمنٹ', 'goods': 'گڈز', 'material': 'میٹیریل',
+    'cement': 'سیمنٹ', 'brick': 'اینٹ', 'bricks': 'اینٹ',
+    'chaugath': 'چو گھاٹ', 'chaughat': 'چو گھاٹ', 'chaugat': 'چو گھاٹ',
+    'choghat': 'چو گھاٹ', 'choughat': 'چو گھاٹ',
+    'mm': 'ملی میٹر', 'goods': 'گڈز', 'material': 'میٹیریل',
     'materials': 'میٹیریلز', 'building': 'بلڈنگ', 'builders': 'بلڈرز',
     'fazal': 'فضل', 'sobtian': 'صوبتیاں', 'sohtian': 'صوبتیاں',
     'driver': 'ڈریور', 'conductor': 'کنڈکٹر',
@@ -132,18 +139,62 @@ def _looks_like_initialism(text: str) -> bool:
     return sum(1 for ch in lowered if ch in _VOWELS) <= 1
 
 
+def _expand_standalone_muhammad(name: str) -> str:
+    """Expand standalone ``M`` / ``M.`` (shorthand for Muhammad) to ``محمد``.
+
+    In Pakistani bills and ledgers a lone ``M`` or ``M.`` in a name (``M Ahmed``,
+    ``M. Ahmed``, ``M.Ahmed``, ``Ch. M. Ali``) stands for ``محمد``.  Numeric
+    units/grades (``3m``, ``M10``, ``M-10``, ``M.10``) and dotted/slashed
+    two-letter abbreviations (``M.S.``, ``A.M.``, ``M/S``) are left untouched.
+    """
+    def repl(match):
+        start = match.start()
+        has_dot = match.group(0).endswith('.')
+        before = name[:start]
+        after_letter = name[start + 1:]
+
+        if before and before[-1].isdigit():
+            return match.group(0)
+        if re.search(r'\d-$', before):
+            return match.group(0)
+        if re.search(r'(?<![A-Za-z])[A-Za-z][./]$', before):
+            return match.group(0)
+
+        if has_dot:
+            if len(after_letter) > 1 and after_letter[1].isdigit():
+                return match.group(0)
+            if re.match(r'^\.[A-Za-z](?![A-Za-z])', after_letter):
+                return match.group(0)
+            if re.match(r'^\.[A-Za-z]{2,}', after_letter):
+                return 'محمد '
+            return 'محمد'
+
+        if after_letter and after_letter[0].isdigit():
+            return match.group(0)
+        if re.match(r'^-\d', after_letter):
+            return match.group(0)
+        if re.match(r'^/[A-Za-z](?![A-Za-z])', after_letter):
+            return match.group(0)
+        return 'محمد'
+
+    return re.sub(r'(?<![A-Za-z])[Mm](?![A-Za-z])\.?', repl, name)
+
+
 def urdu_name(name, preferred=None):
     """Use a saved spelling first; otherwise transliterate Latin words locally."""
     preferred = str(preferred or '').strip()
     if preferred:
         return preferred
-    name = str(name or '').strip()
+    name = _expand_standalone_muhammad(str(name or '').strip())
 
     def word(match):
         original = match.group()
         text = original.lower()
         if text in _WORDS:
-            return _WORDS[text]
+            mapped = _WORDS[text]
+            if text == 'mm' and match.start() > 0 and name[match.start() - 1].isdigit():
+                return ' ' + mapped
+            return mapped
         # Initialisms are read as letter names rather than a single word.
         if _looks_like_initialism(original):
             letters = {'a': 'اے', 'b': 'بی', 'c': 'سی', 'd': 'ڈی', 'e': 'ای',

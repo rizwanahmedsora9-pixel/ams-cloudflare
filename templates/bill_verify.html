@@ -117,7 +117,10 @@
         {% if delivery %}
         <div>
           <div class="k">Delivery / ڈیلیوری</div>
-          <div class="v ur" dir="rtl">{{ delivery }}</div>
+          <div class="v ur" dir="rtl">{{ delivery_ur or delivery }}</div>
+          {% if delivery_ur and delivery_ur != delivery %}
+          <div class="ltr" style="color:var(--muted);font-size:12.5px">{{ delivery }}</div>
+          {% endif %}
         </div>
         {% endif %}
       </div>

@@ -137,7 +137,7 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
     payment_type = (getattr(bill, 'payment_type', '') or '').strip()
 
     if bill_type == 'GRN':
-        supplier = (getattr(bill, 'supplier_name', '') or '').strip()
+        supplier = urdu_name((getattr(bill, 'supplier_name', '') or '').strip())
         if supplier:
             rows.append((L_SUPPLIER, supplier))
         if method:
@@ -162,9 +162,9 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
     if account_no:
         rows.append(('اکاؤنٹ نمبر', account_no))
 
-    people = [p for p in (delivery_people or []) if p]
+    people = [urdu_name(p) for p in (delivery_people or []) if p]
     if not people and driver_name_ur:
-        people = [driver_name_ur]
+        people = [urdu_name(driver_name_ur)]
     if people:
         rows.append(('ڈیلیوری', '، '.join(people)))
     return rows[:4]
@@ -178,11 +178,17 @@ def _item_rows(items):
                 else getattr(item, 'price_at_time', 0)) or 0
         rate = float(rate or 0)
         qty = float(qty or 0)
-        name = ''
         if isinstance(item, dict):
-            name = (item.get('name_ur') or item.get('name') or '')
+            saved = str(item.get('name_ur') or '').strip()
+            raw = (item.get('name') or item.get('product_name')
+                   or item.get('material_name') or '')
+            name = saved or urdu_name(raw)
         else:
-            name = getattr(item, 'name_ur', '') or getattr(item, 'material_name', '')
+            saved = str(getattr(item, 'name_ur', '') or '').strip()
+            raw = (getattr(item, 'material_name', '')
+                   or getattr(item, 'product_name', '')
+                   or getattr(item, 'name', '') or '')
+            name = saved or urdu_name(raw)
         rows.append({
             'index': index,
             'name': str(name).strip(),
@@ -425,10 +431,12 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     party_code = ''
     label = party_label
     if bill_type == 'GRN':
-        party_name = (getattr(bill, 'supplier_name', '') or '').strip()
+        party_name = urdu_name((getattr(bill, 'supplier_name', '') or '').strip())
         label = label or L_SUPPLIER
     else:
-        party_name = client_name_ur or (getattr(bill, 'client_name', '') or '')
+        saved_ur = (getattr(client, 'name_ur', None) or '') if client is not None else ''
+        party_name = client_name_ur or urdu_name(
+            getattr(bill, 'client_name', '') or '', saved_ur)
         party_code = (getattr(client, 'code', '') if client is not None else '') or ''
         if not party_code:
             party_code = (getattr(bill, 'client_code', '') or '')
@@ -451,7 +459,7 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         settings, 'company_address', default='JALAL PUR SOBTIAN GUJRAT'), '')
     company_phone = _settings_value(settings, 'company_phone',
                                     default='+92331-0000993 | +92340-3872722')
-    proprietor = _settings_value(settings, 'proprietor_name_ur')
+    proprietor = urdu_name(_settings_value(settings, 'proprietor_name_ur'))
     # Use the reference branding only for the reference business.
     if not proprietor and _settings_value(settings, 'company_name', default='FAZAL BUILDING MATERIALS').upper() == 'FAZAL BUILDING MATERIALS':
         proprietor = 'عدنان احمد'
@@ -504,11 +512,11 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     # client name and ID, delivery person, the line items and the totals.
     qr_error = ''
     if qr_text is None:
-        delivery = '، '.join(p for p in (delivery_people or []) if p)
+        delivery = '، '.join(urdu_name(p) for p in (delivery_people or []) if p)
         if delivery:
             delivery = f"ڈیلیوری {delivery}"
         elif driver_name_ur:
-            delivery = f"ڈیلیوری {driver_name_ur}"
+            delivery = f"ڈیلیوری {urdu_name(driver_name_ur)}"
         qr_text, qr_error = _qr_payload(
             document, item_rows,
             company_name=company_name,
