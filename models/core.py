@@ -94,7 +94,7 @@ class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     currency = db.Column(db.String(10), default='PKR')
     company_name = db.Column(db.String(100), default='FAZAL BUILDING MATERIALS')
-    company_address = db.Column(db.String(200), default='JALAL PUR SOBTIAN')
+    company_address = db.Column(db.String(200), default='JALAL PUR SOBTIAN GUJRAT')
     company_phone = db.Column(db.String(50), default='+92302-0000993 +92331-0000993')
     # Urdu bill branding.  The proprietor signs the sheet (printed under the
     # address) and the shop note is the standing availability strip above the
