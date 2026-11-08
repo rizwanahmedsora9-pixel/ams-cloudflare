@@ -448,9 +448,9 @@ def _draw_qr(sheet, doc):
     matrix = qr_matrix(doc.get('qr_text'))
     if matrix:
         rows, cols = len(matrix), len(matrix[0])
-        pad = 1.6
-        side = QR_SIZE - 2 * pad
-        module = side / max(rows, cols)
+        # Four clear modules on every side make the live QR scannable.
+        module = QR_SIZE / (max(rows, cols) + 8)
+        pad = 4 * module
         x0, y0 = QR_X + pad, QR_Y + pad
         for r, row in enumerate(matrix):
             c = 0

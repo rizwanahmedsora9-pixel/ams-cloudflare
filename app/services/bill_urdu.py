@@ -298,6 +298,9 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     company_phone = _settings_value(settings, 'company_phone',
                                     default='+92331-0000993 | +92340-3872722')
     proprietor = _settings_value(settings, 'proprietor_name_ur')
+    # Use the reference branding only for the reference business.
+    if not proprietor and _settings_value(settings, 'company_name', default='FAZAL BUILDING MATERIALS').upper() == 'FAZAL BUILDING MATERIALS':
+        proprietor = 'عدنان احمد'
     note = _settings_value(settings, 'company_note_ur')
     if not note:
         note = (getattr(bill, 'note', '') or '').strip()

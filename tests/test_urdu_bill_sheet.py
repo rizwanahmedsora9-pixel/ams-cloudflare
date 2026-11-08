@@ -757,3 +757,25 @@ def test_route_confirmation_defaults_to_the_single_a5_sheet(client, sale):
     html = resp.get_data(as_text=True)
     assert re.search(r'id="copies1"[^>]*checked', html)
     assert not re.search(r'id="copies2"[^>]*checked', html)
+
+
+def test_reference_proprietor_fallback_and_override():
+    assert _document(settings=_settings(proprietor_name_ur=''))['proprietor'] == 'عدنان احمد'
+    assert _document(settings=_settings(proprietor_name_ur='علی'))['proprietor'] == 'علی'
+    assert _document(settings=_settings(company_name='Other', proprietor_name_ur=''))['proprietor'] == ''
+
+
+def test_confirmation_multiple_term_ids_are_all_used(client, sale, app):
+    from app import db
+    from models import TermsAndCondition
+    with app.app_context():
+        rows = [TermsAndCondition(title='Test A', content_ur='پہلی منفرد شرط', is_active=True),
+                TermsAndCondition(title='Test B', content_ur='دوسری منفرد شرط', is_active=True)]
+        db.session.add_all(rows)
+        db.session.commit()
+        ids = [row.id for row in rows]
+    url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur&action=print&tc=1"
+           f"&tc_ids={ids[0]}&tc_ids={ids[1]}")
+    html = client.get(url).get_data(as_text=True)
+    assert 'پہلی منفرد شرط' in html and 'دوسری منفرد شرط' in html

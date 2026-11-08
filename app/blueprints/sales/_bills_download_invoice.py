@@ -390,7 +390,7 @@ def download_invoice(bill_no):
         tc_raw = (request.args.get('tc') or '').strip().lower()
         want_tc = tc_raw in ('1', 'yes', 'true', 'on')
         tc_ids = []
-        for raw in (request.args.get('tc_ids') or '').split(','):
+        for raw in ','.join(request.args.getlist('tc_ids')).split(','):
             raw = raw.strip()
             if raw:
                 try:
