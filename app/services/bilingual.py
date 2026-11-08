@@ -679,7 +679,7 @@ _SPENT = '\u062e\u0631\u0686'                                 # spent
 _RECORDS = '\u0631\u06cc\u06a9\u0627\u0631\u0688\u0632'        # records
 _SETTLED = '\u062a\u0633\u0648\u06cc\u06c1'                   # settled
 _BAGS = '\u0628\u0648\u0631\u06cc\u0627\u06ba'                       # bags
-_KG = '\u06a9\u06cc \u062c\u06cc'                            # kg
+_KG = '\u06a9\u0644\u0648 \u06af\u0631\u0627\u0645'                  # kilogram (کلو گرام)
 _LABOUR = '\u0645\u0632\u062f\u0648\u0631\u06cc'                        # labour
 
 LABELS = {
@@ -878,8 +878,14 @@ LABELS = {
     'Stamp Here': 'یہاں مہر لگائیں',
     'Bags': _BAGS,
     'Bag': _BAGS,
+    'kg': _KG,
     'Kg': _KG,
     'KG': _KG,
+    'kgs': _KG,
+    'Kgs': _KG,
+    'KGS': _KG,
+    'Kilogram': _KG,
+    'Kilograms': _KG,
     'Labor': _LABOUR,
     'Labour': _LABOUR,
     'Account No.': 'اکاؤنٹ نمبر',

@@ -222,3 +222,24 @@ def test_embedded_ltr_spans_do_not_change_the_logical_text():
     assert any(text == 'ٹائل 12×18' for _x, _top, text, _css in runs)
     assert any(op['op'] == 'text' and op['text'] == 'ٹائل 12×18'
                for op in sheets[0].ops)
+
+
+def test_print_page_signature_rule_stays_aligned_inside_page_margin():
+    html = bill_urdu.render_html(base._reference_document(), copies=1)
+    boxes = _boxes(html)
+    sig_rules = [b for b in boxes
+                 if b[0] is not None
+                 and abs(b[0] - R.SIG_LINE_X0) < 0.05
+                 and abs((b[2] - b[0]) - R.SIG_LINE_W) < 0.05]
+    assert len(sig_rules) == 1
+    x0, _y0, x1, _y1 = sig_rules[0]
+    assert abs(x1 - R.RIGHT) < 0.05
+    assert x1 < R.PAGE_W - 19.0
+
+    runs = _text_runs(html)
+    sig_labels = [(x, css) for x, _top, text, css in runs if text == 'مجاز دستخط']
+    assert len(sig_labels) == 1
+    label_x, label_css = sig_labels[0]
+    assert abs(label_x - (x0 + x1) / 2.0) < 0.05
+    assert label_css.get('transform') == 'translateX(-50%)'
+
