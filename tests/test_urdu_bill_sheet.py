@@ -1,16 +1,18 @@
 """The Urdu bill is its own sheet — not the English receipt with translated labels.
 
 The sheet is defined by ``app/services/urdu_receipt.py`` and measured off the
-approved reference PDF ("max possible.pdf"): an A5 page whose header carries a
+approved reference PDF ("New Receipt.pdf"): an A5 page whose header carries a
 QR block, the Nastaleeq shop name, the proprietor and the phones over a thick
-navy rule; a four-cell meta strip; a pale panel with the four inline fields and
-the shop note; a roof-ruled item table; the summary box on the right with the
-signature rule beside it; and the terms in two numbered columns.
+navy rule and a light dashed companion; the shop note above a four-cell meta
+strip; two pale party panels; a roof-ruled item table; the summary box on the
+left with the signature rule on the right; and the terms in two numbered
+columns.
 
 These tests pin that document, so a later change to the English receipt (or to
 the label dictionary) cannot quietly reshape it, and so "Urdu Print" and
-"Urdu PDF" stay the same page.  They also pin the carbon copy: two identical
-A5 copies on one A4 landscape leaf.
+"Urdu PDF" stay the same page.  The default is the single approved A5 sheet;
+the optional carbon copy places two identical A5 copies on one A4 landscape
+leaf.
 """
 from __future__ import annotations
 
@@ -43,11 +45,41 @@ TERMS = [
     'بینک پر خریدار کو دیا گیا ریٹ صرف اسی صورت میں لاگو ہوگا جب وہ اس بینک کی پوری رقم ادا کرے۔',
     'اگر بینک کی رقم جزوی ادا کی جائے تو بینک کا ریٹ صرف ادا شدہ رقم کے مطابق مال پر لاگو ہوگا۔',
     'بقیہ رقم/بینک کے بقیہ مال پر مارکیٹ کا نیا ریٹ لاگو ہوگا۔',
-    'اگر کسی قسم کا کوئی فرق پاپا جائے تو 10 دن کے اندر رابطہ کریں۔',
+    'اگر کسی قسم کا کوئی فرق پایا جائے تو 10 دن کے اندر رابطہ کریں۔',
     'مال واپس یا تبدیل نہیں ہوگا، سوائے ڈیلیوری کے وقت ثابت شدہ نقص کے۔',
     'اتروائی کے بعد مال کی ٹوٹ پھوٹ، نقصان یا چوری کی ذمہ داری کمپنی پر نہیں۔',
     'ادھار کی صورت میں بقایا رقم باہمی طے شدہ مدت میں ادا کرنا لازم ہے۔',
 ]
+
+
+# The complete item list and figures visible in the supplied New Receipt.pdf.
+# Keep this separate from the smaller everyday fixture above: these values are
+# a layout reference, never defaults injected into a user's real bill.
+REFERENCE_ITEMS = [
+    {'name_ur': 'ڈی جی', 'qty': 1, 'price_at_time': 2000},
+    {'name_ur': 'سیمنٹ ٹھیکہ', 'qty': 50, 'price_at_time': 1290},
+    {'name_ur': '12 ملی میٹر سریا', 'qty': 1964, 'price_at_time': 224},
+    {'name_ur': 'چناب بریٹ ٹرالی', 'qty': 2, 'price_at_time': 12500},
+    {'name_ur': 'بجری ٹرالی', 'qty': 2, 'price_at_time': 14000},
+    {'name_ur': 'اینٹ 1000', 'qty': 3, 'price_at_time': 18000},
+    {'name_ur': 'کرایہ سیمنٹ', 'qty': 50, 'price_at_time': 30},
+    {'name_ur': 'اٹنی', 'qty': 5000, 'price_at_time': 25},
+    {'name_ur': 'ٹائل 12×18', 'qty': 40, 'price_at_time': 1950},
+    {'name_ur': 'اینگل 2 انچ', 'qty': 12, 'price_at_time': 6500},
+    {'name_ur': 'چوگھٹ پٹی', 'qty': 60, 'price_at_time': 1150},
+    {'name_ur': '10 ملی میٹر سریا', 'qty': 500, 'price_at_time': 226},
+    {'name_ur': 'بائنڈنگ تار', 'qty': 15, 'price_at_time': 380},
+    {'name_ur': 'چونا بوری', 'qty': 20, 'price_at_time': 450},
+    {'name_ur': 'ماربل پاؤڈر بوری', 'qty': 25, 'price_at_time': 520},
+]
+
+
+def _reference_document():
+    return _document(
+        bill=_bill(amount=1105636, paid_amount=614936),
+        items=REFERENCE_ITEMS,
+        terms=[SimpleNamespace(title='', content_ur=text) for text in TERMS],
+    )
 
 
 def _bill(**over):
@@ -122,8 +154,17 @@ def test_single_copy_is_one_a5_page():
     assert round(float(box.height), 1) == round(R.PAGE_H, 1)
 
 
+def test_default_is_the_single_approved_a5_sheet():
+    data = bill_urdu.render_pdf(_document())          # copies default to 1
+    reader = PdfReader(io.BytesIO(data))
+    assert len(reader.pages) == 1
+    box = reader.pages[0].mediabox
+    assert round(float(box.width), 1) == round(R.PAGE_W, 1)
+    assert round(float(box.height), 1) == round(R.PAGE_H, 1)
+
+
 def test_carbon_copy_is_two_a5_copies_on_one_a4_leaf():
-    data = bill_urdu.render_pdf(_document())          # copies default to 2
+    data = bill_urdu.render_pdf(_document(), copies=2)
     reader = PdfReader(io.BytesIO(data))
     assert len(reader.pages) == 1, 'a carbon copy is one leaf, not two pages'
     box = reader.pages[0].mediabox
@@ -175,29 +216,32 @@ def test_sheet_anchors_match_the_reference_bill():
     rects = _ops(R.layout_document(_document())[0], 'rect')
     lines = _ops(R.layout_document(_document())[0], 'line')
 
-    # the thick navy rule and its thin companion under the header
-    assert any(abs(op['y'] - 75.0) < 0.1 and abs(op['h'] - 2.9) < 0.1
+    # the thick navy rule and its light dashed companion under the header
+    assert any(abs(op['y'] - R.Y_RULE_1) < 0.01 and abs(op['h'] - R.RULE_1_H) < 0.01
                and op['fill'] == R.NAVY for op in rects), 'header rule missing'
-    assert any(abs(op['y'] - 79.2) < 0.1 and op['fill'] == R.NAVY
-               for op in rects), 'second header rule missing'
-    # the four-cell meta strip
-    assert any(abs(op['y'] - 80.7) < 0.1 and abs(op['h'] - 16.2) < 0.1
+    assert any(abs(op['y0'] - R.Y_RULE_2) < 0.01 and op.get('dash')
+               and op['color'] == R.DOT for op in lines), 'dashed header rule missing'
+    # the shop note sits above the four-cell meta strip
+    assert any(abs(op['y'] - R.Y_META) < 0.01 and abs(op['h'] - R.META_H) < 0.01
                for op in rects), 'meta strip missing'
-    # the info panel and its dotted divider
-    assert any(abs(op['y'] - 99.7) < 0.1 and abs(op['h'] - 39.9) < 0.1
-               for op in rects), 'info panel missing'
-    assert any(op['op'] == 'line' and abs(op['y0'] - 121.4) < 0.1
-               and op.get('dash') for op in lines), 'dotted divider missing'
+    # the two pale party panels
+    panels = [op for op in rects if abs(op['y'] - R.Y_PANEL) < 0.01
+              and abs(op['h'] - R.PANEL_H) < 0.01 and op['fill'] == R.PANEL]
+    assert len(panels) == 2, 'two party panels missing'
+    assert any(abs(op['x'] - R.LEFT) < 0.01 for op in panels)
+    assert any(abs(op['x'] - R.PANEL_RIGHT_X) < 0.01 for op in panels)
     # the navy item header row
-    assert any(abs(op['y'] - 158.7) < 0.1 and abs(op['h'] - 15.9) < 0.1
+    assert any(abs(op['y'] - R.Y_ITEMS_HEAD) < 0.01
+               and abs(op['h'] - R.ITEMS_HEAD_H) < 0.01
                and op['fill'] == R.NAVY for op in rects), 'item header missing'
-    # the summary box on the right half, closed by the navy total bar
-    assert any(abs(op['x'] - 229.4) < 0.1
-               and abs(op['w'] - (397.4 - 229.4)) < 0.2
+    # the summary box on the left half, closed by the navy total bar
+    assert any(abs(op['x'] - (R.SUM_LEFT + 0.375)) < 0.01
+               and abs(op['w'] - (R.SUM_RIGHT - R.SUM_LEFT - 0.75)) < 0.01
                and op['fill'] == R.NAVY for op in rects), 'summary bar missing'
-    # the signature rule beside the summary
+    # the signature rule on the right
     assert any(abs(op['y0'] - op['y1']) < 0.01
-               and abs(op['x0'] - 66.5) < 0.1 and abs(op['x1'] - 208.3) < 0.1
+               and abs(op['x0'] - R.SIG_LINE_X0) < 0.01
+               and abs(op['x1'] - R.SIG_LINE_X1) < 0.01
                for op in lines), 'signature rule missing'
     assert ops, 'the sheet is empty'
 
@@ -207,7 +251,7 @@ def test_item_table_columns_are_the_reference_widths():
     assert [c['label'] for c in columns] == [
         'رقم (روپے)', 'ریٹ', 'مقدار', 'تفصیل / آئٹم', 'نمبر']
     assert [round(c['x0'], 1) for c in columns] == [
-        R.LEFT, 114.8, 187.0, 243.9, 369.3]
+        round(R.LEFT, 1), 114.8, 187.0, 243.9, 369.3]
     assert round(columns[-1]['x1'], 1) == round(R.RIGHT, 1)
 
 
@@ -215,13 +259,16 @@ def test_fifteen_rows_end_where_the_reference_table_ends():
     items = [{'name_ur': 'اینٹ', 'qty': 1, 'price_at_time': 10}] * 15
     sheet = R.layout_document(_document(items=items))[0]
     lines = _ops(sheet, 'line')
-    # the reference's ruled table closes at y = 404.6 and the summary starts
-    # 6.9pt under it
-    assert any(abs(op['y0'] - 404.6) < 0.2 for op in lines)
-    # summary box: 58.6pt tall under a 6.9pt gap, closed by the navy bar
+    # the reference's ruled table closes at y = 428.79 and the summary starts
+    # 6.877pt under it
+    table_end = R.Y_ITEMS_ROWS + 15 * R.ROW_H
+    assert any(abs(op['y0'] - table_end) < 0.01 for op in lines)
+    # summary box closed by the navy total bar on the left half
     total = [op for op in _ops(sheet, 'rect')
-             if op['fill'] == R.NAVY and abs(op['x'] - 229.4) < 0.1]
-    assert total and abs(total[0]['y'] - 455.7) < 0.4
+             if op['fill'] == R.NAVY and abs(op['x'] - (R.SUM_LEFT + 0.375)) < 0.01]
+    assert total
+    assert abs(total[0]['y'] - (table_end + R.SUMMARY_GAP + 0.375
+                                + 3 * R.SUM_ROW_H)) < 0.01
 
 
 def test_row_height_and_zebra_tint_are_the_reference_ones():
@@ -249,7 +296,7 @@ def test_sheet_text_holds_the_urdu_furniture_and_every_figure():
         assert english not in op_text, english
 
 
-def test_panel_prints_the_four_inline_fields_in_reading_order():
+def test_panel_model_keeps_the_two_card_fields_in_reading_order():
     doc = _document()
     assert [label for label, _value in doc['fields']] == [
         'بل برائے', 'ڈیلیوری', 'کوڈ', 'اکاؤنٹ']
@@ -379,8 +426,14 @@ def test_print_page_is_the_same_rtl_sheet():
     html = bill_urdu.render_html(_document())
     assert 'dir="rtl"' in html
     assert '<div class="pg"' in html
-    # the carbon copy is one A4 leaf holding both copies
-    assert 'width:841.89pt' in html
+    # the default print page is the single approved A5 sheet
+    assert f'width:{R._fmt(R.PAGE_W)}pt' in html
+    assert R.COPY_ORIGINAL not in html and R.COPY_CARBON not in html
+
+
+def test_print_page_can_still_be_the_carbon_copy():
+    html = bill_urdu.render_html(_document(), copies=2)
+    assert f'width:{R._fmt(R.A4_W)}pt' in html
     assert R.COPY_ORIGINAL in html and R.COPY_CARBON in html
 
 
@@ -489,7 +542,7 @@ def sale(app, client):
         return {'id': row.id, 'bill_no': row.manual_bill_no}
 
 
-def test_route_serves_the_carbon_copy_pdf_by_default(client, sale):
+def test_route_serves_the_single_a5_pdf_by_default(client, sale):
     url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
            f"&src_id={sale['id']}&lang=ur&tc=0")
     resp = client.get(url)
@@ -501,20 +554,20 @@ def test_route_serves_the_carbon_copy_pdf_by_default(client, sale):
     reader = PdfReader(io.BytesIO(resp.data))
     assert len(reader.pages) == 1
     box = reader.pages[0].mediabox
-    assert round(float(box.width), 1) == round(R.A4_W, 1)
-    assert round(float(box.height), 1) == round(R.A4_H, 1)
+    assert round(float(box.width), 1) == round(R.PAGE_W, 1)
+    assert round(float(box.height), 1) == round(R.PAGE_H, 1)
 
 
-def test_route_serves_a_single_a5_sheet_when_asked(client, sale):
+def test_route_serves_the_carbon_copy_when_asked(client, sale):
     url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
-           f"&src_id={sale['id']}&lang=ur&tc=0&copies=1")
+           f"&src_id={sale['id']}&lang=ur&tc=0&copies=2")
     resp = client.get(url)
     assert resp.status_code == 200
     reader = PdfReader(io.BytesIO(resp.data))
     assert len(reader.pages) == 1
     box = reader.pages[0].mediabox
-    assert round(float(box.width), 1) == round(R.PAGE_W, 1)
-    assert round(float(box.height), 1) == round(R.PAGE_H, 1)
+    assert round(float(box.width), 1) == round(R.A4_W, 1)
+    assert round(float(box.height), 1) == round(R.A4_H, 1)
 
 
 def test_route_print_is_the_same_urdu_sheet(client, sale):
@@ -526,7 +579,7 @@ def test_route_print_is_the_same_urdu_sheet(client, sale):
     assert '-UR.html' in resp.headers['Content-Disposition']
     assert 'dir="rtl"' in html
     assert '<div class="pg"' in html
-    assert R.COPY_ORIGINAL in html and R.COPY_CARBON in html
+    assert R.COPY_ORIGINAL not in html and R.COPY_CARBON not in html
     # English receipt furniture must never leak into the Urdu sheet
     for english in ('rcpt-header', 'rcpt-table', 'English PDF'):
         assert english not in html, english
@@ -543,3 +596,164 @@ def test_english_download_is_untouched(client, sale):
     text = _pdf_text(resp.data).upper()
     assert 'INVOICE' in text or 'RECEIPT' in text
     assert 'بل نمبر' not in text
+
+
+# ---------------------------------------------------------------------------
+# The "New Receipt.pdf" reference: data, fonts and mixed-script figures
+# ---------------------------------------------------------------------------
+
+def test_reference_geometry_is_pinned():
+    """The anchors measured off New Receipt.pdf, not the older Urdu sheet."""
+    assert round(R.PAGE_W, 4) == 419.5276
+    assert round(R.PAGE_H, 4) == 595.2756
+    assert round(R.LEFT, 4) == 19.8425
+    assert round(R.RIGHT, 4) == 399.6851
+    assert round(R.Y_RULE_1, 4) == 75.0315
+    assert round(R.Y_META, 4) == 94.9596
+    assert round(R.META_BASELINE, 3) == 105.161
+    assert round(R.Y_PANEL, 4) == 116.8289
+    assert round(R.PANEL_H, 4) == 43.3293
+    assert round(R.Y_ITEMS_HEAD, 4) == 183.3102
+    assert round(R.ROW_H, 4) == 15.3071
+    assert R.ROWS_FIRST_PAGE == 15
+    assert round(R.SUM_LEFT, 4) == 17.5925
+    assert round(R.SUM_RIGHT, 4) == 185.5866
+    assert round(R.SIG_LINE_X0, 4) == 302.3917
+    assert round(R.TERMS_STEP, 3) == 11.670
+
+
+def test_party_panel_carries_the_contact_placeholder_and_code():
+    doc = _document()
+    assert doc['party_phone'] == '____'
+    ops = R.layout_document(doc)[0].ops
+    text = [op['text'] for op in ops if op['op'] == 'text']
+    assert 'حوالہ:' in text
+    assert '____' in text
+    assert 'کوڈ:' in text
+    assert 'FBMCL-00002' in text
+    assert 'ڈیلیوری:' in text
+    assert 'اکاؤنٹ:' in text
+
+
+def test_party_phone_comes_from_the_client_when_present():
+    client = SimpleNamespace(code='FBMCL-00002', phone='0300-1234567')
+    doc = _document(client=client)
+    assert doc['party_phone'] == '0300 1234567'
+    text = [op['text'] for op in R.layout_document(doc)[0].ops
+            if op['op'] == 'text']
+    assert '0300 1234567' in text
+
+
+def test_pdf_embeds_the_reference_faces():
+    data = bill_urdu.render_pdf(_document())
+    assert b'Jameel' in data
+    assert b'DejaVu' in data
+
+
+def test_mixed_urdu_figures_keep_their_left_to_right_order():
+    assert R._urdu_runs('ٹائل 12×18')[0] == ('12×18', 'ltr')
+    assert R._urdu_runs('07 نومبر 2026')[0] == ('2026', 'ltr')
+    assert R._urdu_runs('07 نومبر 2026')[-1] == ('07', 'ltr')
+    assert R._urdu_runs('12 ملی میٹر سریا')[-1] == ('12', 'ltr')
+
+
+def test_print_page_wraps_embedded_figures_for_browser_bidi():
+    items = [{'name_ur': 'ٹائل 12×18', 'qty': 40, 'price_at_time': 1950}]
+    html = bill_urdu.render_html(_document(items=items))
+    assert '<span dir="ltr">12×18</span>' in html
+
+
+def test_long_bills_continue_without_the_first_page_meta_strip():
+    items = [{'name_ur': 'اینٹ', 'qty': 1, 'price_at_time': 10}] * 40
+    sheets = R.layout_document(_document(items=items))
+    assert len(sheets) >= 2
+    first_meta = [op for op in sheets[0].ops if op['op'] == 'rect'
+                  and abs(op['y'] - R.Y_META) < 0.01]
+    assert first_meta
+    for sheet in sheets[1:]:
+        assert not [op for op in sheet.ops if op['op'] == 'rect'
+                    and abs(op['y'] - R.Y_META) < 0.01]
+        assert any(op['op'] == 'rect' and op['fill'] == R.NAVY
+                   and abs(op['y'] - R.CONT_HEAD_TOP) < 0.01 for op in sheet.ops)
+
+
+def test_reference_bill_data_flows_through_the_real_adapter():
+    doc = _reference_document()
+    assert len(doc['items']) == 15
+    assert sum(float(row['amount'].replace(',', '')) for row in doc['items']) == 1105636
+    assert {row['label']: row['value'] for row in doc['summary']} == {
+        'کل فروخت': '1,105,636',
+        'پچھلا بقایا': '31,700',
+        'ادا شدہ رقم': '614,936',
+        'کل بقایا رقم': '522,400',
+    }
+    assert doc['qr_text'] == 'SB-SL-1008 | FBMCL-00002 | 1,105,636 | 07-11-2026'
+    assert doc['qr_caption'] == 'SB-SL-1008', 'the real bill, not a fake SAMPLE QR'
+
+    sheets = R.layout_document(doc)
+    assert len(sheets) == 1
+    assert any(op['op'] == 'line' and abs(op['y0'] - 428.7905) < 0.001
+               for op in sheets[0].ops)
+    assert len(bill_urdu.render_pdf(doc)) > 10000
+
+
+def test_reference_terms_use_equal_columns_and_the_red_fourth_number():
+    sheet = R.layout_document(_reference_document())[0]
+    assert abs(R.TERMS_RIGHT_WIDTH - R.TERMS_LEFT_WIDTH) < 0.02
+    assert round(R.TERMS_COLUMN_W, 2) == 184.25
+    clauses = [op for op in sheet.ops if op['op'] == 'text'
+               and op['size'] == R.TERMS_SIZE]
+    assert len(clauses) == 7, 'each reference clause fits on one line'
+    assert [round(op['y'], 3) for op in clauses[:4]] == [
+        521.215, 532.885, 544.555, 556.225]
+    numbers = {op['text']: op for op in sheet.ops if op['op'] == 'text'
+               and re.fullmatch(r'\d+\.', op['text'])}
+    assert numbers['4.']['color'] == R.TERMS_RED
+    assert numbers['4.']['font'] == R.SANS_BOLD
+    assert all(numbers[f'{n}.']['color'] == R.NAVY for n in (1, 2, 3, 5, 6, 7))
+
+
+def test_item_header_has_no_white_column_dividers():
+    sheet = R.layout_document(_reference_document())[0]
+    assert not [op for op in sheet.ops if op['op'] == 'line'
+                and op['color'] == R.WHITE
+                and R.Y_ITEMS_HEAD <= op['y0'] <= R.Y_ITEMS_ROWS]
+
+
+def test_long_bill_keeps_every_row_and_finishes_the_footer_on_the_page():
+    items = [{'name_ur': 'اینٹ', 'qty': 1, 'price_at_time': 10}] * 40
+    doc = _document(items=items,
+                    terms=[SimpleNamespace(title='', content_ur=t) for t in TERMS])
+    sheets = R.layout_document(doc)
+    indices = [int(op['text']) for sheet in sheets for op in sheet.ops
+               if op['op'] == 'text' and op['font'] == R.SANS
+               and op['text'].isdigit()
+               and abs(op['x'] - R._item_columns()[-1]['x']) < 0.01]
+    assert indices == list(range(1, 41))
+    assert any(op['op'] == 'text' and op['text'] == '7.' for op in sheets[-1].ops)
+    for sheet in sheets:
+        assert all(op['y'] <= R.PAGE_BOTTOM for op in sheet.ops
+                   if op['op'] == 'text')
+
+
+def test_html_title_is_escaped():
+    html = R.render_html(_document(), title='</title><script>alert(1)</script>')
+    assert '<script>alert(1)</script>' not in html
+    assert '&lt;/title&gt;&lt;script&gt;' in html
+
+
+def test_urdu_brackets_are_mirrored_like_the_browser():
+    runs = R._urdu_runs('رقم (روپے)')
+    assert runs[0] == ('(', 'ltr')
+    assert runs[2] == (')', 'ltr')
+    assert ''.join(chunk for chunk, _direction in runs) == '(روپے) رقم'
+
+
+def test_route_confirmation_defaults_to_the_single_a5_sheet(client, sale):
+    url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur")
+    resp = client.get(url)
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert re.search(r'id="copies1"[^>]*checked', html)
+    assert not re.search(r'id="copies2"[^>]*checked', html)

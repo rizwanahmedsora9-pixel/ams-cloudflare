@@ -36,7 +36,7 @@
                         <i class="bi bi-copy me-1"></i> Copies
                     </div>
                     <div class="form-check">
-                        <input class="form-check-input" type="radio" name="urduCopies" id="urduCopies2" value="2" checked>
+                        <input class="form-check-input" type="radio" name="urduCopies" id="urduCopies2" value="2">
                         <label class="form-check-label text-white fw-bold" for="urduCopies2">
                             <bdi dir="rtl">کاربن کاپی</bdi> — 2 copies on one A4 (carbon copy)
                         </label>
@@ -45,7 +45,7 @@
                         </div>
                     </div>
                     <div class="form-check mt-2">
-                        <input class="form-check-input" type="radio" name="urduCopies" id="urduCopies1" value="1">
+                        <input class="form-check-input" type="radio" name="urduCopies" id="urduCopies1" value="1" checked>
                         <label class="form-check-label text-white-50" for="urduCopies1">
                             <i class="bi bi-file-earmark me-1"></i> Single copy — one A5 sheet
                         </label>
@@ -162,7 +162,7 @@
                 url += '&tc_ids=' + ids.join(',');
             }
             var copies = document.querySelector('input[name="urduCopies"]:checked');
-            url += '&copies=' + (copies ? copies.value : '2');
+            url += '&copies=' + (copies ? copies.value : '1');
             modal.hide();
             location.href = url;
         }
