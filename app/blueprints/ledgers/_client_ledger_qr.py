@@ -1,7 +1,9 @@
 """Public, read-only client ledger QR links and their staff print controls."""
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import secrets
 from urllib.parse import urlsplit
 
@@ -51,6 +53,28 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 
+def _derive_token(client, salt: str) -> str:
+    """Re-derive the client's current bearer token from the stored salt.
+
+    The raw token is never written to the database — only its SHA-256 digest
+    and the random per-rotation salt are.  Re-running this with the same
+    salt reproduces the exact token, so the currently active QR can be
+    printed again without rotating (and invalidating) it.  A replacement
+    generates a fresh salt, so the derived token — and its digest — change.
+    """
+    message = f"client-ledger-qr-v1:{client.id}:{salt}".encode("utf-8")
+    digest = hmac.new(
+        current_app.secret_key.encode("utf-8"), message, hashlib.sha256
+    ).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def _can_print(client) -> bool:
+    """True when the active QR can be re-rendered (hash + salt stored)."""
+    return bool(client.client_ledger_qr_token_hash
+                and client.client_ledger_qr_token_salt)
+
+
 def _worker_origin() -> str:
     """Require an explicitly configured HTTPS Worker origin for printed QR."""
     configured = (current_app.config.get("PUBLIC_BASE_URL") or "").strip()
@@ -85,14 +109,15 @@ def _staff_only():
         abort(403)
 
 
-def _qr_dialog_fragment(client, *, qr_url="", error="", status=200):
+def _qr_dialog_fragment(client, *, qr_url="", error="", status=200,
+                        replaced=True):
     """HTML fragment shown inside the ledger page's big QR dialog.
 
-    The raw bearer token is never stored (only its SHA-256 digest), so an
-    already-printed QR cannot be rendered again.  The fragment therefore
-    either shows the QR that was just generated, or offers to generate one
-    (a replacement, which revokes the previous code) without leaving the
-    client's ledger page.
+    The raw bearer token is never stored (only its SHA-256 digest plus a
+    per-rotation salt), but the token is re-derivable from them, so the
+    currently active QR can be printed again.  The fragment either shows the
+    QR that was just generated/reprinted, or offers to print, generate a
+    replacement, or revoke without leaving the client's ledger page.
     """
     nonce = _form_nonce(client)
     svg = None
@@ -109,6 +134,8 @@ def _qr_dialog_fragment(client, *, qr_url="", error="", status=200):
         error=error,
         is_active=bool(client.client_ledger_qr_token_hash),
         can_generate=bool(client.is_active and not client.transferred_to_id),
+        can_print=_can_print(client),
+        replaced=replaced,
         qr_nonce=nonce,
     ), status)
     response.headers["Cache-Control"] = "private, no-store, max-age=0"
@@ -127,7 +154,7 @@ def client_ledger_qr_dialog(client_id):
     return _qr_dialog_fragment(client)
 
 
-def _qr_admin_page(client, *, qr_url="", error=""):
+def _qr_admin_page(client, *, qr_url="", error="", replaced=True):
     nonce = _form_nonce(client)
     matrix = None
     svg = None
@@ -144,7 +171,30 @@ def _qr_admin_page(client, *, qr_url="", error=""):
         error=error,
         is_active=bool(client.client_ledger_qr_token_hash),
         can_generate=bool(client.is_active and not client.transferred_to_id),
+        can_print=_can_print(client),
+        replaced=replaced,
         qr_nonce=nonce,
+    ))
+    response.headers["Cache-Control"] = "private, no-store, max-age=0"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+def _qr_print_page(client, qr_url, matrix, *, replaced=True):
+    """Full-page success response showing a printable QR sheet."""
+    response = make_response(render_template(
+        "client_ledger_qr.html",
+        client=client,
+        qr_url=qr_url,
+        qr_svg=_qr_svg_path(matrix),
+        error="",
+        is_active=True,
+        can_generate=bool(client.is_active and not client.transferred_to_id),
+        can_print=_can_print(client),
+        replaced=replaced,
+        qr_nonce=_form_nonce(client),
     ))
     response.headers["Cache-Control"] = "private, no-store, max-age=0"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -173,11 +223,56 @@ def client_ledger_qr(client_id):
     action = (request.form.get("action") or "").strip().lower()
     if action == "revoke":
         client.client_ledger_qr_token_hash = None
+        client.client_ledger_qr_token_salt = None
         db.session.commit()
         if in_dialog:
             return _qr_dialog_fragment(client)
         flash("This client's public ledger QR has been revoked.", "success")
         return redirect(url_for("ledgers.client_ledger_qr", client_id=client.id))
+    if action == "print":
+        # Re-render the client's currently active QR.  No new token is
+        # issued, so the previously printed copies stay valid — staff can
+        # reprint a lost sheet without rotating the client's access.
+        if not client.is_active or client.transferred_to_id:
+            error = "An active, non-transferred client is required for a QR link."
+            if in_dialog:
+                return _qr_dialog_fragment(client, error=error, status=409)
+            return _qr_admin_page(client, error=error), 409
+        if not _can_print(client):
+            error = ("This QR was created before reprint support and cannot be "
+                     "shown again. Generate a replacement to print another copy.")
+            if in_dialog:
+                return _qr_dialog_fragment(client, error=error, status=409)
+            return _qr_admin_page(client, error=error), 409
+        origin = _worker_origin()
+        if not origin:
+            error = ("Set PUBLIC_BASE_URL to the HTTPS Cloudflare Worker origin "
+                     "before printing client ledger QR codes.")
+            if in_dialog:
+                return _qr_dialog_fragment(client, error=error, status=503)
+            return _qr_admin_page(client, error=error), 503
+        token = _derive_token(client, client.client_ledger_qr_token_salt)
+        if _token_hash(token) != client.client_ledger_qr_token_hash:
+            # The app secret key changed since the QR was generated: the
+            # derived token no longer matches the stored digest, so a
+            # reprinted code would not work.  Offer a replacement instead.
+            error = ("The current QR can no longer be reprinted because the "
+                     "server key changed. Generate a replacement to print "
+                     "another copy.")
+            if in_dialog:
+                return _qr_dialog_fragment(client, error=error, status=409)
+            return _qr_admin_page(client, error=error), 409
+        qr_url = f"{origin}{url_for('ledgers.public_client_ledger', token=token)}"
+        from app.services import qr_code
+        matrix = qr_code.make_matrix(qr_url, error="m")
+        if not matrix:
+            if in_dialog:
+                return _qr_dialog_fragment(
+                    client, error="Could not encode this QR link.", status=500)
+            return _qr_admin_page(client, error="Could not encode this QR link."), 500
+        if in_dialog:
+            return _qr_dialog_fragment(client, qr_url=qr_url, replaced=False)
+        return _qr_print_page(client, qr_url, matrix, replaced=False)
     if action != "generate":
         abort(400)
     if not client.is_active or client.transferred_to_id:
@@ -194,7 +289,12 @@ def client_ledger_qr(client_id):
             return _qr_dialog_fragment(client, error=error, status=503)
         return _qr_admin_page(client, error=error), 503
 
-    token = secrets.token_urlsafe(_TOKEN_BYTES)
+    # A fresh salt yields a fresh token; rotation invalidates every
+    # previously printed copy. The raw bearer token is never stored — only
+    # its SHA-256 digest and the salt, which together re-derive the same
+    # token later so the active QR can be printed again.
+    salt = secrets.token_urlsafe(_TOKEN_BYTES)
+    token = _derive_token(client, salt)
     path = url_for("ledgers.public_client_ledger", token=token)
     qr_url = f"{origin}{path}"
     from app.services import qr_code
@@ -205,26 +305,12 @@ def client_ledger_qr(client_id):
                 client, error="Could not encode this QR link.", status=500)
         return _qr_admin_page(client, error="Could not encode this QR link."), 500
 
-    # Rotation invalidates every previously printed copy. Persist only the
-    # digest, not the bearer token; the raw link is returned once for printing.
+    client.client_ledger_qr_token_salt = salt
     client.client_ledger_qr_token_hash = _token_hash(token)
     db.session.commit()
     if in_dialog:
         return _qr_dialog_fragment(client, qr_url=qr_url)
-
-    response = make_response(render_template(
-        "client_ledger_qr.html",
-        client=client,
-        qr_url=qr_url,
-        qr_svg=_qr_svg_path(matrix),
-        error="",
-        is_active=True,
-    ))
-    response.headers["Cache-Control"] = "private, no-store, max-age=0"
-    response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Robots-Tag"] = "noindex, nofollow"
-    return response
+    return _qr_print_page(client, qr_url, matrix)
 
 
 @bp.route("/c/<token>")

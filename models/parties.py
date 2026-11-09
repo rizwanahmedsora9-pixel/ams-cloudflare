@@ -36,6 +36,12 @@ class Client(db.Model):
     # SHA-256 of the high-entropy bearer token used for the client's public,
     # read-only ledger QR. Store only the digest; NULL means access is revoked.
     client_ledger_qr_token_hash = db.Column(db.String(64), nullable=True)
+    # Random per-rotation salt mixed into the token derivation
+    # (HMAC over the app secret key, client id and salt).  The raw token is
+    # never stored; the salt lets it be re-derived exactly so the currently
+    # active QR can be printed again without rotating.  NULL means revoked
+    # or created before reprint support (the digest alone cannot render it).
+    client_ledger_qr_token_salt = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, default=pk_model_now, index=True)
 
 
