@@ -1,0 +1,40 @@
+{#
+  ``action=print`` opens a tab that prints itself.  Two things made that tab
+  feel unlike the bill: it showed the whole application (dark sidebar, menu)
+  before and after the print dialog, and it called ``window.print()`` on a
+  timer whether or not the icons and fonts had painted yet.  This partial hides
+  the app chrome for the screen and prints once the sheet is ready.
+
+  Included only when ``auto_print`` is set (view_bill.html / payment_receipt.html).
+#}
+<style>
+    /* Screen only - @media print lives in _receipt_print_css.html. */
+    @media screen {
+        body { background: #eceff3 !important; }
+        .sidebar,
+        #sidebar,
+        .sidebar-overlay,
+        #sidebarOverlay,
+        .mobile-header,
+        #sidebarToggle,
+        .top-progress-bar { display: none !important; }
+        .main-content {
+            margin-left: 0 !important;
+            padding: 16px 10px 28px !important;
+        }
+        .rcpt-wrapper { padding: 0 8px; }
+    }
+</style>
+<script>
+    window.addEventListener('load', function () {
+        var fire = function () { window.print(); };
+        // Wait for the icon font and the sheet's own fonts: printing on a bare
+        // 150ms timer opened the dialog before the bill had finished painting.
+        if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+            document.fonts.ready.then(function () { setTimeout(fire, 60); })
+                .catch(function () { setTimeout(fire, 150); });
+        } else {
+            setTimeout(fire, 150);
+        }
+    });
+</script>
