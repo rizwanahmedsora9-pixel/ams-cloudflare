@@ -54,6 +54,49 @@ def _staff_only():
         abort(403)
 
 
+def _qr_dialog_fragment(client, *, qr_url="", error="", status=200):
+    """HTML fragment shown inside the ledger page's big QR dialog.
+
+    The raw bearer token is never stored (only its SHA-256 digest), so an
+    already-printed QR cannot be rendered again.  The fragment therefore
+    either shows the QR that was just generated, or offers to generate one
+    (a replacement, which revokes the previous code) without leaving the
+    client's ledger page.
+    """
+    nonce = secrets.token_urlsafe(24)
+    session["client_ledger_qr_nonce"] = nonce
+    svg = None
+    if qr_url:
+        from app.services import qr_code
+        matrix = qr_code.make_matrix(qr_url, error="m")
+        if matrix:
+            svg = _qr_svg_path(matrix)
+    response = make_response(render_template(
+        "client_ledger_qr_dialog_body.html",
+        client=client,
+        qr_url=qr_url,
+        qr_svg=svg,
+        error=error,
+        is_active=bool(client.client_ledger_qr_token_hash),
+        can_generate=bool(client.is_active and not client.transferred_to_id),
+        qr_nonce=nonce,
+    ), status)
+    response.headers["Cache-Control"] = "private, no-store, max-age=0"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+@bp.route("/client_ledger_qr/<int:client_id>/dialog")
+@login_required
+def client_ledger_qr_dialog(client_id):
+    """Staff-only fragment loaded into the ledger page's QR dialog."""
+    _staff_only()
+    client = Client.query.get_or_404(client_id)
+    return _qr_dialog_fragment(client)
+
+
 def _qr_admin_page(client, *, qr_url="", error=""):
     nonce = secrets.token_urlsafe(24)
     session["client_ledger_qr_nonce"] = nonce
@@ -94,26 +137,30 @@ def client_ledger_qr(client_id):
     expected_nonce = session.pop("client_ledger_qr_nonce", "")
     if not expected_nonce or not secrets.compare_digest(submitted_nonce, expected_nonce):
         abort(400)
+    in_dialog = (request.form.get("dialog") or "").strip() == "1"
     action = (request.form.get("action") or "").strip().lower()
     if action == "revoke":
         client.client_ledger_qr_token_hash = None
         db.session.commit()
+        if in_dialog:
+            return _qr_dialog_fragment(client)
         flash("This client's public ledger QR has been revoked.", "success")
         return redirect(url_for("ledgers.client_ledger_qr", client_id=client.id))
     if action != "generate":
         abort(400)
     if not client.is_active or client.transferred_to_id:
-        return _qr_admin_page(
-            client, error="An active, non-transferred client is required for a QR link."
-        ), 409
+        error = "An active, non-transferred client is required for a QR link."
+        if in_dialog:
+            return _qr_dialog_fragment(client, error=error, status=409)
+        return _qr_admin_page(client, error=error), 409
 
     origin = _worker_origin()
     if not origin:
-        return _qr_admin_page(
-            client,
-            error=("Set PUBLIC_BASE_URL to the HTTPS Cloudflare Worker origin "
-                   "before printing client ledger QR codes."),
-        ), 503
+        error = ("Set PUBLIC_BASE_URL to the HTTPS Cloudflare Worker origin "
+                 "before printing client ledger QR codes.")
+        if in_dialog:
+            return _qr_dialog_fragment(client, error=error, status=503)
+        return _qr_admin_page(client, error=error), 503
 
     token = secrets.token_urlsafe(_TOKEN_BYTES)
     path = url_for("ledgers.public_client_ledger", token=token)
@@ -121,12 +168,17 @@ def client_ledger_qr(client_id):
     from app.services import qr_code
     matrix = qr_code.make_matrix(qr_url, error="m")
     if not matrix:
+        if in_dialog:
+            return _qr_dialog_fragment(
+                client, error="Could not encode this QR link.", status=500)
         return _qr_admin_page(client, error="Could not encode this QR link."), 500
 
     # Rotation invalidates every previously printed copy. Persist only the
     # digest, not the bearer token; the raw link is returned once for printing.
     client.client_ledger_qr_token_hash = _token_hash(token)
     db.session.commit()
+    if in_dialog:
+        return _qr_dialog_fragment(client, qr_url=qr_url)
 
     response = make_response(render_template(
         "client_ledger_qr.html",

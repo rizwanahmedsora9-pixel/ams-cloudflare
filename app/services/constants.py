@@ -230,6 +230,7 @@ ENDPOINT_PERMISSION_MAP = {
     'download_client_ledger': 'can_view_client_ledger',
     'download_full_client_history': 'can_view_client_ledger',
     'client_ledger_qr': 'can_manage_clients',
+    'client_ledger_qr_dialog': 'can_manage_clients',
 
     'decision_ledger': 'can_view_decision_ledger',
     'clients': 'can_view_client_ledger',

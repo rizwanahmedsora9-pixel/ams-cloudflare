@@ -60,7 +60,7 @@ def register_hooks(app):
         # a stale fragment is the classic "click edit -> stuck overlay".
         endpoint = request.endpoint or ''
         short = endpoint.rsplit('.', 1)[-1] if endpoint else ''
-        if short in ('public_client_ledger', 'client_ledger_qr'):
+        if short in ('public_client_ledger', 'client_ledger_qr', 'client_ledger_qr_dialog'):
             response.headers['Cache-Control'] = 'private, no-store, max-age=0'
             return response
         if short in (
