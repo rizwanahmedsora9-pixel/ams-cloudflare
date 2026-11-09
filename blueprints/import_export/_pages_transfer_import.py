@@ -75,9 +75,9 @@ def _json_import_error(msg, status=400):
 def transfer_import():
     # ===== PANDAS DEPENDENCY CHECK =====
     if not _validate_pandas_installed():
-        msg = 'CRITICAL: pandas library is not installed. Run: pip install pandas>=2.3.3'
+        msg = 'Spreadsheet import requires pandas. Install requirements-data.txt and restart the app.'
         if _wants_import_json():
-            return _json_import_error(msg, 500)
+            return _json_import_error(msg, 503)
         flash(msg, 'danger')
         return redirect(url_for('import_export.import_export_page'))
     # ===== END DEPENDENCY CHECK =====

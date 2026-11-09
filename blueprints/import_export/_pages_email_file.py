@@ -4,6 +4,8 @@ from ._common import *  # noqa
 @import_export_bp.route('/email_file', methods=['POST'])
 @login_required
 def email_file():
+    if not ensure_pandas_installed():
+        return redirect(url_for('import_export.import_export_page'))
     kind = (request.form.get('kind') or '').strip().lower()
     dataset = (request.form.get('dataset') or '').strip()
     fmt = (request.form.get('format') or 'excel').strip().lower()

@@ -198,7 +198,7 @@ def delete_selected_data():
         # Wipe transactional/master data only. Never delete User rows.
 
         if is_full_wipe:
-            wipe_all_business_data(db.session)
+            preserved_unknown = wipe_all_business_data(db.session)
             deleted_info.append('Full Wipe (All Transactions, Accounts, Cash & Rentals)')
             if history_row:
                 history_row.wipe_status = 'completed'
@@ -211,6 +211,9 @@ def delete_selected_data():
                 logging.getLogger('wipe').exception('Full wipe committed but post-wipe bookkeeping failed')
                 flash('Data was wiped, but post-wipe bookkeeping failed. Contact support.', 'warning')
             flash(f'Data Wiped: {", ".join(deleted_info)}', 'danger')
+            if preserved_unknown:
+                flash('Unrecognized tables were preserved and may contain old data: '
+                      + ', '.join(preserved_unknown) + '. Contact support to review them.', 'warning')
             return redirect(url_for('settings'))
 
         if 'pending_bills' in targets:

@@ -1,6 +1,6 @@
 """Atomic full business-data reset. Identity, configuration and system audit survive.
 
-Keep this explicit: silently deleting new or third-party tables is unsafe. New
+Keep deletion explicit: unknown tables are preserved, not silently deleted. New
 business tables must be classified here and covered by the schema inventory test.
 """
 from sqlalchemy import MetaData, Table, inspect, text
@@ -62,10 +62,20 @@ def wipe_all_business_data(session=None):
     inspector = inspect(conn)
     present = set(inspector.get_table_names()) - {'sqlite_sequence'}
     unknown = present - BUSINESS_TABLES - PRESERVED_TABLES
-    if unknown:
-        raise RuntimeError('Unclassified database tables prevent a safe full wipe: ' + ', '.join(sorted(unknown)))
-
     names = BUSINESS_TABLES & present
+    # An extension table may be unrelated to the reset. Preserve it, but never
+    # let ON DELETE CASCADE/SET NULL mutate any unclassified or system table.
+    # We cannot infer whether unknown tables contain business data, so the
+    # caller must warn that they remain after a successful reset.
+    for name in sorted(present - names):
+        for fk in inspector.get_foreign_keys(name):
+            if fk.get('referred_table') in names:
+                raise RuntimeError(
+                    'A preserved or unrecognized table references business data; '
+                    'the wipe was stopped to protect it. Contact support to review '
+                    f'table {name}. No data was changed.'
+                )
+
     metadata = MetaData()
     tables = {name: Table(name, metadata, autoload_with=conn) for name in names}
     # Self-references (such as merged clients and reconciliation chains) can
@@ -73,7 +83,7 @@ def wipe_all_business_data(session=None):
     for table in tables.values():
         for fk in table.foreign_keys:
             if fk.column.table.name == table.name and fk.parent.nullable:
-                s.execute(table.update().values({fk.parent.name: None}))
+                s.execute(table.update().where(fk.parent.is_not(None)).values({fk.parent.name: None}))
     if 'import_job' in tables:
         active = s.execute(
             text("SELECT COUNT(*) FROM import_job WHERE status IN ('queued', 'processing')")
@@ -85,8 +95,13 @@ def wipe_all_business_data(session=None):
     ordered = [table for table, _ in sort_tables_and_constraints(list(tables.values())) if table is not None]
     for table in reversed(ordered):
         s.execute(table.delete())
-    violations = conn.execute(text('PRAGMA foreign_key_check')).fetchall()
-    if violations:
-        raise RuntimeError('Full wipe failed database relationship verification')
     s.add(BillCounter(namespace=AUTO_BILL_NS_DEFAULT, count=1000))
     s.flush()
+    violations = conn.execute(text('PRAGMA foreign_key_check')).fetchall()
+    if violations:
+        raise RuntimeError('Full wipe failed database relationship verification; no data was changed.')
+    # Delete triggers must not silently repopulate tables already processed.
+    for table in tables.values():
+        if s.execute(table.select().limit(1)).first() and table.name != 'bill_counter':
+            raise RuntimeError('Full wipe could not clear all business data. No data was changed.')
+    return sorted(unknown)

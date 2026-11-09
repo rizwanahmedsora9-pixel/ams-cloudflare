@@ -659,7 +659,7 @@ def export_grn():
         bd = grn_breakdown(g)
         total = bd['landed_cost_total']
         data.append({
-            'Date': g.date_posted.strftime('%Y-%m-%d'),
+            'Date': g.date_posted.strftime('%Y-%m-%d') if g.date_posted else '',
             'GRN #': g.manual_bill_no or g.auto_bill_no,
             'Supplier': g.supplier,
             'Items Count': len([i for i in (g.items or []) if not bool(getattr(i, 'is_void', False))]),
@@ -683,12 +683,15 @@ def export_grn():
             'Note': g.note
         })
     
-    import pandas as pd
-    df = pd.DataFrame(data)
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='GRN List')
-    output.seek(0)
+    from utils.excel_export import single_sheet_xlsx
+    output = single_sheet_xlsx('GRN List', data, [
+        'Date', 'GRN #', 'Supplier', 'Items Count', 'Total Qty', 'Discount',
+        'Tax', 'Supplier Material Amount', 'Vehicle Fare', 'Loading',
+        'Unloading', 'Other Charges', 'Expenses', 'Total Actual Purchase Cost',
+        'Avg Actual Cost Per Unit', 'Supplier Paid', 'Supplier Remaining',
+        'Additional Charges Paid', 'Additional Charges Remaining',
+        'Total Cash Actually Paid', 'Net Amount', 'Note',
+    ])
     
     return send_file(
         output,

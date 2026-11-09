@@ -12,7 +12,7 @@ def pk_today():
 def ensure_pandas_installed():
     if pd is None:
         flash(
-            'The Import/Export module requires pandas and openpyxl. Install them to use this feature.',
+            'This spreadsheet feature needs pandas. Install the optional dependencies with pip install -r requirements-data.txt, then restart the app.',
             'danger'
         )
         return False
@@ -165,6 +165,8 @@ def _flatten_single_root_folder(release_dir):
 @import_export_bp.route('/transfer/export', methods=['POST'])
 @login_required
 def transfer_export():
+    if not ensure_pandas_installed():
+        return redirect(url_for('import_export.import_export_page'))
     try:
         scope_ctx = _resolve_scope_context(
             scope_raw=request.form.get('scope'),
@@ -221,6 +223,8 @@ def transfer_export():
 @login_required
 def export_master():
     """Export all datasets into a single Excel file with multiple sheets."""
+    if not ensure_pandas_installed():
+        return redirect(url_for('import_export.import_export_page'))
     try:
         scope_ctx = _resolve_scope_context(
             scope_raw=request.args.get('scope'),

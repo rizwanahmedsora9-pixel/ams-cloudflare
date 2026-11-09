@@ -5,6 +5,8 @@ from ._common import *  # noqa
 @login_required
 def preview_import():
     """Analyze file and return preview data."""
+    if not _validate_pandas_installed():
+        return jsonify({'error': 'Spreadsheet import requires pandas. Install requirements-data.txt and restart the app.'}), 503
     file = request.files.get('file')
     if not file:
         return jsonify({'error': 'No file uploaded'}), 400
