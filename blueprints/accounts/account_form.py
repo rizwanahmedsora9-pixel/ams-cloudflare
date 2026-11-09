@@ -224,7 +224,7 @@ def validate_account_form(form, *, is_edit=False):
         if not exists:
             new_cat = AccountCategory(name=submitted_source_category)
             db.session.add(new_cat)
-            db.session.commit()
+            # The account and any new category must commit or roll back together.
 
     cleaned = {
         "name": name,

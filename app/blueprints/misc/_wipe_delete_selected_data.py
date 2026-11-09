@@ -1,6 +1,7 @@
 """wipe — split from misc.py."""
 from ._common import *  # noqa
 from models import Service  # noqa: F401  (Service master wipe target)
+from app.services.full_wipe import FULL_WIPE_TARGETS, wipe_all_business_data
 
 @bp.route('/delete_selected_data', methods=['POST'])
 @login_required
@@ -20,6 +21,8 @@ def delete_selected_data():
         return redirect(url_for('settings'))
 
     targets = request.form.getlist('delete_targets')
+    # Full reset requires every visible checkbox, not an expanded partial set.
+    is_full_wipe = FULL_WIPE_TARGETS.issubset(set(targets))
     # Centralized wipe registry: map a user-facing dataset to all related
     # dataset keys used by the wipe engine. This ensures dependent accounting
     # and ledger tables are removed together with the primary dataset.
@@ -91,6 +94,10 @@ def delete_selected_data():
             AccountTransaction.source_type == 'DeliveryPersonPayment',
             AccountTransaction.source_id.in_(ids),
         ).all()
+        if linked:
+            _tq(CashFlowEntry).filter(
+                CashFlowEntry.account_tx_id.in_([tx.id for tx in linked])
+            ).update({'account_tx_id': None}, synchronize_session=False)
         for tx in linked:
             _void_account_tx(tx)  # restore the account balance before removal
             db.session.delete(tx)
@@ -190,105 +197,19 @@ def delete_selected_data():
         # Keep core config intact: Users/Roles, login sessions, and Settings.
         # Wipe transactional/master data only. Never delete User rows.
 
-        full_set = {
-            'clients', 'suppliers', 'supplier_payments', 'pending_bills',
-            'dispatching', 'receiving', 'grn', 'materials', 'material_categories',
-            'direct_sales', 'material_returns', 'delivery_rents', 'delivery_persons',
-            'invoices', 'payments', 'bookings', 'notifications'
-        }
-        is_full_wipe = full_set.issubset(set(targets))
-
         if is_full_wipe:
-            # Full transactional reset (everything except users/settings/audit).
-            # Order matters: this app enforces SQLite foreign keys, so every
-            # child/ledger table must go before the master table it references.
-            # --- notifications & follow-ups (children of pending bills) ---
-            _tq(FollowUpContact).delete()
-            _tq(FollowUpReminder).delete()
-            _tq(StaffEmail).delete()
-            # --- pending bills (follow-ups cleared above) ---
-            _tq(PendingBill).delete()
-            # --- stock in/out + deliveries (entry references invoice) ---
-            _tq(DeliveryItem).delete()
-            _tq(Delivery).delete()
-            _tq(Entry).delete()
-            # --- allocation rows reference sale items AND grn items, so they
-            #     go first; then sale line items (which reference GRN lots
-            #     via grn_item_id) before the lots themselves ---
-            _tq(GRNAllocation).delete()
-            _tq(BookingAllocationRepairArchive).delete()
-            _tq(BookingAllocation).delete()
-            _tq(DirectSaleItem).delete()
-            # GRN payments + their ledger rows reference the GRN rows: remove
-            # them first or SQLite aborts the whole wipe on that foreign key.
-            _purge_grn_payment_ledger(
-                [row[0] for row in _tq(GRN).with_entities(GRN.id).all()])
-            _tq(GRNCharge).delete()
-            _tq(GRNItem).delete()
-            _tq(GRN).delete()
-            # --- driver payments: void their ledger rows, then remove rows ---
-            _purge_driver_payment_ledger(_tq(DeliveryPersonPayment))
-            _tq(DeliveryPersonPayment).delete()
-            _tq(SaleDeliveryPerson).delete()
-            _tq(DeliveryRent).delete()
-            # --- money documents before the sales/booking parents ---
-            _tq(WaiveOff).delete()
-            _tq(MaterialReturnItem).delete()
-            _tq(MaterialReturn).delete()
-            _tq(Payment).delete()
-            _tq(SupplierPayment).delete()
-            # --- sales & bookings (children already gone; invoice last) ---
-            _tq(DirectSale).delete()
-            _tq(DirectSaleDraft).delete()
-            _tq(BookingItem).delete()
-            _tq(Booking).delete()
-            _tq(Invoice).delete()
-            _tq(ReconBasket).delete()
-            # --- rental management (FBM): rentals link to client/item/account ---
-            _tq(FBMRental).delete()
-            _tq(FBMClient).delete()
-            _tq(FBMRentalItem).delete()
-            # --- financial accounts & cash management (ledger first, then
-            #     account definitions — a true full wipe removes accounts too,
-            #     unlike the granular 'accounts' reset option) ---
-            _tq(CashFlowEntryAudit).delete()
-            _tq(CashFlowEntry).delete()
-            _tq(AccountTransaction).delete()
-            # Reconciliation chains link to their predecessor via a self-FK;
-            # null the chain before the bulk delete so SQLite's immediate
-            # FK checks never abort mid-wipe.
-            _tq(AccountReconciliation).update({'previous_reconciliation_id': None}, synchronize_session=False)
-            _tq(AccountReconciliation).delete()
-            _tq(FbmCashDrawerEntry).delete()
-            _tq(FbmCashDrawerCategory).delete()
-            _tq(CashFlowReconciliationAudit).delete()
-            _tq(CashFlowDifferenceAdjustment).delete()
-            # Daily board state (typed counts + verified locks) is account-keyed
-            # and has no FK to ``account``, so it must be removed explicitly
-            # here — before the account rows it refers to disappear.
-            purge_daily_reconciliation_state()
-            _tq(CashFlowSubcategory).delete()
-            _tq(CashFlowCategory).delete()
-            _tq(CashFlowParty).delete()
-            _tq(AccountCategory).delete()
-            _tq(Account).delete()
-            # --- masters (no remaining references) ---
-            _tq(Supplier).delete()
-            _tq(Client).delete()
-            _tq(DeliveryPerson).delete()
-            _tq(Material).delete()
-            # Services are a master too: leaving rent/charge rows behind would
-            # make "data 0" a lie and keep stale charges in every dropdown.
-            _tq(Service).delete()
-            _tq(MaterialCategory).delete()
-            _tq(BillCounter).delete()
-            db.session.add(BillCounter(namespace=AUTO_BILL_NS_DEFAULT, count=1000))
+            wipe_all_business_data(db.session)
             deleted_info.append('Full Wipe (All Transactions, Accounts, Cash & Rentals)')
             if history_row:
                 history_row.wipe_status = 'completed'
                 history_row.note = f'Completed full wipe. Targets: {", ".join(sorted(set(targets)))}'
             db.session.commit()
-            _complete_intentional_wipe_workflow(targets, deleted_info, backup_info, 'full')
+            try:
+                _complete_intentional_wipe_workflow(targets, deleted_info, backup_info, 'full')
+            except Exception:
+                db.session.rollback()
+                logging.getLogger('wipe').exception('Full wipe committed but post-wipe bookkeeping failed')
+                flash('Data was wiped, but post-wipe bookkeeping failed. Contact support.', 'warning')
             flash(f'Data Wiped: {", ".join(deleted_info)}', 'danger')
             return redirect(url_for('settings'))
 
@@ -482,16 +403,13 @@ def delete_selected_data():
             # The cached account balance is derived from these rows: without a
             # rebuild the Accounts / Cash Flow screens would keep showing the
             # deleted movements as if they were still on the ledger.
-            try:
-                rebuild_account_balances_from_ledger()
-            except Exception:
-                logging.getLogger('wipe').exception(
-                    'Balance rebuild failed after account_transactions wipe'
-                )
+            # A failed rebuild must abort the wipe rather than leave stale balances.
+            rebuild_account_balances_from_ledger()
             deleted_info.append('Account Transactions')
 
         if 'account_reconciliations' in targets:
             _tq(AccountTransaction).update({'reconciliation_id': None}, synchronize_session=False)
+            _tq(AccountReconciliation).update({'previous_reconciliation_id': None}, synchronize_session=False)
             _tq(AccountReconciliation).delete()
             deleted_info.append('Account Reconciliations')
 
@@ -604,7 +522,7 @@ def delete_selected_data():
             except Exception:
                 pass
             # Reset balances on all accounts to zero.
-            _tq(Account).update({'balance': 0}, synchronize_session=False)
+            _tq(Account).update({'balance': 0, 'balance_minor': 0, 'opening_balance': 0, 'opening_balance_minor': 0}, synchronize_session=False)
             deleted_info.append('Financial Accounts (transactions, reconciliations & counts cleared, balances reset)')
 
         # ACCOUNTS_DOMAIN_WIPE: additional domain that aggressively clears
@@ -657,7 +575,7 @@ def delete_selected_data():
             _tq(SupplierPayment).update({'payment_account_id': None}, synchronize_session=False)
             _tq(Payment).update({'payment_account_id': None}, synchronize_session=False)
             # Reset all known account balances to zero
-            _tq(Account).update({'balance': 0}, synchronize_session=False)
+            _tq(Account).update({'balance': 0, 'balance_minor': 0, 'opening_balance': 0, 'opening_balance_minor': 0}, synchronize_session=False)
             deleted_info.append('Accounts Domain Wipe (all accounting snapshots cleared, balances reset)')
 
         # Always clean orphan invoices to avoid hidden "bill already exists" residue.
@@ -678,7 +596,12 @@ def delete_selected_data():
             history_row.wipe_status = 'completed'
             history_row.note = f'Completed selective wipe. Targets: {", ".join(sorted(set(targets)))}'
         db.session.commit()
-        _complete_intentional_wipe_workflow(targets, deleted_info, backup_info, 'selective')
+        try:
+            _complete_intentional_wipe_workflow(targets, deleted_info, backup_info, 'selective')
+        except Exception:
+            db.session.rollback()
+            logging.getLogger('wipe').exception('Selective wipe committed but post-wipe bookkeeping failed')
+            flash('Data was wiped, but post-wipe bookkeeping failed. Contact support.', 'warning')
         flash(f'Data Wiped: {", ".join(deleted_info)}', 'danger')
     except Exception as exc:
         db.session.rollback()

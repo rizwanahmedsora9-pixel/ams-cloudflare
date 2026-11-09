@@ -353,7 +353,7 @@ def accounts_domain_post_reset(session=None):
 
         # Reset account balances to 0
         try:
-            updated = s.query(Account).update({'balance': 0}, synchronize_session=False)
+            updated = s.query(Account).update({'balance': 0, 'balance_minor': 0, 'opening_balance': 0, 'opening_balance_minor': 0}, synchronize_session=False)
             operations.append(('account', 'reset_balance', int(updated or 0)))
             logger.info('Post-reset: reset balance for %s accounts', updated)
         except Exception:
