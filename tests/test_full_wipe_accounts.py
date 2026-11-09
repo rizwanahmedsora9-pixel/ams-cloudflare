@@ -74,17 +74,53 @@ def test_full_wipe_linked_records_and_create_new_account(app, client):
         assert AccountingAuditLog.query.filter_by(entity_type='Account', entity_id=account.id).count() == 1
 
 
-def test_full_wipe_unknown_tables_fails_without_deleting(app, client):
+def test_full_wipe_preserves_and_reports_unrecognized_tables(app, client):
     login(client)
     with app.app_context():
-        db.session.add(Client(name='Keep me', code='KEEP001'))
-        db.session.execute(text('CREATE TABLE extension_table (id INTEGER PRIMARY KEY)'))
+        db.session.add(Client(name='Remove me', code='REMOVE001'))
+        db.session.execute(text('CREATE TABLE extension_table (id INTEGER PRIMARY KEY, note TEXT)'))
+        db.session.execute(text("INSERT INTO extension_table VALUES (1, 'keep')"))
         db.session.commit()
     response = client.post('/delete_selected_data', data={'delete_targets': list(FULL_WIPE_TARGETS),
                         'hard_delete_override': '1', 'confirm_text': 'DELETE ALL DATA'}, follow_redirects=True)
-    assert 'Wipe failed' in response.get_data(as_text=True)
+    html = response.get_data(as_text=True)
+    assert 'Full Wipe' in html
+    assert 'Unrecognized tables were preserved' in html and 'extension_table' in html
     with app.app_context():
-        assert Client.query.filter_by(name='Keep me').count() == 1
+        assert Client.query.filter_by(code='REMOVE001').count() == 0
+        assert db.session.execute(text('SELECT note FROM extension_table')).scalar() == 'keep'
+
+
+def test_full_wipe_refuses_to_cascade_into_extension(app, client):
+    login(client)
+    with app.app_context():
+        db.session.add(Client(name='Keep me', code='KEEP001'))
+        db.session.flush()
+        client_id = Client.query.filter_by(code='KEEP001').one().id
+        db.session.execute(text('CREATE TABLE extension_table (id INTEGER PRIMARY KEY, client_id INTEGER REFERENCES client(id) ON DELETE CASCADE)'))
+        db.session.execute(text('INSERT INTO extension_table VALUES (1, :id)'), {'id': client_id})
+        db.session.commit()
+    response = client.post('/delete_selected_data', data={'delete_targets': list(FULL_WIPE_TARGETS),
+                        'hard_delete_override': '1', 'confirm_text': 'DELETE ALL DATA'}, follow_redirects=True)
+    assert 'wipe was stopped to protect it' in response.get_data(as_text=True)
+    with app.app_context():
+        assert Client.query.filter_by(code='KEEP001').count() == 1
+        assert db.session.execute(text('SELECT COUNT(*) FROM extension_table')).scalar() == 1
+
+
+def test_full_wipe_rolls_back_if_trigger_repopulates_data(app, client):
+    login(client)
+    with app.app_context():
+        db.session.add(Client(name='Keep on failure', code='KEEP002'))
+        db.session.execute(text("""CREATE TRIGGER repopulate_client AFTER INSERT ON bill_counter
+                               BEGIN INSERT INTO client (name, code) VALUES ('ghost', 'GHOST01'); END"""))
+        db.session.commit()
+    response = client.post('/delete_selected_data', data={'delete_targets': list(FULL_WIPE_TARGETS),
+                        'hard_delete_override': '1', 'confirm_text': 'DELETE ALL DATA'}, follow_redirects=True)
+    assert 'could not clear all business data' in response.get_data(as_text=True)
+    with app.app_context():
+        assert Client.query.filter_by(code='KEEP002').count() == 1
+        assert Client.query.filter_by(code='GHOST01').count() == 0
 
 
 def test_missing_checkbox_does_not_trigger_full_wipe(app, client):
@@ -165,3 +201,35 @@ def test_selective_reconciliation_wipe_handles_self_references(app, client):
     with app.app_context():
         assert AccountReconciliation.query.count() == 0
         assert Account.query.filter_by(name='Account').count() == 1
+
+
+def test_full_wipe_can_be_repeated(app, client):
+    login(client)
+    data = {'delete_targets': list(FULL_WIPE_TARGETS),
+            'hard_delete_override': '1', 'confirm_text': 'DELETE ALL DATA'}
+    for _ in range(2):
+        response = client.post('/delete_selected_data', data=data, follow_redirects=True)
+        assert 'Data Wiped: Full Wipe' in response.get_data(as_text=True)
+    with app.app_context():
+        assert db.session.execute(text('SELECT COUNT(*) FROM bill_counter')).scalar() == 1
+        assert User.query.filter_by(username='Admin').count() == 1
+
+
+def test_full_wipe_requires_confirmation_and_admin(app, client):
+    login(client)
+    with app.app_context():
+        db.session.add(Client(name='Protected', code='PROTECTED'))
+        db.session.commit()
+    response = client.post('/delete_selected_data', data={'delete_targets': list(FULL_WIPE_TARGETS),
+                        'hard_delete_override': '1', 'confirm_text': 'DELETE SELECTED'}, follow_redirects=True)
+    assert 'Incorrect confirmation text' in response.get_data(as_text=True)
+    with app.app_context():
+        assert Client.query.filter_by(code='PROTECTED').count() == 1
+        admin = User.query.filter_by(username='Admin').one()
+        admin.role = 'manager'
+        db.session.commit()
+    response = client.post('/delete_selected_data', data={'delete_targets': list(FULL_WIPE_TARGETS),
+                        'hard_delete_override': '1', 'confirm_text': 'DELETE ALL DATA'}, follow_redirects=True)
+    assert 'Only tenant admin or root' in response.get_data(as_text=True)
+    with app.app_context():
+        assert Client.query.filter_by(code='PROTECTED').count() == 1

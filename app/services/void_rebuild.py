@@ -343,8 +343,8 @@ def _set_payment_receipt_pending_bill_void_state(payment, is_void):
     if client_obj:
         client_filter = or_(
             PendingBill.client_code == client_obj.code,
-            func.lower(func.coalesce(PendingBill.client_name, '')) == client_obj.name.lower(),
-            func.coalesce(PendingBill.client_code, '') == ''
+            and_(func.coalesce(PendingBill.client_code, '') == '',
+                 func.lower(func.coalesce(PendingBill.client_name, '')) == client_obj.name.lower()),
         )
     else:
         client_filter = func.lower(func.coalesce(PendingBill.client_name, '')) == (payment.client_name or '').strip().lower()
@@ -442,12 +442,10 @@ def hard_delete_payment(payment, *, actor=None):
 
     # 3. remove the children that would otherwise be left behind (and flagged)
     WaiveOff.query.filter_by(payment_id=pay_id).delete(synchronize_session=False)
-    try:
-        for pb in _payment_generated_pending_bills(payment):
-            db.session.delete(pb)
-    except Exception:
-        logging.getLogger(__name__).exception(
-            'Could not remove the pending bill(s) of payment %s', pay_id)
+    # Failure here must roll back the payment as well; otherwise a generated
+    # bill is left attached to a payment that no longer exists.
+    for pb in _payment_generated_pending_bills(payment):
+        hard_delete_pending_bill(pb)
     marker = f'[SRC:Payment:{pay_id}]'
     for tx in AccountTransaction.query.filter(
             AccountTransaction.note.ilike(f'%{marker}%')).all():
@@ -516,7 +514,7 @@ def _payment_generated_pending_bills(payment):
     refs = _payment_receipt_refs(payment)
     if not refs:
         return []
-    from sqlalchemy import func as _func, or_ as _or
+    from sqlalchemy import func as _func, or_ as _or_
     reason_filter = _func.lower(_func.coalesce(PendingBill.reason, '')).like(
         'payment received%')
     bill_filter = _or_(*[PendingBill.bill_no.ilike(r) for r in refs])
@@ -524,9 +522,9 @@ def _payment_generated_pending_bills(payment):
     if client_obj:
         client_filter = _or_(
             PendingBill.client_code == client_obj.code,
-            _func.lower(_func.coalesce(PendingBill.client_name, ''))
-            == client_obj.name.lower(),
-            _func.coalesce(PendingBill.client_code, '') == '',
+            and_(_func.coalesce(PendingBill.client_code, '') == '',
+                 _func.lower(_func.coalesce(PendingBill.client_name, ''))
+                 == client_obj.name.lower()),
         )
     else:
         client_filter = (

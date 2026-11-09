@@ -7,7 +7,11 @@ def import_dispatch_data():
     if current_user.role not in ['admin', 'root']:
         flash('Only tenant admin or root can run import/export operations.', 'danger')
         return redirect(url_for('index'))
-    import pandas as pd
+    try:
+        import pandas as pd
+    except ImportError:
+        flash('Spreadsheet import requires pandas. Install requirements-data.txt and restart the app.', 'danger')
+        return redirect(url_for('import_export.import_export_page'))
     from datetime import datetime
     file = request.files.get('file')
     if not file or not file.filename:

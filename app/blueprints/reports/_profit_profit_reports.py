@@ -189,7 +189,8 @@ def profit_report_pdf():
         doc_title=f"Profit & Loss {stamp}",
     )
     if response is None:
-        abort(500, "PDF generation failed")
+        flash("PDF export is unavailable. Install requirements-pdf.txt and restart the app; if already installed, check the server logs.", "danger")
+        return redirect(url_for("profit_reports"))
     return response
 
 

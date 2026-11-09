@@ -8,6 +8,8 @@ from app.services.files_pdf import _try_render_weasy_pdf, resolve_export_lang
 @import_export_bp.route('/export', methods=['GET'])
 @login_required
 def export_data():
+    if not ensure_pandas_installed():
+        return redirect(url_for('import_export.import_export_page'))
     dataset = request.args.get('dataset')
     fmt = request.args.get('format', 'excel')
     start_date = request.args.get('start_date')

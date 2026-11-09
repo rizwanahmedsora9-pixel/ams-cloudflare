@@ -8,7 +8,7 @@ def export_clients():
     if current_user.role not in ['admin', 'root']:
         flash('Only tenant admin or root can run import/export operations.', 'danger')
         return redirect(url_for('index'))
-    import pandas as pd
+    from utils.excel_export import single_sheet_xlsx
 
     clients = Client.query.order_by(Client.name.asc()).all()
     pending_rows = db.session.query(
@@ -41,10 +41,12 @@ def export_clients():
             'pending_amount': float(pending_map.get(c.code, 0.0))
         })
 
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        pd.DataFrame(data).to_excel(writer, index=False, sheet_name='Clients')
-    output.seek(0)
+    output = single_sheet_xlsx('Clients', data, [
+        'client_name', 'client_code', 'phone', 'address', 'location_url',
+        'category', 'status', 'financial_book_no', 'financial_page_no',
+        'cement_book_no', 'cement_page_no', 'steel_book_no', 'steel_page_no',
+        'other_book_no', 'notes', 'pending_amount',
+    ])
 
     return send_file(
         output,

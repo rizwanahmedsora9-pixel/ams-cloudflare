@@ -4,6 +4,8 @@ from ._common import *  # noqa
 @import_export_bp.route('/full_raw_export')
 @login_required
 def full_raw_export():
+    if not ensure_pandas_installed():
+        return redirect(url_for('import_export.import_export_page'))
     try:
         scope_ctx = _resolve_scope_context(
             scope_raw=request.args.get('scope'),

@@ -7,7 +7,7 @@ def execute_import():
     """Process the import with selected options."""
     # ===== PANDAS DEPENDENCY CHECK =====
     if not _validate_pandas_installed():
-        return jsonify({'error': 'pandas library is not installed. Run: pip install pandas>=2.3.3'}), 500
+        return jsonify({'error': 'Spreadsheet import requires pandas. Install requirements-data.txt and restart the app.'}), 503
     # ===== END DEPENDENCY CHECK =====
     
     file = request.files.get('file')
