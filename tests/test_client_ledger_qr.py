@@ -83,3 +83,45 @@ def test_client_qr_generation_uses_worker_origin_and_revoke_invalidates_it(app, 
     assert revoked.status_code == 302
     with app.app_context():
         assert db.session.get(Client, client_id).client_ledger_qr_token_hash is None
+
+
+def test_client_qr_dialog_fragment_generates_qr_with_download_and_print(app, client):
+    """More -> QR Code: the in-ledger dialog generates and shows the big QR."""
+    app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
+    with app.app_context():
+        row = Client(code="QR-DIALOG", name="Dialog QR Client", is_active=True)
+        db.session.add(row)
+        db.session.commit()
+        client_id = row.id
+        admin_id = User.query.filter_by(username="Admin").first().id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    # The ledger's "More" menu opens this dialog.
+    dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
+    assert dialog.status_code == 200
+    body = dialog.get_data(as_text=True)
+    assert "Generate QR Code" in body
+    assert 'name="dialog" value="1"' in body
+    nonce = re.search(r'name="qr_nonce" value="([^"]+)"', body).group(1)
+
+    # Generating inside the dialog returns the QR fragment (not a new page),
+    # with Download / Print directly below the code.
+    generated = client.post(f"/client_ledger_qr/{client_id}", data={
+        "action": "generate", "qr_nonce": nonce, "dialog": "1",
+    })
+    assert generated.status_code == 200
+    body = generated.get_data(as_text=True)
+    assert "clientLedgerQrCode" in body and "<svg" in body
+    assert "clientLedgerQrDownload" in body
+    assert "clientLedgerQrPrint" in body
+    assert body.index("clientLedgerQrCode") < body.index("clientLedgerQrDownload")
+    with app.app_context():
+        assert db.session.get(Client, client_id).client_ledger_qr_token_hash
+
+    # The dialog needs staff permission.
+    with client.session_transaction() as sess:
+        sess.clear()
+    assert client.get(f"/client_ledger_qr/{client_id}/dialog").status_code in (302, 401, 403)

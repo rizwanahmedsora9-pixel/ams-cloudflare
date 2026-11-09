@@ -1,0 +1,80 @@
+{# Fragment loaded into #clientLedgerQrModal on the client ledger page.
+   Either shows the just-generated QR (large, with Download / Print directly
+   below it) or offers to generate one without leaving the ledger page. #}
+<div class="cl-qr-dialog text-center">
+  <p class="mb-1"><strong>{{ client.name }}</strong>
+    {% if client.code %}<span class="text-white-50">&middot; {{ client.code }}</span>{% endif %}
+  </p>
+
+  {% if error %}<div class="alert alert-danger py-2" role="alert">{{ error }}</div>{% endif %}
+
+  {% if qr_svg %}
+    <div class="cl-qr-code mx-auto" id="clientLedgerQrCode" role="img"
+         aria-label="QR code for {{ client.name }}'s ledger">{{ qr_svg }}</div>
+    <p class="text-white-50 small mb-3">Scan to view this client's current ledger online.<br>
+      This code is private — please keep it for the named client only.</p>
+
+    {# Download / Print sit directly below the QR code, as requested. #}
+    <div class="d-flex justify-content-center gap-2 flex-wrap mb-3">
+      <button type="button" class="btn btn-warning fw-bold text-dark" id="clientLedgerQrDownload">
+        <i class="bi bi-download me-1"></i> Download
+      </button>
+      <button type="button" class="btn btn-primary fw-bold" id="clientLedgerQrPrint">
+        <i class="bi bi-printer me-1"></i> Print
+      </button>
+    </div>
+
+    <div class="alert alert-warning py-2 small">
+      This new QR replaces any previously printed code for this client.
+      Anyone with the QR can see the live ledger.
+    </div>
+    <form method="post" class="js-qr-dialog-form d-inline"
+          action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
+          data-confirm="Revoke this client ledger QR? The printed code will stop working.">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+      <input type="hidden" name="dialog" value="1">
+      <input type="hidden" name="action" value="revoke">
+      <button type="submit" class="btn btn-outline-danger btn-sm">Revoke this QR</button>
+    </form>
+  {% else %}
+    {% if is_active %}
+      <div class="alert alert-info py-2">
+        A QR access link is currently active for this client. For security the
+        existing QR cannot be shown again — generate a replacement to view,
+        download or print it here.
+      </div>
+    {% else %}
+      <p class="text-white-50">No QR code has been generated for this client yet.
+        Generate one to view, download or print it here.</p>
+    {% endif %}
+
+    {% if can_generate %}
+    <form method="post" class="js-qr-dialog-form"
+          action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
+          {% if is_active %}data-confirm="Generate a replacement QR? All previously printed codes for this client will stop working immediately."{% endif %}>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+      <input type="hidden" name="dialog" value="1">
+      <input type="hidden" name="action" value="generate">
+      <button type="submit" class="btn btn-warning fw-bold text-dark">
+        <i class="bi bi-qr-code me-1"></i> {{ 'Generate replacement QR' if is_active else 'Generate QR Code' }}
+      </button>
+    </form>
+    {% else %}
+      <div class="alert alert-warning py-2">QR access can only be generated for an active, non-transferred client.</div>
+    {% endif %}
+
+    {% if is_active %}
+    <form method="post" class="js-qr-dialog-form mt-3"
+          action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
+          data-confirm="Revoke this client ledger QR? The printed code will stop working.">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+      <input type="hidden" name="dialog" value="1">
+      <input type="hidden" name="action" value="revoke">
+      <button type="submit" class="btn btn-outline-danger btn-sm">Revoke current QR</button>
+    </form>
+    {% endif %}
+  {% endif %}
+</div>
