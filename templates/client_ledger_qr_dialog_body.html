@@ -25,8 +25,14 @@
     </div>
 
     <div class="alert alert-warning py-2 small">
+      {% if replaced %}
       This new QR replaces any previously printed code for this client.
       Anyone with the QR can see the live ledger.
+      {% else %}
+      This is the client's current active QR — the same code stays valid, so
+      previously printed copies keep working. Anyone with the QR can see the
+      live ledger.
+      {% endif %}
     </div>
     <form method="post" class="js-qr-dialog-form d-inline"
           action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
@@ -40,10 +46,25 @@
   {% else %}
     {% if is_active %}
       <div class="alert alert-info py-2">
-        A QR access link is currently active for this client. For security the
-        existing QR cannot be shown again — generate a replacement to view,
-        download or print it here.
+        A QR access link is currently active for this client. Print the same QR
+        again any time — it stays valid; generate a replacement only if you
+        think the code was shared or lost.
       </div>
+      {% if can_print %}
+      <form method="post" class="js-qr-dialog-form"
+            action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="dialog" value="1">
+        <input type="hidden" name="action" value="print">
+        <button type="submit" class="btn btn-warning fw-bold text-dark">
+          <i class="bi bi-printer me-1"></i> Print current QR
+        </button>
+      </form>
+      {% else %}
+      <p class="text-white-50 small">This QR was created before reprint support and
+        cannot be shown again — generate a replacement to view, download or print it here.</p>
+      {% endif %}
     {% else %}
       <p class="text-white-50">No QR code has been generated for this client yet.
         Generate one to view, download or print it here.</p>

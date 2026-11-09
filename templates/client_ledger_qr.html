@@ -41,7 +41,11 @@
     <p class="small">Scan to view this client's current ledger online. This code is private; please keep it for the named client.</p>
     <div class="no-print">
       <button class="primary" type="button" onclick="window.print()">Print this QR</button>
+      {% if replaced %}
       <p class="warning">This new QR replaces any previously printed code for this client. Anyone with the QR can see the live ledger.</p>
+      {% else %}
+      <p class="warning">This is the client's current active QR — the same code stays valid, so previously printed copies keep working. Anyone with the QR can see the live ledger.</p>
+      {% endif %}
       <a class="link secondary" href="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}">QR settings / revoke</a>
     </div>
   {% else %}
@@ -49,7 +53,17 @@
     <p><strong>{{ client.name }}</strong>{% if client.code %}<br>Client code: {{ client.code }}{% endif %}</p>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     {% if is_active %}
-      <p class="status">A QR access link is currently active. For security, the existing QR cannot be displayed again; generate a replacement to print another copy.</p>
+      <p class="status">A QR access link is currently active. Print the same QR again any time — it stays valid; generate a replacement only if you think the code was shared or lost.</p>
+      {% if can_print %}
+      <form method="post">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="action" value="print">
+        <button class="primary" type="submit">Print current QR</button>
+      </form>
+      {% else %}
+      <p class="warning">This QR was created before reprint support and cannot be shown again. Generate a replacement to print another copy.</p>
+      {% endif %}
     {% else %}
       <p class="small">No active public QR exists for this client.</p>
     {% endif %}

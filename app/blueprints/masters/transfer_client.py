@@ -38,6 +38,7 @@ def transfer_client(id):
     source_client.is_active = False
     source_client.transferred_to_id = target_client.id
     source_client.client_ledger_qr_token_hash = None
+    source_client.client_ledger_qr_token_salt = None
     db.session.commit()
 
     flash(f'Transferred {entries_updated} entries, {bills_updated} bills, and {waive_updated} waive-off rows.', 'success')

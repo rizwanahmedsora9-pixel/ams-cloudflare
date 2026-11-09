@@ -19,6 +19,7 @@ def client_toggle_active(client_id):
         # Suspension is an access-revocation event; reactivation must require a
         # freshly printed QR rather than silently reviving an old one.
         client.client_ledger_qr_token_hash = None
+        client.client_ledger_qr_token_salt = None
     from utils.accounting_audit import record_accounting_audit
     record_accounting_audit(
         current_user, action='Activate' if client.is_active else 'Suspend',

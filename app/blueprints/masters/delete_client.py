@@ -12,6 +12,7 @@ def delete_client(id):
         before = {'id': c.id, 'code': c.code, 'name': c.name, 'is_active': bool(c.is_active)}
         c.is_active = False
         c.client_ledger_qr_token_hash = None
+        c.client_ledger_qr_token_salt = None
         record_accounting_audit(
             current_user, action='Suspend', entity_type='Client', entity_id=c.id,
             before=before, after={**before, 'is_active': False},
