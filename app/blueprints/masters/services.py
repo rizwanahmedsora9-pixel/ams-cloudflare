@@ -193,10 +193,10 @@ def add_service():
         db.session.commit()
         _invalidate_all_service_caches()
         flash(f'Service "{name}" added.', 'success')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('add_service failed for %r', name)
-        flash('The service could not be saved. Check the name and code are unique.', 'danger')
+        flash(f'The service could not be saved: {exc or "check the name and code are unique."}', 'danger')
     return redirect(url_for('masters.services'))
 
 
@@ -235,10 +235,10 @@ def edit_service(id):
         db.session.commit()
         _invalidate_all_service_caches()
         flash(f'Service updated to "{new_name}". Historical records updated.', 'success')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('edit_service failed for id=%s', id)
-        flash('The service could not be updated.', 'danger')
+        flash(f'The service could not be updated: {exc}', 'danger')
     return redirect(url_for('masters.services'))
 
 
@@ -255,9 +255,9 @@ def toggle_service(id):
         _invalidate_all_service_caches()
         state = 'activated' if svc.is_active else 'suspended'
         flash(f'Service "{svc.name}" {state}.', 'success')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
-        flash('The service could not be updated.', 'danger')
+        flash(f'The service could not be updated: {exc}', 'danger')
     return redirect(url_for('masters.services'))
 
 
@@ -283,9 +283,9 @@ def delete_service(id):
         db.session.commit()
         _invalidate_all_service_caches()
         flash(f'Service "{svc.name}" deleted.', 'success')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
-        flash('The service could not be deleted.', 'danger')
+        flash(f'The service could not be deleted: {exc}', 'danger')
     return redirect(url_for('masters.services'))
 
 
@@ -418,10 +418,10 @@ def migrate_rent_to_services():
         _rebuild_material_totals()
         db.session.commit()
         _invalidate_all_service_caches()
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('services/migrate failed')
-        flash('Conversion failed and nothing was changed. No rows were altered.', 'danger')
+        flash(f'Conversion failed and nothing was changed: {exc or "no rows were altered."}', 'danger')
         return redirect(url_for('masters.services'))
 
     total = sum(u for _n, u in converted)
@@ -464,8 +464,8 @@ def merge_services():
         db.session.commit()
         _invalidate_all_service_caches()
         flash(f'Merged "{source_name}" into "{target_name}". All historical entries and bill lines updated.', 'success')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('merge_services failed')
-        flash('Services could not be merged.', 'danger')
+        flash(f'Services could not be merged: {exc}', 'danger')
     return redirect(url_for('masters.services'))

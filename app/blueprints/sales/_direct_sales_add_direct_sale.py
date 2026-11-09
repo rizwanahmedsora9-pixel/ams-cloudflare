@@ -848,12 +848,12 @@ def add_direct_sale():
     flash(str(ve), 'danger')
     _stash_direct_sale_form_draft(request.form, mode='add')
     return redirect(url_for('direct_sales_page', resume='add'))
-  except Exception:
+  except Exception as exc:
     db.session.rollback()
     # Never surface SQL/driver details to the user; log the full traceback
     # server-side instead.
     logging.getLogger('sales').exception('Direct sale save failed')
-    flash('Error processing sale: the sale could not be saved. Please check the details and try again.', 'danger')
+    flash(f'Error processing sale: {exc or "the sale could not be saved. Please check the details and try again."}', 'danger')
     _stash_direct_sale_form_draft(request.form, mode='add')
     return redirect(url_for('direct_sales_page', resume='add'))
 

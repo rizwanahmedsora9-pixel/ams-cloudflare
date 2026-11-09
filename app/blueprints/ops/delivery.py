@@ -194,7 +194,7 @@ def pay_delivery_rent(alloc_id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Delivery rent payment failed')
-        flash('Unable to record the delivery rent payment: the payment could not be saved. Please check the details and try again.', 'danger')
+        flash(f'Unable to record the delivery rent payment: {exc or "the payment could not be saved. Please check the details and try again."}', 'danger')
     return redirect(_delivery_rent_safe_next(url_for('delivery_rents_page')))
 
 
@@ -248,5 +248,5 @@ def pay_delivery_person_rent(person_id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Delivery person settlement failed')
-        flash('Unable to record the delivery payment: the payment could not be saved. Please check the details and try again.', 'danger')
+        flash(f'Unable to record the delivery payment: {exc or "the payment could not be saved. Please check the details and try again."}', 'danger')
     return redirect(_delivery_rent_safe_next(url_for('delivery_rents_page')))

@@ -33,10 +33,10 @@ def terms_conditions():
             except Exception:
                 pass
             flash('Term added successfully', 'success')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logging.getLogger(__name__).exception('Could not add terms and condition row')
-            flash('Could not save the term', 'danger')
+            flash(f'Could not save the term: {exc}', 'danger')
         return redirect(url_for('terms_conditions'))
 
     terms = (TermsAndCondition.query

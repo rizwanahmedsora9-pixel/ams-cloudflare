@@ -31,5 +31,5 @@ def delete_transaction(type, id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Hard delete failed')
-        flash('Unable to delete: the record could not be deleted. Please try again.', 'danger')
+        flash(f'Unable to delete: {exc or "the record could not be deleted. Please try again."}', 'danger')
     return redirect(request.referrer or url_for('index'))

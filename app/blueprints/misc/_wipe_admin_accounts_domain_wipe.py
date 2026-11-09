@@ -47,9 +47,9 @@ def admin_accounts_domain_wipe():
                 )
                 db.session.add(history_row)
                 db.session.commit()
-            except Exception:
+            except Exception as exc:
                 db.session.rollback()
-                flash('Pre-wipe backup failed. Operation blocked.', 'danger')
+                flash(f'Pre-wipe backup failed: {exc or "operation blocked."}', 'danger')
                 return redirect(url_for('settings'))
 
         # Mark operation as in-progress (visible to other processes) to reduce
@@ -135,7 +135,7 @@ def admin_accounts_domain_wipe():
                 except Exception:
                     db.session.rollback()
             logging.getLogger('app').exception('Accounts domain wipe failed')
-            flash('Accounts domain wipe failed: the wipe could not be completed and no data was changed. Please try again.', 'danger')
+            flash(f'Accounts domain wipe failed: {e or "the wipe could not be completed and no data was changed. Please try again."}', 'danger')
     finally:
         # PHASE 7: Always release the lock (success or failure)
         released, release_error = release_system_lock(lock_name)

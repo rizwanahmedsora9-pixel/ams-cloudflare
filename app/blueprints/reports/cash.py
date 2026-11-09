@@ -294,10 +294,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow add category failed')
-            flash('Unable to save category.', 'danger')
+            flash(f'Unable to save category: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action == 'add_subcategory':
@@ -313,10 +313,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow add subcategory failed')
-            flash('Unable to save sub-category.', 'danger')
+            flash(f'Unable to save sub-category: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action == 'add_party':
@@ -332,10 +332,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow add party failed')
-            flash('Unable to save party.', 'danger')
+            flash(f'Unable to save party: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action == 'disable_category':
@@ -450,10 +450,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow delete category failed')
-            flash('Unable to delete category.', 'danger')
+            flash(f'Unable to delete category: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action == 'delete_subcategory':
@@ -464,10 +464,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow delete subcategory failed')
-            flash('Unable to delete sub-category.', 'danger')
+            flash(f'Unable to delete sub-category: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action == 'delete_party':
@@ -478,10 +478,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow delete party failed')
-            flash('Unable to delete party.', 'danger')
+            flash(f'Unable to delete party: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action in ('delete_entry', 'void_entry'):
@@ -497,10 +497,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow void failed')
-            flash('Unable to void transaction.', 'danger')
+            flash(f'Unable to void transaction: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action == 'restore_entry':
@@ -516,10 +516,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow restore failed')
-            flash('Unable to restore transaction.', 'danger')
+            flash(f'Unable to restore transaction: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action in ('record_movement', 'edit_entry'):
@@ -565,10 +565,10 @@ def cash_flow():
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), 'danger')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Cash flow save failed')
-            flash('Unable to save cash flow transaction.', 'danger')
+            flash(f'Unable to save cash flow transaction: {exc}', 'danger')
         return _back()
 
     if request.method == 'POST' and action in ('set_opening_override', 'clear_opening_override', 'reset_fresh_start'):
@@ -1290,10 +1290,10 @@ def daily_reconciliation_differences():
         try:
             count = recon.import_saved_differences(actor=current_user)
             flash(f'Imported {count} current saved-count difference(s). Earlier edits cannot be reconstructed.', 'success')
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
             logger.exception('Importing saved daily differences failed')
-            flash('Unable to import saved differences. Please try again.', 'danger')
+            flash(f'Unable to import saved differences: {exc or "please try again."}', 'danger')
         return redirect(url_for('daily_reconciliation_differences'))
 
     args = request.args
@@ -1639,10 +1639,10 @@ def _dr_resolve_difference(*, actor=None, difference=None):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logger.exception('Resolving a daily reconciliation difference failed')
-        flash('Unable to resolve the difference. Please try again.', 'danger')
+        flash(f'Unable to resolve the difference: {exc or "please try again."}', 'danger')
     return redirect(request.form.get('return_to') or back)
 
 

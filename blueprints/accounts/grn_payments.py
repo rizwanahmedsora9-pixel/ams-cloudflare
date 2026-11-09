@@ -285,10 +285,10 @@ def grn_payment_save():
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logger.exception('GRN payment save failed')
-        flash('Unable to save the GRN payment. Please check the details and try again.', 'danger')
+        flash(f'Unable to save the GRN payment: {exc or "please check the details and try again."}', 'danger')
     args = {'grn_id': grn_id} if grn_id else {}
     if mode == MODE_EXPENSES:
         args['mode'] = MODE_EXPENSES
@@ -462,10 +462,10 @@ def grn_expenses_pay_from_modal():
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logger.exception('Pay GRN expenses from the transaction modal failed')
-        flash('Unable to pay the GRN expenses. Please check the details and try again.', 'danger')
+        flash(f'Unable to pay the GRN expenses: {exc or "please check the details and try again."}', 'danger')
     return redirect(url_for('accounts.dashboard'))
 
 
@@ -612,10 +612,10 @@ def pay_grn_save():
         db.session.rollback()
         flash(str(exc), 'danger')
         return redirect(url_for('accounts.pay_grn', grn_id=grn_id, obligation=request.form.get('focus', '')))
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logger.exception('PAY GRN save failed')
-        flash('Unable to save the GRN payment. Please check the details and try again.', 'danger')
+        flash(f'Unable to save the GRN payment: {exc or "please check the details and try again."}', 'danger')
         return redirect(url_for('accounts.pay_grn', grn_id=grn_id))
     total = sum(float(getattr(p, 'amount', 0) or 0) for p in posted)
 

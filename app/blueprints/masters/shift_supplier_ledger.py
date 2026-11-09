@@ -168,10 +168,10 @@ def shift_supplier_ledger(id):
         db.session.rollback()
         flash(str(exc), 'danger')
         return redirect(url_for('supplier_ledger_shift_page', id=supplier.id))
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier ledger shift failed')
-        flash('Unable to shift this supplier ledger. Nothing was changed — please try again.', 'danger')
+        flash(f'Unable to shift this supplier ledger: {exc or "nothing was changed — please try again."}', 'danger')
         return redirect(url_for('supplier_ledger_shift_page', id=supplier.id))
 
     flash(
@@ -230,10 +230,10 @@ def shift_supplier_payment(id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier payment shift failed')
-        flash('Unable to move this payment. Nothing was changed — please try again.', 'danger')
+        flash(f'Unable to move this payment: {exc or "nothing was changed — please try again."}', 'danger')
     return redirect(redirect_to)
 
 
@@ -263,8 +263,8 @@ def reclaim_supplier_ledger(id):
     except ValueError as exc:
         db.session.rollback()
         flash(str(exc), 'danger')
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.exception('Supplier ledger reclaim failed')
-        flash('Unable to reclaim this ledger. Nothing was changed — please try again.', 'danger')
+        flash(f'Unable to reclaim this ledger: {exc or "nothing was changed — please try again."}', 'danger')
     return redirect(url_for('supplier_ledger', id=id))
