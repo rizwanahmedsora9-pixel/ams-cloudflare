@@ -592,6 +592,53 @@
                                     <label class="form-label">Purpose / Target Label</label>
                                     <input type="text" class="form-control" name="target_label" id="target_label" placeholder="e.g. Office rent, Loan installment">
                                 </div>
+
+                                <div class="col-12 d-none" id="expenseMasterWrap">
+                                    <div class="p-3 border rounded bg-light-subtle">
+                                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                            <div>
+                                                <div class="fw-bold">Expense classification</div>
+                                                <div class="small text-muted">Category and party/recipient are required. Masters come only from Cash Flow.</div>
+                                            </div>
+                                            <a href="{{ url_for('cash_flow') }}#tab-master" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">Manage Cash Flow masters</a>
+                                        </div>
+                                        {% if not expense_categories or not expense_parties %}
+                                        <div class="alert alert-warning py-2 small">
+                                            An active expense category and an active party are required before an expense can be posted.
+                                            Create them in Cash Flow → Master Data.
+                                        </div>
+                                        {% endif %}
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label" for="expense_category_id">Expense category <span class="text-danger">*</span></label>
+                                                <select class="form-select" name="expense_category_id" id="expense_category_id" disabled>
+                                                    <option value="">Select category</option>
+                                                    {% for category in expense_categories or [] %}
+                                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label" for="expense_subcategory_id">Subcategory</label>
+                                                <select class="form-select" name="expense_subcategory_id" id="expense_subcategory_id" disabled>
+                                                    <option value="">Select subcategory (optional)</option>
+                                                    {% for subcategory in expense_subcategories or [] %}
+                                                    <option value="{{ subcategory.id }}" data-category-id="{{ subcategory.category_id }}">{{ subcategory.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label" for="expense_party_id">Party / recipient <span class="text-danger">*</span></label>
+                                                <select class="form-select" name="expense_party_id" id="expense_party_id" disabled>
+                                                    <option value="">Select party / recipient</option>
+                                                    {% for party in expense_parties or [] %}
+                                                    <option value="{{ party.id }}">{{ party.name }}{% if party.party_type %} — {{ party.party_type }}{% endif %}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -762,8 +809,11 @@ function populateAccountsForMethod() {
     if (!methodSelect) return;
 
     const expectedCategory = expectedAccountCategory(methodSelect.value);
+    const payTarget = document.getElementById('pay_target');
+    const isClassifiedExpense = payTarget && isClassifiedExpenseTarget(payTarget.value);
+    const payAccountPool = isClassifiedExpense ? companyAccountItems : accountItems;
     const receiveCandidates = expectedCategory ? companyAccountItems.filter(acc => acc.category === expectedCategory) : companyAccountItems;
-    const payFromCandidates = expectedCategory ? accountItems.filter(acc => acc.category === expectedCategory) : accountItems;
+    const payFromCandidates = expectedCategory ? payAccountPool.filter(acc => acc.category === expectedCategory) : payAccountPool;
 
     if (receiveAccount) {
         const selected = receiveAccount.value;
@@ -1010,6 +1060,30 @@ function setReceiveSourceMode() {
     }
 }
 
+function isClassifiedExpenseTarget(target) {
+    return ['personal_expense', 'other_expense'].includes((target || '').toLowerCase());
+}
+
+function filterExpenseSubcategories() {
+    const category = document.getElementById('expense_category_id');
+    const subcategory = document.getElementById('expense_subcategory_id');
+    if (!category || !subcategory) return;
+    const categoryId = String(category.value || '');
+    let selectedStillVisible = false;
+    Array.from(subcategory.options).forEach((option, index) => {
+        if (index === 0) {
+            option.hidden = false;
+            option.disabled = false;
+            return;
+        }
+        const visible = Boolean(categoryId) && option.dataset.categoryId === categoryId;
+        option.hidden = !visible;
+        option.disabled = !visible;
+        if (visible && option.selected) selectedStillVisible = true;
+    });
+    if (!selectedStillVisible) subcategory.value = '';
+}
+
 function setPayTargetMode() {
     const payTarget = document.getElementById('pay_target');
     const payToWrap = document.getElementById('payToAccountWrap');
@@ -1033,6 +1107,7 @@ function setPayTargetMode() {
     const isPayMode = txMode && (txMode.value || '').toLowerCase() === 'pay';
     const target = (payTarget.value || '').toLowerCase();
     const isGrnExpenses = isPayMode && target === 'grn_payment';
+    const isClassifiedExpense = isPayMode && isClassifiedExpenseTarget(target);
 
     payToWrap.classList.toggle('d-none', target !== 'company_transfer');
     supplierWrap.classList.toggle('d-none', target !== 'supplier');
@@ -1041,9 +1116,22 @@ function setPayTargetMode() {
     const driverInput = document.getElementById('payDriverInput');
     const payReferenceWrap = document.getElementById('payReferenceWrap');
     if (driverWrap) driverWrap.classList.toggle('d-none', target !== 'driver');
-    if (payReferenceWrap) payReferenceWrap.classList.toggle('d-none', target !== 'driver');
+    if (payReferenceWrap) payReferenceWrap.classList.toggle('d-none', !(target === 'driver' || isClassifiedExpense));
     if (driverInput) driverInput.required = isPayMode && target === 'driver';
     targetLabelWrap.classList.toggle('d-none', !['loan', 'personal_expense', 'other_expense'].includes(target));
+
+    const expenseMasterWrap = document.getElementById('expenseMasterWrap');
+    const expenseCategory = document.getElementById('expense_category_id');
+    const expenseSubcategory = document.getElementById('expense_subcategory_id');
+    const expenseParty = document.getElementById('expense_party_id');
+    if (expenseMasterWrap) expenseMasterWrap.classList.toggle('d-none', !isClassifiedExpense);
+    [expenseCategory, expenseSubcategory, expenseParty].forEach(field => {
+        if (field) field.disabled = !isClassifiedExpense;
+    });
+    if (expenseCategory) expenseCategory.required = isClassifiedExpense;
+    if (expenseParty) expenseParty.required = isClassifiedExpense;
+    if (isClassifiedExpense) filterExpenseSubcategories();
+    else if (expenseSubcategory) expenseSubcategory.value = '';
 
     // The GRN picker belongs to Pay GRN Expenses ONLY.  For a supplier payment
     // (or any other target) it is hidden and disabled, so it can never look
@@ -1550,7 +1638,12 @@ document.addEventListener('DOMContentLoaded', function() {
             setTransactionMode();
         });
     }
-    if (targetSelect) targetSelect.addEventListener('change', setPayTargetMode);
+    if (targetSelect) targetSelect.addEventListener('change', function() {
+        setPayTargetMode();
+        populateAccountsForMethod();
+    });
+    const expenseCategorySelect = document.getElementById('expense_category_id');
+    if (expenseCategorySelect) expenseCategorySelect.addEventListener('change', filterExpenseSubcategories);
     const grnPaymentSelect = document.getElementById('grnPaymentGrnSelect');
     if (grnPaymentSelect) grnPaymentSelect.addEventListener('change', updateGrnPaymentInfo);
     const grnExpenseBody = document.getElementById('grnExpenseBody');

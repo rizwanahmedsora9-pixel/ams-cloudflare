@@ -96,26 +96,39 @@ def api_expenditures_today():
         'note': e.note
     } for e in expenditures]
 
-    tx_receipts = AccountTransaction.query.filter(
+    tx_expenditures = AccountTransaction.query.filter(
         AccountTransaction.date_posted >= today,
         AccountTransaction.date_posted < today + timedelta(days=1),
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type.in_(['Expense', 'Payment', 'Driver Payment']),
-        AccountTransaction.transaction_type != 'Supplier Payment',
-        AccountTransaction.to_account_id.isnot(None)
+        AccountTransaction.from_account_id.isnot(None)
     ).all()
-    
-    for tx in tx_receipts:
-        acc = Account.query.get(tx.to_account_id)
+
+    flow_by_tx = {}
+    tx_ids = [tx.id for tx in tx_expenditures]
+    if tx_ids:
+        flow_by_tx = {
+            flow.account_tx_id: flow
+            for flow in CashFlowEntry.query.filter(CashFlowEntry.account_tx_id.in_(tx_ids)).all()
+        }
+    for tx in tx_expenditures:
+        acc = Account.query.get(tx.from_account_id)
+        flow = flow_by_tx.get(tx.id)
+        note_parts = [tx.note or '']
+        if flow and flow.party_name:
+            note_parts.append(f'Recipient: {flow.party_name}')
         data.append({
             'id': f"tx_{tx.id}",
-            'client_name': tx.description or 'Other Receipt',
+            'category': ('Driver / Delivery Services' if tx.transaction_type == 'Driver Payment'
+                         else ((flow.category.name if flow and flow.category else '')
+                               or tx.description or 'Expense')),
             'amount': float(tx.amount or 0),
             'method': (acc.category.capitalize() if acc else 'Other'),
             'date_posted': tx.date_posted.strftime('%Y-%m-%d %H:%M'),
-            'note': tx.note or ''
+            'note': ' · '.join(part for part in note_parts if part)
         })
-    
+
+    data.sort(key=lambda row: row.get('date_posted') or '', reverse=True)
     return jsonify(data)
 
 
@@ -394,19 +407,33 @@ def kpi_expenditures():
         AccountTransaction.from_account_id.isnot(None)
     ).all()
 
-    if search:
-        like = f'%{search}%'
-        tx_rows = [r for r in tx_rows if like.lower() in (r.description or '').lower() or like.lower() in (r.note or '').lower()]
-
+    flow_by_tx = {}
+    tx_ids = [tx.id for tx in tx_rows]
+    if tx_ids:
+        flow_by_tx = {
+            flow.account_tx_id: flow
+            for flow in CashFlowEntry.query.filter(CashFlowEntry.account_tx_id.in_(tx_ids)).all()
+        }
     for tx in tx_rows:
         acc = Account.query.get(tx.from_account_id)
         method = (acc.category.capitalize() if acc else 'Other')
         if method_f and method.lower() != method_f.lower():
             continue
+        flow = flow_by_tx.get(tx.id)
+        category = ('Driver / Delivery Services' if tx.transaction_type == 'Driver Payment'
+                    else ((flow.category.name if flow and flow.category else '')
+                          or tx.description or 'Expense'))
+        if search:
+            searchable = ' '.join(filter(None, [
+                tx.description, tx.note, category,
+                flow.subcategory.name if flow and flow.subcategory else '',
+                flow.party_name if flow else '',
+            ])).lower()
+            if search.lower() not in searchable:
+                continue
         items.append({
             'date_posted': tx.date_posted,
-            'category': ('Driver / Delivery Services' if tx.transaction_type == 'Driver Payment'
-                         else (tx.description or 'Expense')),
+            'category': category,
             'amount': float(tx.amount or 0),
             'method': method,
             'note': tx.note or '',

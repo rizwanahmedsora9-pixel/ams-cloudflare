@@ -50,12 +50,23 @@ def dashboard():
     supplier_payments_today = float(supplier_payments_core_today or 0) + float(grn_supplier_paid_today or 0)
     
     # Total expenditures today
-    expenditures_today = db.session.query(func.sum(FbmCashDrawerEntry.amount)).filter(
+    drawer_expenditures_today = db.session.query(func.sum(FbmCashDrawerEntry.amount)).filter(
         FbmCashDrawerEntry.date_posted >= today,
         FbmCashDrawerEntry.date_posted < today + timedelta(days=1),
         FbmCashDrawerEntry.entry_type == 'out',
         FbmCashDrawerEntry.is_void == False
     ).scalar() or 0
+    # Keep the headline KPI consistent with its drill-down: Accounts expenses,
+    # direct payments and driver payments are expenditures too, not only the
+    # legacy FBM cash-drawer rows.
+    account_expenditures_today = db.session.query(func.sum(AccountTransaction.amount)).filter(
+        AccountTransaction.date_posted >= today,
+        AccountTransaction.date_posted < today + timedelta(days=1),
+        AccountTransaction.is_void == False,
+        AccountTransaction.transaction_type.in_(['Expense', 'Payment', 'Driver Payment']),
+        AccountTransaction.from_account_id.isnot(None),
+    ).scalar() or 0
+    expenditures_today = float(drawer_expenditures_today or 0) + float(account_expenditures_today or 0)
     
     # Total receipts today (paid amounts only): bookings + direct sales.
     booking_paid_today = db.session.query(func.sum(Booking.paid_amount)).filter(
@@ -145,7 +156,27 @@ def dashboard():
             'supplier_ledger_due': bill['material_remaining'] + bill['expenses_remaining'],
             'recipient_expenses_due': _grn_expenses_open_total(bill),
         })
+    # Expense classification is mastered only in Cash Flow.  The Accounts form
+    # reads the same rows; no parallel Accounts category/party registry exists.
+    expense_categories = CashFlowCategory.query.filter(
+        CashFlowCategory.is_active == True,
+        func.lower(func.coalesce(CashFlowCategory.direction, 'both')).in_(['out', 'both']),
+    ).order_by(CashFlowCategory.sort_order.asc(), CashFlowCategory.name.asc(), CashFlowCategory.id.asc()).all()
+    expense_subcategories = CashFlowSubcategory.query.join(
+        CashFlowCategory, CashFlowSubcategory.category_id == CashFlowCategory.id
+    ).filter(
+        CashFlowSubcategory.is_active == True,
+        CashFlowCategory.is_active == True,
+        func.lower(func.coalesce(CashFlowCategory.direction, 'both')).in_(['out', 'both']),
+    ).order_by(CashFlowSubcategory.name.asc(), CashFlowSubcategory.id.asc()).all()
+    expense_parties = CashFlowParty.query.filter(
+        CashFlowParty.is_active == True,
+    ).order_by(CashFlowParty.name.asc(), CashFlowParty.id.asc()).all()
+
     return render_template('accounts/dashboard.html',
+                          expense_categories=expense_categories,
+                          expense_subcategories=expense_subcategories,
+                          expense_parties=expense_parties,
                           grn_payment_options=grn_payment_options,
                           client_payments_today=client_payments_today,
                           supplier_payments_today=supplier_payments_today,
