@@ -8,12 +8,43 @@ from urllib.parse import urlsplit
 from flask import abort, current_app, make_response, render_template, request, session, url_for
 from flask_login import current_user, login_required
 from markupsafe import Markup
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from ._common import *  # noqa: F401,F403
 
 
 _TOKEN_BYTES = 32
 _TOKEN_LENGTH = 43  # token_urlsafe(32), 256 bits of entropy
+_FORM_MAX_AGE = 30 * 60
+
+
+def _form_signer():
+    return URLSafeTimedSerializer(current_app.secret_key, salt="client-ledger-qr-form")
+
+
+def _form_context(client):
+    """Bind a form to its browser, staff member, client and current QR state."""
+    return {
+        "client": client.id,
+        "user": str(current_user.get_id()),
+        "session": hashlib.sha256(session["_csrf_token"].encode()).hexdigest(),
+        "state": client.client_ledger_qr_token_hash,
+    }
+
+
+def _form_nonce(client):
+    # Do not write a single shared nonce into Flask's cookie session here.
+    # Another tab/dialog (or an overlapping response) could overwrite it.
+    # Signing the current state also rejects stale forms after a QR rotation.
+    return _form_signer().dumps(_form_context(client))
+
+
+def _valid_form_nonce(client, nonce):
+    try:
+        payload = _form_signer().loads(nonce, max_age=_FORM_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return False
+    return payload == _form_context(client)
 
 
 def _token_hash(token: str) -> str:
@@ -63,8 +94,7 @@ def _qr_dialog_fragment(client, *, qr_url="", error="", status=200):
     (a replacement, which revokes the previous code) without leaving the
     client's ledger page.
     """
-    nonce = secrets.token_urlsafe(24)
-    session["client_ledger_qr_nonce"] = nonce
+    nonce = _form_nonce(client)
     svg = None
     if qr_url:
         from app.services import qr_code
@@ -98,8 +128,7 @@ def client_ledger_qr_dialog(client_id):
 
 
 def _qr_admin_page(client, *, qr_url="", error=""):
-    nonce = secrets.token_urlsafe(24)
-    session["client_ledger_qr_nonce"] = nonce
+    nonce = _form_nonce(client)
     matrix = None
     svg = None
     if qr_url:
@@ -134,10 +163,13 @@ def client_ledger_qr(client_id):
         return _qr_admin_page(client)
 
     submitted_nonce = request.form.get("qr_nonce") or ""
-    expected_nonce = session.pop("client_ledger_qr_nonce", "")
-    if not expected_nonce or not secrets.compare_digest(submitted_nonce, expected_nonce):
-        abort(400)
     in_dialog = (request.form.get("dialog") or "").strip() == "1"
+    if not _valid_form_nonce(client, submitted_nonce):
+        error = ("This QR form expired or the client's QR access changed. "
+                 "Review the current status below and try again.")
+        if in_dialog:
+            return _qr_dialog_fragment(client, error=error, status=400)
+        return _qr_admin_page(client, error=error), 400
     action = (request.form.get("action") or "").strip().lower()
     if action == "revoke":
         client.client_ledger_qr_token_hash = None
