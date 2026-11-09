@@ -29,6 +29,11 @@
         <a href="{{ url_for('download_client_ledger', id=client.id, action='print') }}" class="btn btn-outline-primary btn-sm">
             <i class="bi bi-printer me-1"></i> Print
         </a>
+        {% if current_user.role in ('admin', 'root') or current_user.can_manage_clients %}
+        <a href="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}" class="btn btn-outline-info btn-sm fw-bold">
+            <i class="bi bi-qr-code me-1"></i> Client QR
+        </a>
+        {% endif %}
     </div>
 </div>
 

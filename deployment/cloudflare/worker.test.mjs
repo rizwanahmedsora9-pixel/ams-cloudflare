@@ -19,8 +19,13 @@ result = await worker.fetch(request('/b/S.1.BILL.SIGNATURE.pdf'), env);
 assert.match(result.headers.get('Content-Disposition'), /^attachment/);
 result = await worker.fetch(request('/static/fonts/DejaVuSans.ttf'), env);
 assert.equal(result.headers.get('Content-Type'), 'font/ttf');
+result = await worker.fetch(request(`/c/${'a'.repeat(43)}`), env);
+assert.equal(result.status, 200);
+assert.equal(result.headers.get('Content-Type'), 'text/html');
+assert.equal(result.headers.get('Content-Disposition'), null);
+assert.doesNotMatch(result.headers.get('Content-Security-Policy'), /script-src/);
 const before = calls;
-for (const path of ['/', '/login', '/static/secret', '/download_invoice/1']) {
+for (const path of ['/', '/login', '/static/secret', '/download_invoice/1', '/c/short', `/c/${'a'.repeat(42)}`]) {
   assert.equal((await worker.fetch(request(path), env)).status, 404);
 }
 assert.equal(calls, before);
@@ -31,4 +36,4 @@ assert.equal(result.headers.get('Location'), null);
 globalThis.fetch = async () => new Response('private error', { status: 500 });
 result = await worker.fetch(request('/b/token'), env);
 assert.equal(await result.text(), 'Download service unavailable.');
-console.log('Worker checks passed: view, download, fonts, path restrictions, redirects, and errors.');
+console.log('Worker checks passed: bill view/download, client-ledger HTML, fonts, path restrictions, redirects, and errors.');

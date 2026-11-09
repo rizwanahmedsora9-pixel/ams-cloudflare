@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <title>Client ledger — {{ client.name }}</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; color: #171717; background: #f2f4f7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; }
+    main { width: min(100%, 900px); margin: 0 auto; background: #fff; border: 1px solid #d5d9de; }
+    header, footer { padding: 18px 22px; }
+    header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 3px solid #222; }
+    .brand { font-size: 1.25rem; font-weight: 800; text-transform: uppercase; }
+    .muted { color: #555; font-size: .88rem; margin-top: 4px; }
+    .title { text-align: right; font-weight: 800; }
+    .content { padding: 18px 22px; }
+    .client-summary { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #bbb; }
+    .client-name { font-size: 1.2rem; font-weight: 800; }
+    .totals { min-width: 250px; border: 1px solid #777; }
+    .total-row { display: flex; justify-content: space-between; padding: 7px 10px; border-bottom: 1px solid #ddd; gap: 12px; }
+    .total-row:last-child { border: 0; background: #eee; font-weight: 800; }
+    h2 { font-size: .93rem; text-transform: uppercase; margin: 22px 0 7px; border-bottom: 2px solid #333; padding-bottom: 5px; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    th, td { border: 1px solid #c6c6c6; padding: 6px 7px; text-align: left; vertical-align: top; }
+    th { background: #eee; font-size: .74rem; text-transform: uppercase; }
+    .num { text-align: right; white-space: nowrap; }
+    .bill { white-space: nowrap; }
+    .note { color: #444; font-size: .75rem; margin-top: 3px; }
+    footer { border-top: 2px solid #222; text-align: center; color: #555; font-size: .8rem; }
+    .live-note { margin: 0 0 14px; color: #555; font-size: .8rem; text-align: right; }
+    @media (max-width: 600px) {
+      body { padding: 0; }
+      header, footer { padding: 14px; }
+      .content { padding: 14px; }
+      header, .client-summary { flex-direction: column; }
+      .title { text-align: left; }
+      .totals { min-width: 0; width: 100%; }
+      table { font-size: .76rem; }
+      th, td { padding: 5px; }
+    }
+    @media print {
+      :root { background: #fff; }
+      body { padding: 0; }
+      main { width: 100%; border: 0; }
+      .table-wrap { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="brand">{{ settings.company_name if settings and settings.company_name else 'FAZAL BUILDING MATERIALS' }}</div>
+      <div class="muted">{{ settings.company_address if settings and settings.company_address else 'JALAL PUR SOBTIAN GUJRAT' }}</div>
+      <div class="muted"><bdi dir="ltr">{{ settings.company_phone if settings and settings.company_phone else '+92331-0000993 | +92340-3872722' }}</bdi></div>
+    </div>
+    <div class="title">CLIENT LEDGER<div class="muted">Updated {{ generated_at.strftime('%d %b %Y %I:%M %p') }}</div></div>
+  </header>
+  <section class="content">
+    <p class="live-note">Live statement — figures update when you open this link.</p>
+    <div class="client-summary">
+      <div>
+        <div class="muted">ACCOUNT STATEMENT FOR</div>
+        <div class="client-name">{{ client.name }}</div>
+        {% if client.code %}<div class="muted">Code: {{ client.code }}</div>{% endif %}
+        {% if client.address %}<div class="muted">{{ client.address }}</div>{% endif %}
+        {% if client.phone %}<div class="muted"><bdi dir="ltr">{{ client.phone }}</bdi></div>{% endif %}
+      </div>
+      <div class="totals">
+        <div class="total-row"><span>Total Due</span><strong>Rs. {{ "{:,.2f}".format(total_debit or 0) }}</strong></div>
+        <div class="total-row"><span>Total Paid</span><strong>Rs. {{ "{:,.2f}".format(total_credit or 0) }}</strong></div>
+        <div class="total-row"><span>Net Pending</span><strong>Rs. {{ "{:,.2f}".format(total_balance or 0) }}</strong></div>
+      </div>
+    </div>
+
+    <h2>Financial Transaction Ledger</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Description</th><th>Bill #</th><th class="num">Due</th><th class="num">Paid</th><th class="num">Pending</th></tr></thead>
+      <tbody>
+      {% for row in financial_history %}
+        <tr>
+          <td>{{ row.date_display or '' }}</td>
+          <td>{{ row.description }}{% if row.note %}<div class="note">Note: {{ row.note }}</div>{% endif %}{% if row.is_cancel_entry %}<div class="note">Audit row{% if row.cancel_amount is not none %}, Rs. {{ "{:,.2f}".format(row.cancel_amount) }}{% endif %}</div>{% endif %}</td>
+          <td class="bill">{{ row.bill_no or '-' }}</td>
+          <td class="num">{{ "{:,.2f}".format(row.debit) if row.debit > 0 else '-' }}</td>
+          <td class="num">{{ "{:,.2f}".format(row.credit) if row.credit > 0 else '-' }}</td>
+          <td class="num">{{ "{:,.2f}".format(row.balance or 0) }}</td>
+        </tr>
+      {% else %}<tr><td colspan="6">No financial transactions found.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+
+    {% if pending_bills %}
+    <h2>Pending Bills</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Bill #</th><th class="num">Amount</th><th>Status</th><th>Reason</th></tr></thead>
+      <tbody>{% for bill in pending_bills %}<tr>
+        <td class="bill">{{ bill.bill_no or '-' }}</td><td class="num">Rs. {{ "{:,.2f}".format(bill.amount or 0) }}</td>
+        <td>{{ 'Paid' if bill.is_paid else 'Pending' }}</td>
+        <td>{{ bill.reason or '' }}{% if bill.note %}<div class="note">Note: {{ bill.note }}</div>{% endif %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+
+    {% if material_summary %}
+    <h2>Material Summary</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Material</th><th class="num">Net Qty (IN - OUT)</th></tr></thead>
+      <tbody>{% for name, qty in material_summary.items()|sort %}<tr><td>{{ name }}</td><td class="num">{{ "{:,.2f}".format(qty or 0) }}</td></tr>{% endfor %}
+        <tr><td><strong>Net material position</strong></td><td class="num"><strong>{{ "{:,.2f}".format(material_total_qty or 0) }}</strong></td></tr>
+      </tbody>
+    </table></div>
+    {% endif %}
+
+    {% if movement_rows %}
+    <h2>Movement History</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Time</th><th>Material</th><th>Type</th><th class="num">Qty</th><th>Bill No</th><th>Notes</th></tr></thead>
+      <tbody>{% for row in movement_rows %}<tr>
+        <td>{{ row.date or '' }}</td><td>{{ row.time or '' }}</td><td>{{ row.material_display or row.material or '' }}</td>
+        <td>{{ row.type or '-' }}</td><td class="num">{{ "{:,.2f}".format(row.qty or 0) }}</td><td class="bill">{{ row.bill_no or '-' }}</td><td>{{ row.note or '' }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  </section>
+  <footer>Read-only client statement · {{ settings.company_name if settings and settings.company_name else 'FAZAL BUILDING MATERIALS' }}</footer>
+</main>
+</body>
+</html>
