@@ -117,21 +117,40 @@ def load_user(user_id):
     user cannot even reach the login page again.  A session id that is not a
     valid integer (older cookie format, tampered cookie) or a transient DB
     error must simply mean "not logged in".
+
+    A *transient* error (SQLite "database is locked" while a backup, import or
+    report holds the write lock) is retried first: giving up immediately logs
+    the user out and bounces every page to ``/login`` — which is exactly what
+    a shop sees when a long job overlaps normal work.
     """
     try:
         uid = int(str(user_id).strip())
     except (TypeError, ValueError):
         logging.getLogger("auth").warning("Ignoring malformed session user id %r", user_id)
         return None
-    try:
-        return db.session.get(User, uid)
-    except Exception:
+
+    from app.services.errors import is_transient_db_error
+
+    delays = (0.5, 1.5)
+    for attempt in range(len(delays) + 1):
         try:
-            db.session.rollback()
-        except Exception:
-            pass
-        logging.getLogger("auth").exception("Could not load user id %s", uid)
-        return None
+            return db.session.get(User, uid)
+        except Exception as exc:
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            if attempt < len(delays) and is_transient_db_error(exc):
+                logging.getLogger("auth").warning(
+                    "User %s lookup hit a busy database; retrying in %.1fs",
+                    uid,
+                    delays[attempt],
+                )
+                time.sleep(delays[attempt])
+                continue
+            logging.getLogger("auth").exception("Could not load user id %s", uid)
+            return None
+    return None
 
 
 def _permissions_from_request_form():

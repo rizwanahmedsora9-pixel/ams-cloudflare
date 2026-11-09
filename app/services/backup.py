@@ -116,7 +116,21 @@ _DB_HEALTH_MIN_BYTES = C._DB_HEALTH_MIN_BYTES
 def _start_hourly_backup_worker():
     if state.HOURLY_BACKUP_WORKER_STARTED:
         return
-    t = threading.Thread(target=_hourly_backup_worker_loop, daemon=True, name='hourly-backup-mailer')
+    # ``app`` here is Flask's ``current_app`` proxy.  Handing the *proxy* to a
+    # thread is fatal: outside a request/app context the proxy raises
+    # "Working outside of application context", the worker's ``app_context()``
+    # call fails, and the hourly backup silently never runs.  Resolve the real
+    # application object while we are still inside the request.
+    try:
+        flask_app = app._get_current_object()
+    except RuntimeError:
+        return
+    t = threading.Thread(
+        target=_hourly_backup_worker_loop,
+        args=(flask_app,),
+        daemon=True,
+        name='hourly-backup-mailer',
+    )
     t.start()
     state.HOURLY_BACKUP_WORKER_STARTED = True
 
@@ -126,10 +140,14 @@ def _start_reconcile_worker():
         return
     if not _AUTO_RECONCILE_ENABLED:
         return
+    try:
+        flask_app = app._get_current_object()
+    except RuntimeError:
+        return
     t = threading.Thread(
         target=run_auto_reconcile,
         kwargs={
-            'app': app,
+            'app': flask_app,
             'interval_seconds': _AUTO_RECONCILE_INTERVAL_SEC,
             'tolerance': _AUTO_RECONCILE_TOL,
             'fix': _AUTO_RECONCILE_FIX,
@@ -270,17 +288,31 @@ def _send_hourly_all_tenants_backup_email(trigger_type='auto-hourly', force_send
         return False, f'Backup send failed: {e}'
 
 
-def _hourly_backup_worker_loop():
+def _hourly_backup_worker_loop(flask_app):
+    """Hourly root-backup mailer.
+
+    ``flask_app`` is the *real* application object (never the ``current_app``
+    proxy) so an app context can be pushed inside this thread.
+    """
+    failures = 0
     while True:
         try:
-            with app.app_context():
+            with flask_app.app_context():
                 now = pk_now()
                 slot = now.strftime('%Y%m%d%H')
                 if now.minute == 0 and state.HOURLY_BACKUP_LAST_SLOT != slot:
                     _send_hourly_all_tenants_backup_email(trigger_type='auto-hourly', force_send=False)
                     state.HOURLY_BACKUP_LAST_SLOT = slot
+            failures = 0
             time.sleep(30)
         except Exception:
+            failures += 1
+            # Log the first failure only: a scheduler that fails every minute
+            # must not fill the error log (it used to fail silently forever).
+            if failures == 1:
+                logging.getLogger(__name__).exception(
+                    "Hourly backup worker failed; it will keep retrying quietly."
+                )
             time.sleep(60)
 
 

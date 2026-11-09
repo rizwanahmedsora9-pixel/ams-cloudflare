@@ -1,5 +1,6 @@
+import logging
 import os
-import shutil
+import sqlite3
 import threading
 import time
 from datetime import datetime
@@ -10,6 +11,7 @@ from models import db, Account, AccountTransaction, DirectSale, DirectSaleItem, 
 
 
 _RECON_LOCK = threading.Lock()
+LOG = logging.getLogger(__name__)
 
 
 def _pk_now_naive():
@@ -18,7 +20,30 @@ def _pk_now_naive():
     return datetime.now().replace(microsecond=0)
 
 
+def real_app(app):
+    """Return the concrete Flask app behind a ``LocalProxy``.
+
+    ``current_app`` is a proxy: pushing ``proxy.app_context()`` from a worker
+    thread raises "Working outside of application context".  Callers resolve it
+    while a request/app context is still active; this is the safety net for the
+    case where the proxy is passed straight into the thread.
+    """
+    getter = getattr(app, "_get_current_object", None)
+    if callable(getter):
+        try:
+            return getter()
+        except RuntimeError:
+            return None
+    return app
+
+
 def _safe_copy_db(db_path: str, backup_dir: str) -> str | None:
+    """Copy the live database with SQLite's online-backup API.
+
+    ``shutil.copy2`` of a database that is being written (WAL or rollback
+    journal) can capture a torn page.  The backup API produces a consistent
+    copy while the shop keeps working.
+    """
     try:
         if not db_path or not os.path.exists(db_path):
             return None
@@ -26,9 +51,18 @@ def _safe_copy_db(db_path: str, backup_dir: str) -> str | None:
         stamp = _pk_now_naive().strftime("%Y%m%d_%H%M%S")
         name = f"recon_backup_{stamp}.db"
         dest = os.path.join(backup_dir, name)
-        shutil.copy2(db_path, dest)
+        source = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30)
+        try:
+            target = sqlite3.connect(dest, timeout=30)
+            try:
+                source.backup(target, pages=256, sleep=0.05)
+            finally:
+                target.close()
+        finally:
+            source.close()
         return dest
     except Exception:
+        LOG.warning("Reconciliation database copy failed (continuing)", exc_info=True)
         return None
 
 
@@ -309,8 +343,20 @@ def reconcile_direct_sale_item_names(*, tolerance=0.01) -> dict:
 def run_auto_reconcile(app, *, interval_seconds=600, tolerance=0.01, fix=True) -> None:
     """
     Background loop. Uses a global lock so it won't overlap with itself.
+
+    ``app`` must be the concrete Flask application (see :func:`real_app`); a
+    ``current_app`` proxy can only be used from inside a context, which this
+    thread never has.
     """
     interval_seconds = max(10, int(interval_seconds or 600))
+    flask_app = real_app(app)
+    if flask_app is None:
+        LOG.warning(
+            "Auto-reconcile worker started without a usable Flask app; "
+            "it will not run. Set AUTO_RECONCILE_ENABLED=0 to silence this."
+        )
+        return
+    failures = 0
     while True:
         if not fix:
             time.sleep(interval_seconds)
@@ -319,28 +365,38 @@ def run_auto_reconcile(app, *, interval_seconds=600, tolerance=0.01, fix=True) -
             time.sleep(interval_seconds)
             continue
         try:
-            with app.app_context():
-                # Optional DB file backup
+            with flask_app.app_context():
+                # Optional DB file backup.  Kept small on purpose: the copies
+                # live inside instance/, and a shop with a large database
+                # should not quietly fill its disk quota.
                 enable_backup = os.environ.get("AUTO_RECONCILE_DB_BACKUP", "1").strip() != "0"
-                keep_backups = os.environ.get("AUTO_RECONCILE_BACKUP_KEEP", "10").strip()
-                db_uri = app.config.get("SQLALCHEMY_DATABASE_URI") or ""
+                keep_backups = os.environ.get("AUTO_RECONCILE_BACKUP_KEEP", "3").strip()
+                db_uri = flask_app.config.get("SQLALCHEMY_DATABASE_URI") or ""
                 db_path = ""
                 if db_uri.startswith("sqlite:///"):
                     db_path = db_uri.replace("sqlite:///", "", 1)
                 if enable_backup and db_path:
                     backup_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "instance", "reconcile_backups"))
                     _safe_copy_db(db_path, backup_dir)
-                    _cleanup_reconcile_backups(backup_dir, keep=int(keep_backups or 10))
+                    _cleanup_reconcile_backups(backup_dir, keep=int(keep_backups or 3))
 
                 reconcile_direct_sale_item_names(tolerance=tolerance)
                 reconcile_material_totals(tolerance=tolerance)
                 reconcile_account_balances(tolerance=tolerance, create_adjustment=True)
                 db.session.commit()
+            failures = 0
         except Exception:
             try:
                 db.session.rollback()
             except Exception:
                 pass
+            failures += 1
+            # Log the first failure of a streak, then stay quiet: this loop
+            # runs every few minutes and must not flood the error log.
+            if failures == 1:
+                LOG.exception(
+                    "Auto-reconcile pass failed; it will retry on the next interval."
+                )
         finally:
             _RECON_LOCK.release()
         time.sleep(interval_seconds)

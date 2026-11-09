@@ -107,6 +107,15 @@ def create_app(test_config: dict | None = None) -> Flask:
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SQLALCHEMY_ENGINE_OPTIONS={
             "connect_args": {"timeout": 30, "check_same_thread": False},
+            # A pooled connection can be dead even though the file is fine:
+            # a backup/copy job replaced the file, a laptop resumed, or a
+            # network-mounted /home dropped the handle.  Without a pre-ping the
+            # first request that checks out that connection fails, and the
+            # failure repeats until the process restarts.  Recycling also caps
+            # how long a connection can live.
+            "pool_pre_ping": True,
+            "pool_recycle": int(os.environ.get("DB_POOL_RECYCLE_SECONDS", "1800") or "1800"),
+            "pool_timeout": 30,
         },
         SQLITE_JOURNAL_MODE=journal_mode,
         AMS_RUNTIME_DB_CREATED=bool(runtime_status.created),
@@ -170,6 +179,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     _configure_logging(app)
     db.init_app(app)
 
+    # Unhandled failures: reference code + bounded technical log, rollback of
+    # the failed transaction, and one retry for a transiently locked SQLite
+    # database.  Installed before the bootstrap so a bootstrap-time exception
+    # is recorded the same way.
+    from app.services.errors import install_error_handling
+
+    install_error_handling(app)
+
     # SQLite does not enforce declared foreign keys unless each connection
     # explicitly enables them. Register this before bootstrap opens the first
     # connection so future lifecycle regressions fail transactionally instead
@@ -182,7 +199,10 @@ def create_app(test_config: dict | None = None) -> Flask:
                 cursor = dbapi_connection.cursor()
                 try:
                     cursor.execute("PRAGMA foreign_keys=ON")
-                    cursor.execute("PRAGMA busy_timeout=8000")
+                    # Wait longer than one page render before giving up: a
+                    # backup copy or an import must not turn a shop-floor save
+                    # into "database is locked".
+                    cursor.execute("PRAGMA busy_timeout=15000")
                     enabled = cursor.execute("PRAGMA foreign_keys").fetchone()
                     if not enabled or enabled[0] != 1:
                         raise RuntimeError("SQLite foreign-key enforcement could not be enabled")
