@@ -277,6 +277,43 @@ def test_legacy_qr_without_salt_cannot_be_reprinted_but_offers_replacement(
     assert client.get(f"/c/{token}").status_code == 200
 
 
+def test_material_ledger_page_opens_qr_dialog_and_generates_in_it(app, client):
+    """The Client Ledger page opens the QR dialog without the settings page."""
+    app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
+    with app.app_context():
+        row = Client(code="QR-MAT", name="Material QR Client", is_active=True)
+        db.session.add(row)
+        db.session.commit()
+        client_id = row.id
+        admin_id = User.query.filter_by(username="Admin").first().id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    ledger = client.get(f"/client_ledger/{client_id}")
+    assert ledger.status_code == 200
+    body = ledger.get_data(as_text=True)
+    # The Client QR button opens the in-ledger dialog (no settings page needed).
+    assert 'id="clientLedgerQrModal"' in body
+    assert 'data-bs-target="#clientLedgerQrModal"' in body
+    assert 'id="clientLedgerQrModalBody"' in body
+    assert "Loading QR" in body
+
+    dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
+    assert dialog.status_code == 200
+    frag = dialog.get_data(as_text=True)
+    assert "Generate QR Code" in frag
+    nonce = re.search(r'name="qr_nonce" value="([^"]+)"', frag).group(1)
+    generated = client.post(f"/client_ledger_qr/{client_id}", data={
+        "action": "generate", "qr_nonce": nonce, "dialog": "1",
+    })
+    assert generated.status_code == 200
+    body = generated.get_data(as_text=True)
+    assert "clientLedgerQrCode" in body and "<svg" in body
+    assert "clientLedgerQrDownload" in body and "clientLedgerQrPrint" in body
+
+
 def test_qr_forms_survive_other_tabs_and_reject_stale_or_invalid_forms(app, client, monkeypatch):
     """Opening QR settings must not invalidate a form in another dialog/tab."""
     app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"

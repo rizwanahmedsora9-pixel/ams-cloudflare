@@ -30,9 +30,10 @@
             <i class="bi bi-printer me-1"></i> Print
         </a>
         {% if current_user.role in ('admin', 'root') or current_user.can_manage_clients %}
-        <a href="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}" class="btn btn-outline-info btn-sm fw-bold">
+        <button type="button" class="btn btn-outline-info btn-sm fw-bold"
+                data-bs-toggle="modal" data-bs-target="#clientLedgerQrModal">
             <i class="bi bi-qr-code me-1"></i> Client QR
-        </a>
+        </button>
         {% endif %}
     </div>
 </div>
@@ -205,6 +206,159 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
+
+{% if client and (current_user.role in ('admin', 'root') or current_user.can_manage_clients) %}
+{# Big QR dialog: opened from the "Client QR" button.  The body is fetched
+   from the staff-only QR endpoint so the generated code, its Download /
+   Print buttons and the generate/revoke controls all live in one place. #}
+<div class="modal fade" id="clientLedgerQrModal" tabindex="-1" aria-labelledby="clientLedgerQrModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-secondary" style="background: #0f172a;">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-warning fw-bold" id="clientLedgerQrModalLabel">
+                    <i class="bi bi-qr-code me-1"></i> Client Ledger QR — {{ client.name }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="clientLedgerQrModalBody"
+                 data-qr-url="{{ url_for('ledgers.client_ledger_qr_dialog', client_id=client.id) }}"
+                 data-client-name="{{ client.name }}"
+                 data-client-code="{{ client.code or '' }}">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-warning" role="status"></div>
+                    <div class="text-white-50 small mt-2">Loading QR&hellip;</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <a class="btn btn-outline-secondary btn-sm me-auto" target="_blank"
+                   href="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Open QR settings page
+                </a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modalEl = document.getElementById('clientLedgerQrModal');
+    var bodyEl = document.getElementById('clientLedgerQrModalBody');
+    if (!modalEl || !bodyEl) return;
+    var endpoint = bodyEl.getAttribute('data-qr-url');
+    var clientName = bodyEl.getAttribute('data-client-name') || 'Client';
+    var clientCode = bodyEl.getAttribute('data-client-code') || '';
+    var loadingHtml = bodyEl.innerHTML;
+
+    function showError(message) {
+        bodyEl.innerHTML = '<div class="alert alert-danger mb-0" role="alert"></div>';
+        bodyEl.firstElementChild.textContent = message;
+    }
+    function loadFragment(html) { bodyEl.innerHTML = html; }
+    function readFragment(response) {
+        // fetch follows login/permission redirects. Never insert a full app
+        // page into this dialog or mistake it for a successful QR operation.
+        if (response.redirected || response.status === 401) {
+            throw new Error('Your session or permissions changed. Reload the ledger and sign in again if needed.');
+        }
+        return response.text().then(function (text) {
+            var contentType = response.headers.get('Content-Type') || '';
+            if (contentType.indexOf('application/json') !== -1) {
+                var result;
+                try { result = JSON.parse(text); } catch (_) { result = {}; }
+                throw new Error(result.error || 'QR request failed (' + response.status + '). Reload the ledger and try again.');
+            }
+            if (text.indexOf('class="cl-qr-dialog ') !== -1) return text;
+            if (response.status === 403) {
+                throw new Error('You do not have permission to change client QR access.');
+            }
+            // Do not expose raw HTML error pages, tracebacks or SQL details.
+            throw new Error('QR request failed (' + response.status + '). Reload the ledger and try again. If it persists, contact support.');
+        });
+    }
+
+    modalEl.addEventListener('show.bs.modal', function () {
+        bodyEl.innerHTML = loadingHtml;
+        fetch(endpoint, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', cache: 'no-store' })
+            .then(readFragment)
+            .then(loadFragment)
+            .catch(function (err) { showError(err.message || 'QR could not be loaded.'); });
+    });
+    // Never leave a generated (bearer) QR sitting in the page after closing.
+    modalEl.addEventListener('hidden.bs.modal', function () { bodyEl.innerHTML = loadingHtml; });
+
+    // Generate / revoke stay inside the dialog: swap in the returned fragment
+    // (which, after generation, is the big QR with Download / Print below it).
+    bodyEl.addEventListener('submit', function (event) {
+        var form = event.target.closest('.js-qr-dialog-form');
+        if (!form) return;
+        event.preventDefault();
+        var confirmText = form.getAttribute('data-confirm');
+        if (confirmText && !window.confirm(confirmText)) return;
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        fetch(form.action, {
+            method: 'POST', body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin'
+        })
+            .then(readFragment)
+            .then(loadFragment)
+            .catch(function (err) { showError(err.message || 'Could not reach the server. Check your connection, then reopen the QR dialog.'); });
+    });
+
+    function qrSvg() { return bodyEl.querySelector('#clientLedgerQrCode svg'); }
+    function fileSlug() {
+        return (clientCode || clientName).replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'client';
+    }
+
+    bodyEl.addEventListener('click', function (event) {
+        // Download: rasterise the QR SVG to a large white-backed PNG.
+        if (event.target.closest('#clientLedgerQrDownload')) {
+            var svg = qrSvg();
+            if (!svg) return;
+            var svgText = new XMLSerializer().serializeToString(svg);
+            var img = new Image();
+            img.onload = function () {
+                var size = 1024, quiet = 64;
+                var canvas = document.createElement('canvas');
+                canvas.width = size; canvas.height = size;
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, size, size);
+                ctx.drawImage(img, quiet, quiet, size - quiet * 2, size - quiet * 2);
+                URL.revokeObjectURL(img.src);
+                canvas.toBlob(function (blob) {
+                    if (!blob) return;
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = 'client-ledger-qr-' + fileSlug() + '.png';
+                    document.body.appendChild(a); a.click(); a.remove();
+                    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+                }, 'image/png');
+            };
+            img.src = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' }));
+            return;
+        }
+        // Print: a clean sheet with just the client name, code and the QR.
+        if (event.target.closest('#clientLedgerQrPrint')) {
+            var code = qrSvg();
+            if (!code) return;
+            var win = window.open('', '_blank', 'width=640,height=760');
+            if (!win) { window.print(); return; }
+            var esc = function (s) { return s.replace(/[&<>\"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[c]; }); };
+            win.document.write('<!doctype html><html><head><title>Client Ledger QR</title>' +
+                '<style>body{font-family:Arial,Helvetica,sans-serif;text-align:center;padding:24mm 12mm;color:#111}' +
+                'svg{width:82mm;height:82mm}h1{font-size:18px;margin:0 0 4px}p{margin:4px 0}</style></head><body>' +
+                '<h1>' + esc(clientName) + '</h1>' +
+                (clientCode ? '<p>Client code: ' + esc(clientCode) + '</p>' : '') +
+                code.outerHTML +
+                '<p>Scan to view this client\'s current ledger online.</p>' +
+                '<script>window.onload=function(){window.print();};<\/script></body></html>');
+            win.document.close();
+        }
+    });
+})();
+</script>
 {% endif %}
 
 {% endblock %}

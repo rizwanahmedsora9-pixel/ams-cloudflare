@@ -4,11 +4,18 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const template = readFileSync(new URL('../templates/client_ledger.html', import.meta.url), 'utf8');
-const controller = template.slice(template.indexOf('(function () {\n    var modalEl'),
-    template.indexOf('</script>', template.indexOf('(function () {\n    var modalEl')));
+function readController(templateName) {
+    const template = readFileSync(new URL('../templates/' + templateName, import.meta.url), 'utf8');
+    const start = template.indexOf('(function () {\n    var modalEl');
+    return template.slice(start, template.indexOf('</script>', start));
+}
+
+// Both ledger pages must ship a syntactically valid QR dialog controller.
+const controller = readController('client_ledger.html');
+const ledgerController = readController('ledger.html');
 // Check the entire controller's syntax, then exercise its response reader.
 new vm.Script(controller);
+new vm.Script(ledgerController);
 const readerSource = controller.match(/function readFragment\(response\) \{[\s\S]*?\n    \}/)[0];
 const readFragment = vm.runInNewContext(`(${readerSource})`);
 function response(status, body, { redirected = false, type = 'text/html' } = {}) {
