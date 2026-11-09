@@ -174,7 +174,7 @@ def register_hooks(app):
     def _handle_request_too_large(_err):
         max_mb = max(1, int((app.config.get('MAX_CONTENT_LENGTH') or 0) / (1024 * 1024)))
         msg = f"Uploaded file is too large. Max allowed size is {max_mb} MB."
-        if request.path.startswith('/import_export/app_upgrade/start') or request.path.startswith('/import_export/master/import/start'):
+        if request.path.startswith('/import_export/master/import/start'):
             return jsonify({'error': msg}), 413
         flash(msg, 'danger')
         return redirect(request.referrer or url_for('index'))

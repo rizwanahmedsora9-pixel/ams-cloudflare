@@ -4,9 +4,6 @@ This file is only:
 
   * ``app`` / ``application``  — the Flask app (created by the factory)
   * a local development server
-
-Production deployment webhooks are mounted only by wsgi.py.
-See README.md ("Deployment" section) for the current status.
 """
 from __future__ import annotations
 

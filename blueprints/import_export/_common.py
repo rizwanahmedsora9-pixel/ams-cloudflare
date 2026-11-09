@@ -46,7 +46,6 @@ MODULE_CONFIG = {
 import_export_bp = Blueprint('import_export', __name__)
 
 PK_TZ = ZoneInfo('Asia/Karachi')
-APP_UPGRADE_ENABLED = False
 _WIPE_BACKUP_ENABLED = False
 _AUTO_BACKUP_ENABLED = False
 # Wipe never deletes these. Backup/restore DOES include users so a restore
@@ -64,8 +63,6 @@ FULL_RAW_EXCLUDE_TABLES = {
 
 _MASTER_IMPORT_PROGRESS = {}
 _MASTER_IMPORT_PROGRESS_LOCK = threading.Lock()
-_DEPLOY_PROGRESS = {}
-_DEPLOY_PROGRESS_LOCK = threading.Lock()
 _IMPORT_ACTOR_CTX = threading.local()
 
 CLIENT_SCHEMA = [
