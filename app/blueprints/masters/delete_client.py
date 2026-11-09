@@ -11,6 +11,7 @@ def delete_client(id):
         from utils.accounting_audit import record_accounting_audit
         before = {'id': c.id, 'code': c.code, 'name': c.name, 'is_active': bool(c.is_active)}
         c.is_active = False
+        c.client_ledger_qr_token_hash = None
         record_accounting_audit(
             current_user, action='Suspend', entity_type='Client', entity_id=c.id,
             before=before, after={**before, 'is_active': False},

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Client ledger QR — {{ client.name }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; background: #f1f3f5; color: #181818; font-family: Arial, Helvetica, sans-serif; }
+    .card { width: min(100%, 560px); margin: 20px auto; padding: 24px; background: #fff; border: 1px solid #ccd1d7; border-radius: 8px; text-align: center; }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; }
+    p { line-height: 1.45; }
+    .status { padding: 10px; background: #edf5ff; border: 1px solid #b8d4f2; border-radius: 5px; }
+    .warning { padding: 10px; background: #fff3cd; border: 1px solid #ffdf7e; border-radius: 5px; }
+    .error { padding: 10px; color: #8a1c1c; background: #ffe8e8; border: 1px solid #e8b6b6; border-radius: 5px; }
+    button, .link { display: inline-block; border: 0; border-radius: 5px; padding: 11px 16px; font-size: 1rem; font-weight: 700; text-decoration: none; cursor: pointer; }
+    .primary { color: #171717; background: #ffc107; }
+    .danger { color: #fff; background: #b42318; }
+    .secondary { color: #fff; background: #343a40; }
+    form { margin: 12px 0; }
+    .qr { width: min(76vw, 320px); height: auto; margin: 12px auto; display: block; }
+    .small { color: #555; font-size: .86rem; }
+    .print-only { display: none; }
+    @media print {
+      body { padding: 0; background: #fff; }
+      .card { width: 100%; margin: 0; padding: 18mm; border: 0; border-radius: 0; }
+      .no-print { display: none !important; }
+      .print-only { display: block; }
+      .qr { width: 82mm; height: 82mm; }
+    }
+  </style>
+</head>
+<body>
+<main class="card">
+  {% if qr_svg %}
+    <div class="print-only"><strong>{{ settings.company_name if settings and settings.company_name else 'FAZAL BUILDING MATERIALS' }}</strong></div>
+    <h1>Client Ledger QR</h1>
+    <p><strong>{{ client.name }}</strong>{% if client.code %}<br>Client code: {{ client.code }}{% endif %}</p>
+    {{ qr_svg }}
+    <p class="small">Scan to view this client's current ledger online. This code is private; please keep it for the named client.</p>
+    <div class="no-print">
+      <button class="primary" type="button" onclick="window.print()">Print this QR</button>
+      <p class="warning">This new QR replaces any previously printed code for this client. Anyone with the QR can see the live ledger.</p>
+      <a class="link secondary" href="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}">QR settings / revoke</a>
+    </div>
+  {% else %}
+    <h1>Client Ledger QR</h1>
+    <p><strong>{{ client.name }}</strong>{% if client.code %}<br>Client code: {{ client.code }}{% endif %}</p>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    {% if is_active %}
+      <p class="status">A QR access link is currently active. For security, the existing QR cannot be displayed again; generate a replacement to print another copy.</p>
+    {% else %}
+      <p class="small">No active public QR exists for this client.</p>
+    {% endif %}
+    {% if can_generate %}
+    <form method="post">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+      <input type="hidden" name="action" value="generate">
+      <button class="primary" type="submit">{{ 'Generate replacement QR' if is_active else 'Generate and print QR' }}</button>
+    </form>
+    {% else %}<p class="warning">QR access can only be generated for an active, non-transferred client.</p>{% endif %}
+    {% if is_active %}
+      <p class="warning">Generating a replacement immediately invalidates all earlier printed codes. Anyone holding an active QR can view the live ledger.</p>
+      <form method="post" onsubmit="return confirm('Revoke this client ledger QR? The printed code will stop working.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="action" value="revoke">
+        <button class="danger" type="submit">Revoke current QR</button>
+      </form>
+    {% endif %}
+    <a class="link secondary" href="{{ url_for('ledgers.client_ledger', id=client.id) }}">Back to client ledger</a>
+  {% endif %}
+</main>
+</body>
+</html>

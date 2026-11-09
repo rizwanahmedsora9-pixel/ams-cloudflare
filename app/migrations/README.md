@@ -94,4 +94,6 @@ helper function.
   default `JALAL PUR SOBTIAN` to `JALAL PUR SOBTIAN GUJRAT`.  An address an
   admin has edited is never rewritten.
 
-The next schema change should ship as `0011_*.sql`.
+- `0011_client_ledger_qr_token.sql` adds a partial unique index for each client's nullable QR-token digest. Existing databases receive the nullable ORM column through `_ensure_model_columns()`; the token itself is never stored.
+
+The next schema change should ship as `0012_*.sql`.

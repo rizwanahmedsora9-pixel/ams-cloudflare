@@ -33,6 +33,9 @@ class Client(db.Model):
     steel_book_no = db.Column(db.String(50))
     location_url = db.Column(db.String(500))
     page_notes = db.Column(db.String(300))
+    # SHA-256 of the high-entropy bearer token used for the client's public,
+    # read-only ledger QR. Store only the digest; NULL means access is revoked.
+    client_ledger_qr_token_hash = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, default=pk_model_now, index=True)
 
 

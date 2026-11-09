@@ -80,10 +80,11 @@ _DB_HEALTH_DROP_MIN = C._DB_HEALTH_DROP_MIN
 _DB_HEALTH_MIN_BYTES = C._DB_HEALTH_MIN_BYTES
 
 def _log_unhandled_exception(sender, exception, **extra):
+    path = '/c/[client-ledger-token]' if request.path.startswith('/c/') else request.path
     logging.getLogger('error').exception(
         'Unhandled exception during %s %s from %s',
         request.method,
-        request.path,
+        path,
         request.headers.get('X-Forwarded-For', request.remote_addr or '-')
     )
 

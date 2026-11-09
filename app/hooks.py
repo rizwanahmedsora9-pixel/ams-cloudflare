@@ -60,6 +60,9 @@ def register_hooks(app):
         # a stale fragment is the classic "click edit -> stuck overlay".
         endpoint = request.endpoint or ''
         short = endpoint.rsplit('.', 1)[-1] if endpoint else ''
+        if short in ('public_client_ledger', 'client_ledger_qr'):
+            response.headers['Cache-Control'] = 'private, no-store, max-age=0'
+            return response
         if short in (
             'direct_sale_edit_modal',
             'booking_edit_modal',
@@ -152,11 +155,16 @@ def register_hooks(app):
     def _log_request_summary(response):
         started = getattr(request, '_log_started_at', None)
         elapsed_ms = ((time.time() - started) * 1000.0) if started else 0.0
+        # QR links are bearer credentials. Never write a client's raw token
+        # into application request logs.
+        logged_path = '/c/[client-ledger-token]' if request.path.startswith('/c/') else (
+            request.full_path.rstrip('?') if request.query_string else request.path
+        )
         logging.getLogger('request').info(
             '%s - "%s %s" %s %.1fms',
             request.headers.get('X-Forwarded-For', request.remote_addr or '-'),
             request.method,
-            request.full_path.rstrip('?') if request.query_string else request.path,
+            logged_path,
             response.status_code,
             elapsed_ms
         )
