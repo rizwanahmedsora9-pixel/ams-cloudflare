@@ -327,14 +327,17 @@ def expenditures():
         AccountTransaction.transaction_type.in_(['Expense', 'Payment', 'Driver Payment']),
         AccountTransaction.from_account_id.isnot(None)
     )
-    if search:
-        like = f'%{search}%'
-        tx_q = tx_q.filter(or_(AccountTransaction.description.ilike(like), AccountTransaction.note.ilike(like)))
-    if category_f:
-        tx_q = tx_q.filter(AccountTransaction.description == category_f)
+    # Search and category filtering are applied below after linked Cash Flow
+    # metadata is loaded, so the visible category and recipient are searchable.
+    # Legacy rows still fall back to their transaction description.
     if method_f:
         tx_q = tx_q.join(Account, AccountTransaction.from_account_id == Account.id).filter(func.lower(Account.category) == method_f.lower())
     tx_expenditures = tx_q.all()
+    tx_ids = [tx.id for tx in tx_expenditures]
+    flow_by_tx = {}
+    if tx_ids:
+        flows = CashFlowEntry.query.filter(CashFlowEntry.account_tx_id.in_(tx_ids)).all()
+        flow_by_tx = {flow.account_tx_id: flow for flow in flows}
 
     all_expenditures = []
     for e in fbm_expenditures:
@@ -348,13 +351,29 @@ def expenditures():
         })
     for tx in tx_expenditures:
         acc = Account.query.get(tx.from_account_id)
+        flow = flow_by_tx.get(tx.id)
+        category = ('Driver / Delivery Services' if tx.transaction_type == 'Driver Payment'
+                    else ((flow.category.name if flow and flow.category else '')
+                          or tx.description or 'Expense'))
+        if category_f and category != category_f:
+            continue
+        if search:
+            searchable = ' '.join(filter(None, [
+                tx.description, tx.note, category,
+                flow.subcategory.name if flow and flow.subcategory else '',
+                flow.party_name if flow else '',
+            ])).lower()
+            if search.lower() not in searchable:
+                continue
+        note_parts = [tx.note or '']
+        if flow and flow.party_name:
+            note_parts.append(f'Recipient: {flow.party_name}')
         all_expenditures.append({
             'date_posted': tx.date_posted,
-            'category': ('Driver / Delivery Services' if tx.transaction_type == 'Driver Payment'
-                         else (tx.description or 'Expense')),
+            'category': category,
             'amount': float(tx.amount or 0),
             'method': (acc.category.capitalize() if acc else 'Other'),
-            'note': tx.note or '',
+            'note': ' · '.join(part for part in note_parts if part),
             'type': 'Account Transaction'
         })
 
@@ -393,6 +412,11 @@ def expenditures():
         AccountTransaction.description.isnot(None),
         AccountTransaction.description != ''
     ).distinct(AccountTransaction.description).all():
+        all_categories.add(r[0])
+    for r in db.session.query(CashFlowCategory.name).filter(
+        CashFlowCategory.is_active == True,
+        func.lower(func.coalesce(CashFlowCategory.direction, 'both')).in_(['out', 'both']),
+    ).distinct(CashFlowCategory.name).all():
         all_categories.add(r[0])
     categories = sorted(list(all_categories))
 

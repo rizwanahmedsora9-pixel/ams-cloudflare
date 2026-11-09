@@ -86,6 +86,18 @@ def delete_account_transaction(tx_id):
             payment = db.session.get(SupplierPayment, source_id)
             if not payment or not delete_supplier_payment(payment, actor=current_user):
                 raise ValueError('The linked supplier payment is already deleted or missing.')
+        elif source_type == 'CashFlowEntry':
+            # The ledger row and its category/party metadata must change as one
+            # document.  Voiding only AccountTransaction would leave Cash Flow
+            # and its audit trail disagreeing with the account balance.
+            from app.services.cash_flow_svc import void_manual_cash_flow_entry
+            entry = CashFlowEntry.query.filter_by(account_tx_id=tx.id).first()
+            if not entry:
+                raise ValueError('The linked Cash Flow entry is missing; no balance was changed.')
+            void_manual_cash_flow_entry(
+                entry, reason=(request.form.get('void_reason') or tx.note),
+                actor=current_user,
+            )
         else:
             from app.services.accounting import _void_account_tx
             from app.services.payments_crud import _assert_period_open
@@ -143,6 +155,28 @@ def edit_account_transaction(tx_id):
                 new_dt = tx.date_posted
         else:
             new_dt = tx.date_posted
+
+        linked_flow = (CashFlowEntry.query.filter_by(account_tx_id=tx.id).first()
+                       if (tx.source_type or '') == 'CashFlowEntry' else None)
+        if linked_flow:
+            from app.services.cash_flow_svc import update_manual_cash_flow_entry
+            update_manual_cash_flow_entry(
+                linked_flow, direction=linked_flow.direction, amount=new_amount,
+                account_id=(request.form.get('from_account_id', type=int) or linked_flow.account_id),
+                destination_account_id=linked_flow.destination_account_id,
+                category_id=linked_flow.category_id,
+                subcategory_id=linked_flow.subcategory_id,
+                party_id=linked_flow.party_id,
+                party_name=linked_flow.party_name,
+                party_type=linked_flow.party_type,
+                description=new_desc, note=new_note,
+                reference=linked_flow.reference, date_posted=new_dt,
+                reason=(request.form.get('edit_reason') or new_note),
+                actor=current_user, create_missing=False,
+            )
+            db.session.commit()
+            flash('Expense and its Cash Flow classification were updated together.', 'success')
+            return redirect(request.referrer or url_for('accounts.dashboard'))
 
         from app.services.accounting import _apply_account_tx_effect, _reverse_account_tx_effect
         from utils.accounting_audit import record_accounting_audit
@@ -446,6 +480,44 @@ def add_transaction():
                 db.session.add(tx)
                 audit_log(current_user, 'account.transaction.loan_payment', f'from={from_account.name}, to_loan={to_account.name}, amount={amount}')
                 flash('Loan payment recorded successfully.', 'success')
+
+            elif pay_target in ('personal_expense', 'other_expense'):
+                # Categories, subcategories and parties are mastered in Cash
+                # Flow, but the money movement is entered only from Accounts.
+                # Reuse the paired posting service so there is exactly one
+                # account movement and one linked classification row.
+                target_label = (request.form.get('target_label') or '').strip()
+                if not target_label:
+                    raise ValueError('Purpose / description is required for an expense.')
+                if from_account.id not in {a.id for a in _company_accounts()}:
+                    raise ValueError('Select a valid company cash or bank account for the expense.')
+
+                from app.services.cash_flow_svc import (
+                    SRC_ACCOUNT_EXPENSE, save_manual_cash_flow_entry,
+                )
+                entry, created = save_manual_cash_flow_entry(
+                    direction='out', amount=amount, account_id=from_account.id,
+                    category_id=request.form.get('expense_category_id', type=int),
+                    subcategory_id=request.form.get('expense_subcategory_id', type=int),
+                    party_id=request.form.get('expense_party_id', type=int),
+                    party_name='',
+                    description=target_label, note=note,
+                    reference=(request.form.get('reference') or '').strip(),
+                    date_posted=tx_date,
+                    idempotency_key=(request.form.get('idempotency_key') or '').strip() or None,
+                    actor=current_user, create_missing=False,
+                    require_party=True, allow_party_create=False,
+                    entry_source=SRC_ACCOUNT_EXPENSE,
+                )
+                if created:
+                    audit_log(
+                        current_user, 'account.transaction.expense',
+                        f'from={from_account.name}, category_id={entry.category_id}, '
+                        f'party_id={entry.party_id}, amount={amount}, entry_id={entry.id}',
+                    )
+                    flash('Expense recorded with its Cash Flow category and recipient.', 'success')
+                else:
+                    flash('This expense was already saved.', 'info')
 
             else:
                 target_label = (request.form.get('target_label') or '').strip()

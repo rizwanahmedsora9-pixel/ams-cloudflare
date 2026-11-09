@@ -1106,12 +1106,21 @@ def validate_manual_cash_flow(
     return direction, amount, account, destination
 
 
+def _cf_assert_open_period(account_id, posted_at, *, operation):
+    """Apply the same reconciled-period and locked-day rules as Accounts."""
+    from app.services.payments_crud import _assert_day_open, _assert_period_open
+
+    _assert_period_open(account_id, posted_at, operation=operation)
+    _assert_day_open(account_id, posted_at, operation=operation)
+
+
 def save_manual_cash_flow_entry(
     *, direction, amount, account_id, destination_account_id=None,
     category_id=None, category_name=None, subcategory_id=None, subcategory_name=None,
     party_id=None, party_name=None, party_type=None, description=None, note=None,
     reference=None, date_posted=None, idempotency_key=None, actor=None,
-    create_missing=True,
+    create_missing=True, require_party=False, allow_party_create=True,
+    entry_source=SRC_MANUAL,
 ):
     from app.services.accounting import _apply_account_tx_effect
 
@@ -1135,14 +1144,26 @@ def save_manual_cash_flow_entry(
     ) if direction != CF_DIR_TRANSFER else None
     sub = _cf_resolve_subcategory(cat, subcategory_id, subcategory_name, create_if_missing=create_missing)
     ptype = (party_type or 'other').strip().lower() or 'other'
+    if require_party and not party_id and not (party_name or '').strip():
+        raise ValueError('Party / recipient is required. Select a party created in Cash Flow.')
     party = _cf_find_party(party_id=party_id, name=party_name, party_type=ptype, active_only=True)
     if not party and (party_name or '').strip():
+        if not allow_party_create:
+            raise ValueError('Select an existing active party created in Cash Flow.')
         party, _ = save_cf_party(party_name, ptype)
+    if require_party and not party:
+        raise ValueError('Party / recipient is required. Select an active party created in Cash Flow.')
     if party:
         party_name = party.name
         ptype = party.party_type or ptype
 
     posted = date_posted or pk_now()
+    _cf_assert_open_period(account.id, posted, operation='posted')
+    if destination:
+        _cf_assert_open_period(destination.id, posted, operation='posted')
+    entry_source = (entry_source or SRC_MANUAL).strip().upper()
+    if entry_source not in (SRC_MANUAL, SRC_ACCOUNT_EXPENSE):
+        raise ValueError('Unsupported cash-flow entry source.')
     desc = (description or '').strip()
     if not desc:
         desc = (cat.name if cat else _cf_type_label(direction))
@@ -1164,7 +1185,7 @@ def save_manual_cash_flow_entry(
         party_type=ptype,
         description=desc, note=note, reference=reference,
         date_posted=posted, created_by=actor_name, updated_by=actor_name,
-        source_type=SRC_MANUAL, is_void=False, revision=1,
+        source_type=entry_source, is_void=False, revision=1,
         idempotency_key=key, created_at=pk_now(), updated_at=pk_now(),
     )
     db.session.add(entry)
@@ -1196,6 +1217,11 @@ def update_manual_cash_flow_entry(
         raise ValueError('A voided transaction cannot be edited. Restore it first.')
 
     before = _cf_snapshot(entry)
+    tx = db.session.get(AccountTransaction, entry.account_tx_id) if entry.account_tx_id else None
+    posted = date_posted or entry.date_posted or pk_now()
+    if tx:
+        for old_account_id in {tx.from_account_id, tx.to_account_id}:
+            _cf_assert_open_period(old_account_id, tx.date_posted, operation='edited')
     direction, amount, account, destination = validate_manual_cash_flow(
         direction=direction, amount=amount, account_id=account_id,
         destination_account_id=destination_account_id, category_id=category_id,
@@ -1203,8 +1229,10 @@ def update_manual_cash_flow_entry(
         subcategory_name=subcategory_name, require_category=True,
         create_missing=create_missing, check_balance=False,
     )
+    _cf_assert_open_period(account.id, posted, operation='posted')
+    if destination:
+        _cf_assert_open_period(destination.id, posted, operation='posted')
     # Reverse first so the insufficient-balance check sees the pre-transaction balance.
-    tx = db.session.get(AccountTransaction, entry.account_tx_id) if entry.account_tx_id else None
     if tx and not tx.is_void:
         _reverse_account_tx_effect(tx)
 
@@ -1221,12 +1249,13 @@ def update_manual_cash_flow_entry(
     ptype = (party_type or entry.party_type or 'other').strip().lower() or 'other'
     party = _cf_find_party(party_id=party_id, name=party_name, party_type=ptype, active_only=True)
     if not party and (party_name or '').strip():
+        if not create_missing:
+            raise ValueError('Select an existing active party created in Cash Flow.')
         party, _ = save_cf_party(party_name, ptype)
     if party:
         party_name = party.name
         ptype = party.party_type or ptype
 
-    posted = date_posted or entry.date_posted or pk_now()
     desc = (description or '').strip() or entry.description or _cf_type_label(direction)
     note = (note or '').strip() or None
     reference = (reference if reference is not None else entry.reference)
@@ -1276,6 +1305,9 @@ def void_manual_cash_flow_entry(entry, reason=None, actor=None):
         raise ValueError('This transaction is already voided.')
     before = _cf_snapshot(entry)
     tx = db.session.get(AccountTransaction, entry.account_tx_id) if entry.account_tx_id else None
+    if tx:
+        for account_id in {tx.from_account_id, tx.to_account_id}:
+            _cf_assert_open_period(account_id, tx.date_posted, operation='voided')
     if tx and not tx.is_void:
         _void_account_tx(tx)
         tx.voided_by = _cf_actor_name(actor)
@@ -1301,6 +1333,9 @@ def restore_manual_cash_flow_entry(entry, reason=None, actor=None):
         raise ValueError('This transaction is already active.')
     before = _cf_snapshot(entry)
     tx = db.session.get(AccountTransaction, entry.account_tx_id) if entry.account_tx_id else None
+    if tx:
+        for account_id in {tx.from_account_id, tx.to_account_id}:
+            _cf_assert_open_period(account_id, tx.date_posted, operation='restored')
     if tx and tx.is_void:
         _unvoid_account_tx(tx)
     entry.is_void = False
@@ -1447,8 +1482,9 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             note = e.note or tx.note or ''
             reference = getattr(e, 'reference', None) or f'TX-{tx.id}'
             origin = 'recorded'
-            origin_label = 'Recorded on Cash Flow'
             source_type = getattr(e, 'source_type', None) or SRC_MANUAL
+            origin_label = ('Recorded on Accounts' if source_type == SRC_ACCOUNT_EXPENSE
+                            else 'Recorded on Cash Flow')
         else:
             category = ''
             subcategory = ''
@@ -1497,7 +1533,7 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
                 or ''
             ),
             'section_label': cf_section_label(
-                tx.source_type or (source_type if e else None),
+                (source_type if e else tx.source_type),
                 tx.transaction_type,
                 default=(CF_SECTION_CASH_FLOW if e else CF_SECTION_ACCOUNTS),
             ),
