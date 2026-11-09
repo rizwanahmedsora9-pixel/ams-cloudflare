@@ -53,8 +53,8 @@
     <p><strong>{{ client.name }}</strong>{% if client.code %}<br>Client code: {{ client.code }}{% endif %}</p>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     {% if is_active %}
-      <p class="status">A QR access link is currently active. Print the same QR again any time — it stays valid; generate a replacement only if you think the code was shared or lost.</p>
       {% if can_print %}
+      <p class="status">A QR access link is currently active. Print the same QR again any time — it stays valid; generate a replacement only if you think the code was shared or lost.</p>
       <form method="post">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
@@ -62,7 +62,7 @@
         <button class="primary" type="submit">Print current QR</button>
       </form>
       {% else %}
-      <p class="warning">This QR was created before reprint support and cannot be shown again. Generate a replacement to print another copy.</p>
+      <p class="warning">A QR access link is currently active, but it was created before reprint support — the server only stored a fingerprint of the code, never the code itself, so it cannot be shown or printed again. Generate a replacement below: the new code will appear on this page with a Print button. The old printed code and its link will stop working as soon as the replacement is generated.</p>
       {% endif %}
     {% else %}
       <p class="small">No active public QR exists for this client.</p>
@@ -72,7 +72,7 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
       <input type="hidden" name="action" value="generate">
-      <button class="primary" type="submit">{{ 'Generate replacement QR' if is_active else 'Generate and print QR' }}</button>
+      <button class="primary" type="submit">{{ 'Generate replacement and show QR' if is_active else 'Generate and print QR' }}</button>
     </form>
     {% else %}<p class="warning">QR access can only be generated for an active, non-transferred client.</p>{% endif %}
     {% if is_active %}

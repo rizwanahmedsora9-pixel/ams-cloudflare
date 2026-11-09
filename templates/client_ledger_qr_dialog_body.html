@@ -45,12 +45,12 @@
     </form>
   {% else %}
     {% if is_active %}
+      {% if can_print %}
       <div class="alert alert-info py-2">
         A QR access link is currently active for this client. Print the same QR
         again any time — it stays valid; generate a replacement only if you
         think the code was shared or lost.
       </div>
-      {% if can_print %}
       <form method="post" class="js-qr-dialog-form"
             action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
@@ -62,8 +62,15 @@
         </button>
       </form>
       {% else %}
-      <p class="text-white-50 small">This QR was created before reprint support and
-        cannot be shown again — generate a replacement to view, download or print it here.</p>
+      <div class="alert alert-warning py-2">
+        A QR access link is currently active for this client, but it was created
+        before reprint support — the server only stored a fingerprint of the code,
+        never the code itself, so it cannot be shown or printed again.
+      </div>
+      <p class="text-white-50 small">To view, download or print a QR for this client,
+        generate a replacement below. The new code will appear right here with
+        <strong>Download</strong> and <strong>Print</strong> buttons. The old printed
+        code and its link will stop working as soon as the replacement is generated.</p>
       {% endif %}
     {% else %}
       <p class="text-white-50">No QR code has been generated for this client yet.
@@ -73,13 +80,13 @@
     {% if can_generate %}
     <form method="post" class="js-qr-dialog-form"
           action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
-          {% if is_active %}data-confirm="Generate a replacement QR? All previously printed codes for this client will stop working immediately."{% endif %}>
+          {% if is_active %}data-confirm="Generate a replacement QR? All previously printed codes for this client will stop working immediately. The new code will appear here with Download and Print buttons."{% endif %}>
       <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
       <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
       <input type="hidden" name="dialog" value="1">
       <input type="hidden" name="action" value="generate">
       <button type="submit" class="btn btn-warning fw-bold text-dark">
-        <i class="bi bi-qr-code me-1"></i> {{ 'Generate replacement QR' if is_active else 'Generate QR Code' }}
+        <i class="bi bi-qr-code me-1"></i> {{ 'Generate replacement and show QR' if is_active else 'Generate QR Code' }}
       </button>
     </form>
     {% else %}
