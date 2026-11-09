@@ -225,11 +225,32 @@
         bodyEl.firstElementChild.textContent = message;
     }
     function loadFragment(html) { bodyEl.innerHTML = html; }
+    function readFragment(response) {
+        // fetch follows login/permission redirects. Never insert a full app
+        // page into this dialog or mistake it for a successful QR operation.
+        if (response.redirected || response.status === 401) {
+            throw new Error('Your session or permissions changed. Reload the ledger and sign in again if needed.');
+        }
+        return response.text().then(function (text) {
+            var contentType = response.headers.get('Content-Type') || '';
+            if (contentType.indexOf('application/json') !== -1) {
+                var result;
+                try { result = JSON.parse(text); } catch (_) { result = {}; }
+                throw new Error(result.error || 'QR request failed (' + response.status + '). Reload the ledger and try again.');
+            }
+            if (text.indexOf('class="cl-qr-dialog ') !== -1) return text;
+            if (response.status === 403) {
+                throw new Error('You do not have permission to change client QR access.');
+            }
+            // Do not expose raw HTML error pages, tracebacks or SQL details.
+            throw new Error('QR request failed (' + response.status + '). Reload the ledger and try again. If it persists, contact support.');
+        });
+    }
 
     modalEl.addEventListener('show.bs.modal', function () {
         bodyEl.innerHTML = loadingHtml;
-        fetch(endpoint, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
-            .then(function (r) { if (!r.ok) throw new Error('QR could not be loaded (' + r.status + ').'); return r.text(); })
+        fetch(endpoint, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin', cache: 'no-store' })
+            .then(readFragment)
             .then(loadFragment)
             .catch(function (err) { showError(err.message || 'QR could not be loaded.'); });
     });
@@ -250,12 +271,9 @@
             method: 'POST', body: new FormData(form),
             headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin'
         })
-            .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, text: t }; }); })
-            .then(function (res) {
-                if (!res.ok && res.text.indexOf('cl-qr-dialog') === -1) throw new Error('Request failed. Please try again.');
-                loadFragment(res.text);
-            })
-            .catch(function (err) { showError(err.message || 'Request failed. Please try again.'); });
+            .then(readFragment)
+            .then(loadFragment)
+            .catch(function (err) { showError(err.message || 'Could not reach the server. Check your connection, then reopen the QR dialog.'); });
     });
 
     function qrSvg() { return bodyEl.querySelector('#clientLedgerQrCode svg'); }
