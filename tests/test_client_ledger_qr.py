@@ -267,6 +267,16 @@ def test_legacy_qr_without_salt_cannot_be_reprinted_but_offers_replacement(
     body = page.get_data(as_text=True)
     assert "Print current QR" not in body
     assert "before reprint support" in body
+    # The legacy state must not claim reprint is possible, and must point to
+    # the replacement flow instead.
+    assert "again any time" not in body
+    assert "Generate replacement and show QR" in body
+    dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
+    frag = dialog.get_data(as_text=True)
+    assert "Print current QR" not in frag
+    assert "before reprint support" in frag
+    assert "again any time" not in frag
+    assert "Generate replacement and show QR" in frag
     nonce = re.search(r'name="qr_nonce" value="([^"]+)"', body).group(1)
     rejected = client.post(f"/client_ledger_qr/{client_id}", data={
         "action": "print", "qr_nonce": nonce,
