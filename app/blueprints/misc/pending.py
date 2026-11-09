@@ -174,10 +174,10 @@ def import_pending_bills():
             f"Skipped: {report['skipped']}, Errors: {report['errors']}",
             'success'
         )
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger('pending_bills').exception('Pending bills import failed')
-        flash('Import failed: the file could not be processed. No data was changed. Check the file format and try again.', 'danger')
+        flash(f'Import failed: {exc or "the file could not be processed. No data was changed. Check the file format and try again."}', 'danger')
 
     return redirect(url_for('pending_bills'))
 

@@ -67,9 +67,9 @@ def delete_selected_data():
             )
             db.session.add(history_row)
             db.session.commit()
-        except Exception:
+        except Exception as exc:
             db.session.rollback()
-            flash('Pre-wipe history logging failed. Wipe blocked.', 'danger')
+            flash(f'Pre-wipe history logging failed: {exc or "wipe blocked."}', 'danger')
             return redirect(url_for('settings'))
 
     def _tq(model):
@@ -179,9 +179,9 @@ def delete_selected_data():
 
     try:
         backup_info = _create_pre_wipe_safety_backups(targets)
-    except Exception:
+    except Exception as exc:
         logging.getLogger('app').exception('Pre-wipe safety backup failed.')
-        flash('Pre-wipe backup failed, so the wipe was blocked. No data was changed. Please try again.', 'danger')
+        flash(f'Pre-wipe backup failed: {exc or "the wipe was blocked. No data was changed. Please try again."}', 'danger')
         return redirect(url_for('settings'))
 
     _RESET_CONTEXT = 'granular_wipe'
@@ -692,7 +692,7 @@ def delete_selected_data():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-        flash('Wipe failed: the operation could not be completed and no data was changed. Please try again; if the problem persists, contact support.', 'danger')
+        flash(f'Wipe failed: {exc or "the operation could not be completed and no data was changed. Please try again; if the problem persists, contact support."}', 'danger')
     finally:
         _RESET_CONTEXT = None
 

@@ -64,7 +64,7 @@ def merge_materials():
         flash(f'Successfully merged "{source_name}" into "{target_name}". All records updated.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash('Merge failed: the materials could not be merged. Please check the details and try again.', 'danger')
+        flash(f'Merge failed: {e or "the materials could not be merged. Please check the details and try again."}', 'danger')
 
     return redirect(url_for('materials'))
 
@@ -115,12 +115,11 @@ def add_material():
         )
         db.session.add(new_mat)
         db.session.commit()
-    except Exception:
+    except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('add_material failed for %r / %r', name, code)
         flash(
-            'The material could not be saved. Check that the category still '
-            'exists, the name/code are unique, then try again.',
+            f'The material could not be saved: {exc or "check that the category still exists, the name/code are unique, then try again."}',
             'danger',
         )
         return redirect(url_for('materials'))

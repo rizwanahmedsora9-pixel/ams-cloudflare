@@ -165,7 +165,7 @@ def settle_delivery_person(id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Driver settlement failed')
-        flash('Unable to record the driver payment: the payment could not be saved. Please check the details and try again.', 'danger')
+        flash(f'Unable to record the driver payment: {exc or "the payment could not be saved. Please check the details and try again."}', 'danger')
     return redirect(url_for('delivery_person_ledger', id=id))
 
 
@@ -203,7 +203,7 @@ def edit_delivery_person_payment(id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Driver payment edit failed')
-        flash('Unable to update the driver payment: the payment could not be updated. Please check the details and try again.', 'danger')
+        flash(f'Unable to update the driver payment: {exc or "the payment could not be updated. Please check the details and try again."}', 'danger')
     return redirect(url_for('delivery_person_ledger', id=person_id))
 
 
@@ -229,7 +229,7 @@ def void_delivery_person_payment(id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Driver payment reversal failed')
-        flash('Unable to reverse the driver payment: the payment could not be reversed. Please try again.', 'danger')
+        flash(f'Unable to reverse the driver payment: {exc or "the payment could not be reversed. Please try again."}', 'danger')
     return redirect(url_for('delivery_person_ledger', id=person_id))
 
 
@@ -254,7 +254,7 @@ def restore_delivery_person_payment(id):
     except Exception as exc:
         db.session.rollback()
         logging.getLogger(__name__).exception('Driver payment restore failed')
-        flash('Unable to restore the driver payment: the payment could not be restored. Please try again.', 'danger')
+        flash(f'Unable to restore the driver payment: {exc or "the payment could not be restored. Please try again."}', 'danger')
     return redirect(url_for('delivery_person_ledger', id=person_id))
 
 

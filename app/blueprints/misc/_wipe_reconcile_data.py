@@ -42,6 +42,6 @@ def reconcile_data():
         )
     except Exception as e:
         db.session.rollback()
-        flash('Reconciliation failed: the reconciliation could not be completed. Please try again.', 'danger')
+        flash(f'Reconciliation failed: {e or "the reconciliation could not be completed. Please try again."}', 'danger')
     return redirect(url_for('settings'))
 
