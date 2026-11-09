@@ -7,41 +7,11 @@ def _import_export_access_guard():
     if not current_user.is_authenticated:
         return None
     role = getattr(current_user, 'role', None)
-    endpoint = (request.endpoint or '')
-
-    root_only = {
-        'import_export.app_upgrade',
-        'import_export.app_upgrade_start',
-        'import_export.app_upgrade_status',
-        'import_export.app_upgrade_rollback',
-        'import_export.app_upgrade_migrate',
-    }
-    if endpoint in root_only:
-        flash('App Upgrade operations are disabled in single-store mode.', 'warning')
-        return redirect(url_for('index'))
 
     if role != 'admin':
         flash('Only admin can access Import/Export operations.', 'danger')
         return redirect(url_for('index'))
     return None
-
-
-def _tenant_release_dir(kind='artifacts'):
-    """
-    Store import/export snapshots in release folders under DEPLOY_BASE_DIR.
-    Layout:
-      <DEPLOY_BASE_DIR>/data/<kind>/
-    """
-    base_dir = current_app.config.get('DEPLOY_BASE_DIR') or os.path.join(os.path.expanduser('~'), 'releases')
-    username = _actor_username()
-    path = os.path.join(base_dir, 'data', _safe_name(username, 'admin'), _safe_name(kind, 'artifacts'))
-    try:
-        os.makedirs(path, exist_ok=True)
-        return path
-    except Exception:
-        fallback = os.path.join(current_app.instance_path, 'releases', _safe_name(username, 'admin'), _safe_name(kind, 'artifacts'))
-        os.makedirs(fallback, exist_ok=True)
-        return fallback
 
 
 def _set_import_actor_context(username=None, tenant_id=None, role=None):

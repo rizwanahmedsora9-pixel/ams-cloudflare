@@ -1625,8 +1625,6 @@ function toggleNavGroup(groupId, btn) {
             const rawAction = form.getAttribute('action') || '';
             const action = rawAction.toLowerCase();
             const method = ((form.getAttribute('method') || 'GET') + '').toUpperCase();
-            if (form.id === 'deployForm') return;
-            if (action.includes('/import_export/app_upgrade')) return;
             if (action.includes('/import_export/master/import/start')) return;
             const submitter = e.submitter || document.activeElement;
             const submitterText = submitter ? [submitter.textContent || '', submitter.value || '', submitter.getAttribute('title') || '', submitter.className || ''].join(' ') : '';

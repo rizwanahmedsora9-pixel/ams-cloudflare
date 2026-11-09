@@ -51,8 +51,6 @@ from typing import Optional
 
 log = logging.getLogger("app.auto_migrate")
 
-# Shared with blueprints/import_export/deploy.py's SQL runner so the startup
-# path and the release-deploy path never double-apply a file.
 HISTORY_TABLE = "migration_history"
 VERSION_TABLE = "schema_version"
 _FILE_RE = re.compile(r"^(\d+)[_\-].*\.sql$")

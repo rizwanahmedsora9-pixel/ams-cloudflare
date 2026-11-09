@@ -59,7 +59,3 @@ except Exception:  # pragma: no cover - startup diagnostics only
 
     app = application
 
-# Keep the signed webhook reachable even if the Flask factory fails at startup.
-# It is separate from Flask's session authentication and CSRF protection.
-from deploy_hook import wrap_application
-application = wrap_application(application)
