@@ -7,6 +7,7 @@ from .payments import *  # noqa
 from .grn_payments import *  # noqa
 from .accounts_crud import *  # noqa
 from .transactions import *  # noqa
+from .loans import *  # noqa
 from .kpis import *  # noqa
 # Classification registry + shared form logic are imported by the create/edit
 # views; imported here so they are part of the package namespace.

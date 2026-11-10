@@ -1587,17 +1587,12 @@ def _dr_can_resolve():
 
 
 def _dr_resolution_accounts():
-    """Accounts that can absorb a resolved difference (never a counter account)."""
-    from app.services.recon_counter import RECON_CATEGORY
-    return (
-        Account.query
-        .filter(
-            func.coalesce(Account.is_active, True) == True,  # noqa: E712
-            func.lower(func.trim(Account.category)) != RECON_CATEGORY,
-        )
-        .order_by(Account.name.asc(), Account.id.asc())
-        .all()
-    )
+    """Accounts that can absorb a resolved difference (never a system account)."""
+    from app.services.system_accounts import is_reserved_account
+    return [account for account in Account.query.filter(
+        func.coalesce(Account.is_active, True) == True,  # noqa: E712
+    ).order_by(Account.name.asc(), Account.id.asc()).all()
+        if not is_reserved_account(account)]
 
 
 def _dr_resolve_difference(*, actor=None, difference=None):

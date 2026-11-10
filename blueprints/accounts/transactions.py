@@ -63,6 +63,13 @@ def delete_account_transaction(tx_id):
     """Soft-void an entry or delegate to its canonical source record."""
     tx = AccountTransaction.query.get_or_404(tx_id)
     try:
+        from app.services.system_accounts import is_reserved_account, is_legacy_loan_account, account_is_reconciliation_source
+        if account_is_reconciliation_source(tx) or (tx.source_type or '').strip().lower() == 'loanprincipal' or any(
+            is_reserved_account(db.session.get(Account, account_id))
+            or is_legacy_loan_account(db.session.get(Account, account_id))
+            for account_id in (tx.from_account_id, tx.to_account_id) if account_id
+        ):
+            raise ValueError('Reconciliation and loan-register entries are system-managed; use their dedicated module.')
         if tx.reconciliation_id or (tx.source_type or '') == 'AccountReconciliation':
             raise ValueError('Reconciliation adjustments are immutable and cannot be deleted.')
         source_type = (tx.source_type or '').strip()
@@ -137,8 +144,22 @@ def delete_account_transaction(tx_id):
 def edit_account_transaction(tx_id):
     tx = AccountTransaction.query.get_or_404(tx_id)
     try:
+        from app.services.system_accounts import is_reserved_account, is_legacy_loan_account, account_is_reconciliation_source
+        if account_is_reconciliation_source(tx) or (tx.source_type or '').strip().lower() == 'loanprincipal' or any(
+            is_reserved_account(db.session.get(Account, account_id))
+            or is_legacy_loan_account(db.session.get(Account, account_id))
+            for account_id in (tx.from_account_id, tx.to_account_id) if account_id
+        ):
+            raise ValueError('Reconciliation and loan-register entries are system-managed; use their dedicated module.')
         if tx.reconciliation_id or tx.source_type in ('Payment', 'SupplierPayment', 'AccountReconciliation') or re.search(r'\[SRC:(?:Payment|ClientRefund|SupplierPayment):\d+\]', tx.note or '', re.IGNORECASE):
             raise ValueError('Linked financial entries must be edited from their shared source form; reconciliation entries are immutable.')
+        from app.services.system_accounts import is_reserved_account, is_legacy_loan_account
+        for field in ('from_account_id', 'to_account_id'):
+            submitted_id = request.form.get(field, type=int)
+            if submitted_id and is_reserved_account(db.session.get(Account, submitted_id)):
+                raise ValueError('Daily reconciliation counter accounts are system-only and cannot be used for manual Accounts entries.')
+            if submitted_id and is_legacy_loan_account(db.session.get(Account, submitted_id)):
+                raise ValueError('Legacy loan accounts are read-only. Record principal movements in the Loan Register.')
         from app.services.payments_crud import _assert_period_open
         for account_id in {tx.from_account_id, tx.to_account_id}:
             _assert_period_open(account_id, tx.date_posted, operation='edited')
@@ -235,6 +256,16 @@ def add_transaction():
             tx_date = pk_now()
 
     try:
+        from app.services.system_accounts import is_reserved_account, is_legacy_loan_account
+        for field in ('receive_account_id', 'receive_from_account_id', 'pay_from_account_id', 'pay_to_account_id'):
+            selected_id = request.form.get(field, type=int)
+            selected_account = db.session.get(Account, selected_id) if selected_id else None
+            if selected_account and is_reserved_account(selected_account):
+                raise ValueError('Daily reconciliation counter accounts are system-only and cannot be used for manual Accounts entries.')
+            if selected_account and is_legacy_loan_account(selected_account):
+                raise ValueError('Legacy loan accounts are read-only. Record borrowed principal or repayments in the Loan Register.')
+        if (request.form.get('receive_from_category') or '').strip().lower() == 'loan' or (request.form.get('pay_target') or '').strip().lower() == 'loan':
+            raise ValueError('Record loan principal received or repaid in the Loan Register.')
         if tx_mode == 'receive':
             receive_account_id = request.form.get('receive_account_id', type=int)
             receive_from_category = (request.form.get('receive_from_category') or 'client_ledger').strip()
@@ -583,6 +614,9 @@ def add_transfer():
                     'Daily reconciliation counter accounts cannot take manual '
                     'transfers. Resolve the difference from the differences report.'
                 )
+            from app.services.system_accounts import is_legacy_loan_account
+            if any(is_legacy_loan_account(account) for account in (from_account, to_account)):
+                raise ValueError('Legacy loan accounts are read-only. Record principal movements in the Loan Register.')
             if from_account.id == to_account.id:
                 raise ValueError('Source and destination accounts cannot be the same.')
             available_minor = int(from_account.balance_minor) if from_account.balance_minor is not None else to_minor(from_account.balance or 0)

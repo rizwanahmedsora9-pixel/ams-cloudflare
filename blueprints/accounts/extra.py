@@ -32,6 +32,8 @@ def audit_trail():
     date_from, date_to_excl = _parse_date_range(default_days=30)
 
     q = AccountTransaction.query.filter(
+        AccountTransaction.source_type.is_(None)
+        | ~func.lower(func.trim(AccountTransaction.source_type)).in_(['cashdaydifference', 'loanprincipal']),
         AccountTransaction.date_posted >= date_from,
         AccountTransaction.date_posted < date_to_excl
     )
@@ -57,7 +59,8 @@ def audit_trail():
         page=page, per_page=per_page, error_out=False
     )
     types = ['Receipt', 'Refund', 'Payment', 'Transfer', 'Supplier Payment', 'Driver Payment', 'Expense', 'Loss', 'Adjustment', 'Reconciliation Loss', 'Reconciliation Excess']
-    accounts = Account.query.order_by(Account.name.asc(), Account.id.asc()).all()
+    from .helpers import _not_system_account_query
+    accounts = _not_system_account_query(Account.query).order_by(Account.name.asc(), Account.id.asc()).all()
 
     audit_page = max(request.args.get('audit_page', 1, type=int) or 1, 1)
     audit_q = AccountingAuditLog.query.filter(

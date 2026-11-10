@@ -64,6 +64,7 @@ def dashboard():
         AccountTransaction.date_posted < today + timedelta(days=1),
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type.in_(['Expense', 'Payment', 'Driver Payment']),
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         AccountTransaction.from_account_id.isnot(None),
     ).scalar() or 0
     expenditures_today = float(drawer_expenditures_today or 0) + float(account_expenditures_today or 0)
@@ -87,6 +88,7 @@ def dashboard():
         AccountTransaction.date_posted < today + timedelta(days=1),
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type == 'Receipt',
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         AccountTransaction.to_account_id.isnot(None),
         # Booking/direct-sale/payment source rows are already represented by
         # their source document totals above.  Only standalone receipts belong

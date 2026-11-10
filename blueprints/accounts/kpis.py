@@ -101,6 +101,7 @@ def api_expenditures_today():
         AccountTransaction.date_posted < today + timedelta(days=1),
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type.in_(['Expense', 'Payment', 'Driver Payment']),
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         AccountTransaction.from_account_id.isnot(None)
     ).all()
 
@@ -176,6 +177,7 @@ def api_receipts_today():
         AccountTransaction.date_posted < today + timedelta(days=1),
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type == 'Receipt',
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         AccountTransaction.to_account_id.isnot(None),
         or_(
             AccountTransaction.note.is_(None),
@@ -235,6 +237,7 @@ def kpi_client_payments():
         AccountTransaction.date_posted >= date_from,
         AccountTransaction.date_posted < date_to_excl,
         AccountTransaction.transaction_type == 'Receipt',
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         or_(
             AccountTransaction.note.is_(None),
             ~AccountTransaction.note.ilike('%[SRC:%')
@@ -403,6 +406,7 @@ def kpi_expenditures():
         AccountTransaction.date_posted < date_to_excl,
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type.in_(['Expense', 'Payment', 'Driver Payment']),
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         AccountTransaction.transaction_type != 'Supplier Payment',
         AccountTransaction.from_account_id.isnot(None)
     ).all()
@@ -483,6 +487,7 @@ def kpi_receipts():
         AccountTransaction.date_posted < date_to_excl,
         AccountTransaction.is_void == False,
         AccountTransaction.transaction_type == 'Receipt',
+        func.lower(func.coalesce(AccountTransaction.source_type, '')) != 'loanprincipal',
         AccountTransaction.to_account_id.isnot(None),
         or_(
             AccountTransaction.note.is_(None),

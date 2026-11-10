@@ -1,5 +1,6 @@
 from .__base import *  # noqa
 from .helpers import *  # noqa
+from sqlalchemy import CheckConstraint
 
 class FbmCashDrawerEntry(db.Model):
     __tablename__ = 'fbm_cash_drawer_entry'
@@ -74,6 +75,45 @@ class Account(db.Model):
     # 'active') so existing filters keep working.
     account_status = db.Column(db.String(20), default='active', index=True)
     __mapper_args__ = {'version_id_col': revision}
+
+
+class LoanParty(db.Model):
+    """A person or organization from whom the business borrows principal."""
+    __tablename__ = 'loan_party'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(160), nullable=False, index=True)
+    note = db.Column(db.String(500))
+    opening_principal_minor = db.Column(db.BigInteger, nullable=False, default=0)
+    opening_principal_date = db.Column(db.Date, nullable=True)
+    is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=pk_model_now, nullable=False, index=True)
+    created_by = db.Column(db.String(80))
+    __table_args__ = (CheckConstraint('opening_principal_minor >= 0', name='ck_loan_party_opening_nonnegative'),)
+
+
+class LoanMovement(db.Model):
+    """Append-only loan principal movement linked to the real cash/bank leg."""
+    __tablename__ = 'loan_movement'
+    id = db.Column(db.Integer, primary_key=True)
+    loan_party_id = db.Column(db.Integer, db.ForeignKey('loan_party.id'), nullable=False, index=True)
+    movement_type = db.Column(db.String(16), nullable=False, index=True)  # received | repaid
+    amount_minor = db.Column(db.BigInteger, nullable=False)
+    cash_account_id = db.Column(db.Integer, db.ForeignKey('account.id'), nullable=False, index=True)
+    account_tx_id = db.Column(db.Integer, db.ForeignKey('account_transaction.id'), nullable=True, unique=True, index=True)
+    date_posted = db.Column(db.DateTime, default=pk_model_now, nullable=False, index=True)
+    reference = db.Column(db.String(100))
+    note = db.Column(db.String(500))
+    idempotency_key = db.Column(db.String(64), unique=True, nullable=True, index=True)
+    created_by = db.Column(db.String(80))
+    created_at = db.Column(db.DateTime, default=pk_model_now, nullable=False, index=True)
+    __table_args__ = (
+        CheckConstraint("movement_type IN ('received', 'repaid')", name='ck_loan_movement_type'),
+        CheckConstraint('amount_minor > 0', name='ck_loan_movement_amount_positive'),
+    )
+
+    loan_party = db.relationship('LoanParty', backref=db.backref('movements', lazy='dynamic'))
+    cash_account = db.relationship('Account')
+    account_transaction = db.relationship('AccountTransaction')
 
 
 class AccountCategory(db.Model):
