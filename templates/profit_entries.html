@@ -18,6 +18,8 @@
     {% set page_title = 'Profit Entries' %}{% set page_icon = 'bi-arrow-up-circle' %}
   {% elif entry_metric == 'loss' %}
     {% set page_title = 'Loss Entries' %}{% set page_icon = 'bi-arrow-down-circle' %}
+  {% elif entry_metric == 'expense_loss' %}
+    {% set page_title = 'Expenditures Losses' %}{% set page_icon = 'bi-receipt' %}
   {% elif entry_metric == 'unknown_cost' %}
     {% set page_title = 'Unresolved Cost Review' %}{% set page_icon = 'bi-exclamation-triangle' %}
   {% else %}
@@ -53,6 +55,8 @@
       {{ ui_tile(href=summary_url, label='Total Profit', value=("Rs. " ~ ("{:,.2f}".format(total_profit_sum))), icon='bi-arrow-up-circle', colour='green', sub=(profit_entry_count ~ ' profitable entries'), cta='Back to summary') }}
     {% elif entry_metric == 'loss' %}
       {{ ui_tile(href=summary_url, label='Total Loss', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries'), cta='Back to summary') }}
+    {% elif entry_metric == 'expense_loss' %}
+      {{ ui_tile(href=summary_url, label='Expenditures Losses', value=("Rs. " ~ ("{:,.2f}".format(total_expense_loss_sum))), icon='bi-receipt', colour='rose', sub=(expense_loss_entry_count ~ ' expense entries; losses by expenses only'), cta='Back to summary') }}
     {% else %}
       {{ ui_tile(href=summary_url, label='Sales (Money In)', value=("Rs. " ~ ("{:,.2f}".format(total_revenue))), icon='bi-bag-cash', colour='sky', sub='Earned revenue, net of returns', cta='Back to summary') }}
       {{ ui_tile(href=summary_url, label='COGS / Direct Service Cost', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Goods COGS plus direct service cost; open the summary for the split', cta='Back to summary') }}
@@ -66,7 +70,7 @@
       <div class="ui-toolbar"><span class="small text-muted">{{ entries_count }} entries · showing {{ pagination.start }}–{{ pagination.end }}</span>{% if entry_metric %}<a class="btn btn-outline-secondary btn-sm" href="{{ all_url }}">Show all entries</a>{% endif %}</div>
     </div>
     <div class="ui-card-body">
-      {% if entry_metric == 'unknown_cost' %}<p class="small text-warning">These rows remain visible for correction, but their result is excluded from net profit. Open a transaction to review its source and cost evidence.</p>{% elif entry_metric == 'profit' %}<p class="small text-muted">All qualified profitable entries in the selected period; paginated for review.</p>{% endif %}
+      {% if entry_metric == 'unknown_cost' %}<p class="small text-warning">These rows remain visible for correction, but their result is excluded from net profit. Open a transaction to review its source and cost evidence.</p>{% elif entry_metric == 'profit' %}<p class="small text-muted">All qualified profitable entries in the selected period; paginated for review.</p>{% elif entry_metric == 'expense_loss' %}<p class="small text-muted">Only losses happened by operating expenses / expenditures in the selected period (excludes sales, returns and other non-expense losses).</p>{% endif %}
       <div class="d-flex flex-column gap-3">
         {% for t in transactions %}
         <article class="entry-card">

@@ -117,6 +117,7 @@ def _template_context(report, period, period_label, report_url):
         "unknown_url": report_url(view="entries", metric="unknown_cost"),
         "profit_url": report_url(view="entries", metric="profit"),
         "loss_url": report_url(view="entries", metric="loss"),
+        "expense_loss_url": report_url(view="entries", metric="expense_loss"),
         "pl_card_links": {
             "delivered_goods_sales": report_url(view="entries", transaction_group="goods", metric="revenue"),
             "earned_service_revenue": report_url(view="entries", transaction_group="services", metric="revenue"),

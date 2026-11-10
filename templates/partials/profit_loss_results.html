@@ -74,7 +74,9 @@
   </div>
   <div class="ui-kpi-grid">
     {{ ui_tile(href=profit_url, label='Profitable Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_profit_sum))), icon='bi-arrow-up-circle', colour='green', sub=(profit_entry_count ~ ' profitable entries; not the net result'), cta='View profit entries') }}
-    {# Hidden at owner request: 'Loss-making Entries Total' and 'Profit (Money Kept)' tiles. #}
+    {{ ui_tile(href=loss_url, label='Loss-making Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries; not the net result'), cta='View loss entries') }}
+    {{ ui_tile(href=expense_loss_url, label='Expenditures Losses', value=("Rs. " ~ ("{:,.2f}".format(total_expense_loss_sum))), icon='bi-receipt', colour='rose', sub=(expense_loss_entry_count ~ ' expense entries; losses by expenses only'), cta='View expense losses') }}
+    {{ ui_tile(href=entries_url, label='Profit (Money Kept)', value=("Rs. " ~ ("{:,.2f}".format(total_profit))), icon='bi-cash-coin', colour=('green' if total_profit >= 0 else 'red'), sub='Net result after FIFO cost, service cost and expenses', cta='See transactions') }}
     {{ ui_tile(href=report_url(view='entries', metric='revenue'), label='Sales (Money In)', value=("Rs. " ~ ("{:,.2f}".format(total_revenue))), icon='bi-bag-cash', colour='sky', sub='Earned material + delivery + other income, net of returns', cta='See revenue entries') }}
     {{ ui_tile(href=report_url(view='entries', metric='cogs'), label='COGS + Direct Service Cost', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Goods COGS + direct delivery/service cost; the split is shown below', cta='See cost entries') }}
     {{ ui_tile(href=url_for('financial_details', start_date=start_date, end_date=end_date), label='Money Received', value=("Rs. " ~ ("{:,.2f}".format(payment_received_total))), icon='bi-wallet2', colour='teal', sub='Settlement information only — never new profit', cta='Open financial details') }}
@@ -808,6 +810,7 @@
         <div class="ui-card-body">
           <div class="pl-mini-row"><span>Profitable entries</span><strong class="pos">Rs. {{ money(total_profit_sum) }} <span class="small text-muted">({{ profit_entry_count }})</span></strong></div>
           <div class="pl-mini-row"><span>Loss entries</span><strong class="neg">Rs. {{ money(total_loss_sum) }} <span class="small text-muted">({{ loss_entry_count }})</span></strong></div>
+          <div class="pl-mini-row"><span>Expenditures losses (expenses only)</span><strong class="neg">Rs. {{ money(total_expense_loss_sum) }} <span class="small text-muted">({{ expense_loss_entry_count }})</span></strong></div>
           <div class="pl-mini-row"><span>Sales (money in)</span><strong>Rs. {{ money(total_revenue) }}</strong></div>
           <div class="pl-mini-row"><span>Cost of goods (money out)</span><strong>Rs. {{ money(total_cogs) }}</strong></div>
           <div class="pl-mini-row"><span>Discounts on this period's sales</span><strong>Rs. {{ money(summary.total_discounts) }}</strong></div>
