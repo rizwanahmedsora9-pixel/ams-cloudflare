@@ -559,10 +559,13 @@ def hard_delete_transaction(kind, obj_id):
                 db.session.query(BookingItem.id).filter(BookingItem.booking_id == booking.id)
             )
         ).delete(synchronize_session=False)
-        PendingBill.query.filter(
+        for pb in PendingBill.query.filter(
             PendingBill.source_table == 'booking',
-            PendingBill.source_id == booking.id
-        ).delete(synchronize_session=False)
+            PendingBill.source_id == booking.id,
+        ).all():
+            # Same rule as a sale: a pending bill's follow-up reminders and
+            # contact log must go with it, or their foreign key blocks the delete.
+            hard_delete_pending_bill(pb)
         # Cancel entries only exist because of this booking — remove them
         # instead of leaving them flagged.
         if _booking_bill_refs(booking):
@@ -593,7 +596,13 @@ def hard_delete_transaction(kind, obj_id):
         SaleDeliveryPerson.query.filter_by(sale_id=sale.id).delete(synchronize_session=False)
         BookingAllocation.query.filter_by(sale_id=sale.id).delete(synchronize_session=False)
         _delete_sale_grn_allocations(sale)
-        PendingBill.query.filter(PendingBill.source_table == 'direct_sale', PendingBill.source_id == sale.id).delete(synchronize_session=False)
+        for pb in PendingBill.query.filter(
+            PendingBill.source_table == 'direct_sale',
+            PendingBill.source_id == sale.id,
+        ).all():
+            # A pending bill owns follow-up reminders/contacts; deleting the bill
+            # row on its own trips their foreign key and aborts the whole delete.
+            hard_delete_pending_bill(pb)
 
         # A credit sale may own an Invoice row.  Hard-deleting only the sale
         # leaves an active orphan invoice that still appears in bill searches
