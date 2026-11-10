@@ -117,5 +117,9 @@ def import_run(run):
                     db.session.flush()
             obj=Material(code='MIG-'+str(uuid.uuid4())[:8].upper(),name=d['Material Name'],category_id=cat.id if cat else None,unit=d['Unit'] or 'Bags',unit_price=float(d['Unit Price'] or 0))
         else: obj=Account(name=d['Account Name'],type=d['Account Type'],account_type=d['Account Type'],category=d['Category'],balance=float(d['Opening Balance'] or 0),opening_balance=float(d['Opening Balance'] or 0),bank_name=d['Bank Name'] or None,account_number=d['Account Number'] or None)
-        db.session.add(obj); db.session.flush(); row.status='IMPORTED'; row.entity_type=run.template_type[:-1].title(); row.new_entity_id=obj.id; row.imported_at=datetime.utcnow(); db.session.add(MigrationMapping(template_type=run.template_type,legacy_reference=ref,entity_type=row.entity_type,entity_id=obj.id,run_id=run.id)); created+=1
+        db.session.add(obj); db.session.flush()
+        if run.template_type=='CLIENTS':
+            from app.services.client_qr import ensure_client_ledger_qr
+            ensure_client_ledger_qr(obj)
+        row.status='IMPORTED'; row.entity_type=run.template_type[:-1].title(); row.new_entity_id=obj.id; row.imported_at=datetime.utcnow(); db.session.add(MigrationMapping(template_type=run.template_type,legacy_reference=ref,entity_type=row.entity_type,entity_id=obj.id,run_id=run.id)); created+=1
     run.status='COMPLETED'; run.imported_at=datetime.utcnow(); summary=json.loads(run.summary_json); summary['Created']=created; run.summary_json=json.dumps(summary); db.session.commit(); return created

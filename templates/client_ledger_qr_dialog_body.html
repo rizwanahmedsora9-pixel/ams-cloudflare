@@ -34,15 +34,28 @@
       live ledger.
       {% endif %}
     </div>
-    <form method="post" class="js-qr-dialog-form d-inline"
-          action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
-          data-confirm="Revoke this client ledger QR? The printed code will stop working.">
-      <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
-      <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
-      <input type="hidden" name="dialog" value="1">
-      <input type="hidden" name="action" value="revoke">
-      <button type="submit" class="btn btn-outline-danger btn-sm">Revoke this QR</button>
-    </form>
+    <div class="d-flex justify-content-center gap-2 flex-wrap">
+      {% if can_generate %}
+      <form method="post" class="js-qr-dialog-form d-inline"
+            action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
+            data-confirm="Generate a replacement QR? All previously printed codes for this client will stop working immediately.">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="dialog" value="1">
+        <input type="hidden" name="action" value="generate">
+        <button type="submit" class="btn btn-outline-warning btn-sm">Generate replacement and show QR</button>
+      </form>
+      {% endif %}
+      <form method="post" class="js-qr-dialog-form d-inline"
+            action="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}"
+            data-confirm="Revoke this client ledger QR? The printed code will stop working.">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="dialog" value="1">
+        <input type="hidden" name="action" value="revoke">
+        <button type="submit" class="btn btn-outline-danger btn-sm">Revoke this QR</button>
+      </form>
+    </div>
   {% else %}
     {% if is_active %}
       {% if can_print %}

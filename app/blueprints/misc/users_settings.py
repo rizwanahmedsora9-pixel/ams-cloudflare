@@ -191,6 +191,17 @@ def update_settings():
     settings_obj.company_note_ur = (request.form.get('company_note_ur') or '').strip()
     settings_obj.currency = request.form.get('currency', settings_obj.currency or 'PKR')
     settings_obj.allow_global_negative_stock = 'allow_global_negative_stock' in request.form
+    if 'public_base_url' in request.form:
+        from app.services.public_url import normalize_public_origin
+        raw_public_url = (request.form.get('public_base_url') or '').strip()
+        if raw_public_url:
+            normalized_url = normalize_public_origin(raw_public_url, allow_http=True)
+            if not normalized_url:
+                flash('Public QR / Cloudflare Worker URL must be a valid http:// or https:// origin with no path (e.g. https://still-base-ac7a.rizwanahmedsora9.workers.dev).', 'danger')
+                return redirect(url_for('settings'))
+            settings_obj.public_base_url = normalized_url
+        else:
+            settings_obj.public_base_url = ''
 
     db.session.commit()
     flash('Settings updated successfully', 'success')

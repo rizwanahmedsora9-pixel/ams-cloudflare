@@ -63,6 +63,8 @@ def import_dispatch_data():
                 if not client:
                     client = Client(code=code, name=name, category=(c_cat or 'General'))
                     db.session.add(client)
+                    from app.services.client_qr import ensure_client_ledger_qr
+                    ensure_client_ledger_qr(client)
                 elif c_cat:
                     client.category = c_cat
 

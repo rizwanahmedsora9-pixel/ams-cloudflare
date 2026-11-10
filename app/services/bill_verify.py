@@ -261,13 +261,11 @@ def base_url():
     addressed by name keeps that name: its proxy routes on the Host header, so
     substituting a LAN address would break the link.
     """
-    configured = ''
-    try:
-        configured = (current_app.config.get('PUBLIC_BASE_URL') or '').strip()
-    except Exception:
-        configured = ''
+    from app.services.public_url import resolve_public_base_url
+
+    configured = resolve_public_base_url(allow_http=True)
     if configured:
-        return configured.rstrip('/')
+        return configured
     try:
         from flask import request
         if request:

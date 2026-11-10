@@ -75,8 +75,8 @@
 
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
     <div class="small text-muted">
-      A finalised day posts each difference to a counter account, so the accounts match the count;
-      the difference itself never touches sales or profit.
+      Saving a counted balance immediately posts any difference between the counted account and its counter account so Accounts reflects your count;
+      finalising the day freezes these totals for tomorrow. Differences never touch sales or profit.
     </div>
     <div class="d-flex flex-wrap gap-2">
       {% if dr.day_lock %}
@@ -108,7 +108,7 @@
         <div class="small text-secondary">Final day close by {{ dr.day_lock.locked_by or '—' }} on {{ dr.day_lock.locked_at.strftime('%Y-%m-%d %H:%M') if dr.day_lock.locked_at else '—' }}. Locked counted totals are carried to the next day's opening. {{ dr.shift_closes|length }} shift close checkpoint{{ '' if dr.shift_closes|length == 1 else 's' }} retained below.</div>
       </div>
     </div>
-    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Unlock day {{ dr.day_str }}? Any counter-account posting made when the day was finalised will be reversed, and next day openings revert to the ledger.');">
+    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Unlock day {{ dr.day_str }}? You can edit or clear counts and add transactions for this day; saved count postings remain synced with Accounts until edited or cleared.');">
       <input type="hidden" name="day" value="{{ dr.day_str }}">
       {% if dr.embed %}<input type="hidden" name="return_to" value="{{ dr_return_to }}">{% endif %}
       <button class="btn btn-outline-primary fw-bold" name="action" value="unlock"><i class="bi bi-unlock me-1"></i> Unlock Day</button>
@@ -126,7 +126,7 @@
         <div class="small text-secondary">Record one or more shift closes as staff hand over; finalize the day only after the last shift. {{ dr.shift_closes|length }} shift close checkpoint{{ '' if dr.shift_closes|length == 1 else 's' }} recorded.</div>
       </div>
     </div>
-    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Finalize and lock day {{ dr.day_str }}? This is the final daily close. Every difference is posted to the counter accounts (a shortage is sent to {{ dr.counter_less.name if dr.counter_less else 'the Counter Less account' }}, an excess is received from {{ dr.counter_excess.name if dr.counter_excess else 'the Counter Excess account' }}), and the counted totals become the next day opening balances.');">
+    <form method="POST" action="{{ dr_post_action }}" onsubmit="return confirm('Finalize and lock day {{ dr.day_str }}? This is the final daily close. Any remaining unposted differences are posted to the counter accounts ({{ dr.counter_less.name if dr.counter_less else 'Counter Less Account' }} / {{ dr.counter_excess.name if dr.counter_excess else 'Counter Excess Account' }}), and the counted totals become the next day opening balances.');">
       <input type="hidden" name="day" value="{{ dr.day_str }}">
       {% if dr.embed %}<input type="hidden" name="return_to" value="{{ dr_return_to }}">{% endif %}
       <input type="text" name="note" class="form-control form-control-sm me-2" style="max-width:260px;"
@@ -221,23 +221,23 @@
       <div class="col-md-4">
         <div class="dr-kpi">
           <div class="lbl">Counted less (shortage)</div>
-          <div class="val dr-mono text-danger">Rs. {{ "{:,.0f}".format(-(dr.posting.less_total or 0)) }}</div>
-          <div class="small text-muted mt-1">sent to {{ dr.counter_less.name if dr.counter_less else 'Counter Less Account' }}</div>
+          <div class="val dr-mono text-danger" data-dr-counter="less">Rs. {{ "{:,.0f}".format(-(dr.posting.less_total or 0)) }}</div>
+          <div class="small text-muted mt-1">sent to <span data-dr-counter-name="less">{{ dr.counter_less.name if dr.counter_less else 'Counter Less Account' }}</span></div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="dr-kpi">
           <div class="lbl">Counted more (excess)</div>
-          <div class="val dr-mono text-primary">Rs. {{ "{:,.0f}".format(dr.posting.excess_total or 0) }}</div>
-          <div class="small text-muted mt-1">received from {{ dr.counter_excess.name if dr.counter_excess else 'Counter Excess Account' }}</div>
+          <div class="val dr-mono text-primary" data-dr-counter="excess">Rs. {{ "{:,.0f}".format(dr.posting.excess_total or 0) }}</div>
+          <div class="small text-muted mt-1">received from <span data-dr-counter-name="excess">{{ dr.counter_excess.name if dr.counter_excess else 'Counter Excess Account' }}</span></div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="dr-kpi">
           <div class="lbl">Counter accounts hold now</div>
-          <div class="val dr-mono {% if dr.counter_total == 0 %}text-success{% else %}text-danger{% endif %}">Rs. {{ "{:,.0f}".format(dr.counter_total or 0) }}</div>
+          <div class="val dr-mono {% if dr.counter_total == 0 %}text-success{% else %}text-danger{% endif %}" data-dr-counter="total">Rs. {{ "{:,.0f}".format(dr.counter_total or 0) }}</div>
           <div class="small text-muted mt-1">
-            {{ dr.posting.count }} difference{{ '' if dr.posting.count == 1 else 's' }} on this day{% if dr.posting.open_count %} ({{ dr.posting.open_count }} still unexplained){% endif %} ·
+            <span data-dr-counter="summary">{{ dr.posting.count }} difference{{ '' if dr.posting.count == 1 else 's' }} on this day{% if dr.posting.open_count %} ({{ dr.posting.open_count }} still unexplained){% endif %}</span> ·
             <a href="{{ url_for('daily_reconciliation_differences') }}">differences report</a>
           </div>
         </div>
@@ -298,7 +298,7 @@
                 {% if shown_diff == 0 %}<span class="dr-badge-recon">0 (RECONCILED)</span>
                 {% else %}<span class="dr-badge-diff">{{ "{:,.0f}".format(shown_diff) }}</span>{% endif %}
                 {% if p.posting and p.posting.status == 'posted' and p.posting.difference %}
-                  <div class="small mt-1 text-primary fw-semibold" title="Posted to {{ p.posting.counter_name }} at finalisation">
+                  <div class="small mt-1 text-primary fw-semibold" title="Posted to {{ p.posting.counter_name }}">
                     <i class="bi bi-arrow-left-right me-1"></i>
                     {{ 'sent to ' if p.posting.difference < 0 else 'received from ' }}{{ p.posting.counter_name }}
                     · ATX-{{ p.posting.posted_out_tx_id }}
@@ -307,8 +307,8 @@
                   <div class="small mt-1 text-muted" title="Resolved by {{ p.posting.resolved_by or 'unknown' }}">
                     <i class="bi bi-check2-circle me-1"></i>Resolved by {{ p.posting.resolved_by or 'unknown' }}
                   </div>
-                {% elif p.posting and p.posting.status == 'reversed' %}
-                  <div class="small mt-1 text-muted"><i class="bi bi-arrow-counterclockwise me-1"></i>Posting reversed (day reopened)</div>
+                {% elif p.posting and p.posting.status == 'reversed' and shown_diff != 0 %}
+                  <div class="small mt-1 text-muted"><i class="bi bi-arrow-counterclockwise me-1"></i>Posting reversed</div>
                 {% endif %}
               {% else %}<span class="text-muted">—</span>{% endif %}
             </td>
@@ -367,11 +367,53 @@
       el.classList.toggle('text-success', !none && Number(value) === 0);
     }
   }
-  function diffHtml(p){
-    if (p.effective_counted === null || p.effective_counted === undefined) return '<span class="text-muted">—</span>';
-    const d = Number(p.difference || 0);
-    if (d === 0) return '<span class="dr-badge-recon">0 (RECONCILED)</span>';
-    return '<span class="dr-badge-diff">' + money0.format(d) + '</span>';
+  function renderDiffCell(cell, p){
+    cell.textContent = '';
+    if (p.effective_counted === null || p.effective_counted === undefined) {
+      const dash = document.createElement('span');
+      dash.className = 'text-muted';
+      dash.textContent = '—';
+      cell.appendChild(dash);
+      return;
+    }
+    const d = Number((p.posted_difference !== null && p.posted_difference !== undefined) ? p.posted_difference : (p.difference || 0));
+    const badge = document.createElement('span');
+    if (d === 0) {
+      badge.className = 'dr-badge-recon';
+      badge.textContent = '0 (RECONCILED)';
+    } else {
+      badge.className = 'dr-badge-diff';
+      badge.textContent = money0.format(d);
+    }
+    cell.appendChild(badge);
+    const posting = p.posting;
+    if (posting && posting.status === 'posted' && posting.difference) {
+      const info = document.createElement('div');
+      info.className = 'small mt-1 text-primary fw-semibold';
+      info.title = 'Posted to ' + (posting.counter_name || '');
+      const icon = document.createElement('i');
+      icon.className = 'bi bi-arrow-left-right me-1';
+      info.appendChild(icon);
+      const prefix = Number(posting.difference) < 0 ? 'sent to ' : 'received from ';
+      info.appendChild(document.createTextNode(prefix + (posting.counter_name || '') + ' · ATX-' + (posting.posted_out_tx_id || '')));
+      cell.appendChild(info);
+    } else if (posting && posting.status === 'resolved') {
+      const info = document.createElement('div');
+      info.className = 'small mt-1 text-muted';
+      const icon = document.createElement('i');
+      icon.className = 'bi bi-check2-circle me-1';
+      info.appendChild(icon);
+      info.appendChild(document.createTextNode('Resolved by ' + (posting.resolved_by || 'unknown')));
+      cell.appendChild(info);
+    } else if (posting && posting.status === 'reversed' && d !== 0) {
+      const info = document.createElement('div');
+      info.className = 'small mt-1 text-muted';
+      const icon = document.createElement('i');
+      icon.className = 'bi bi-arrow-counterclockwise me-1';
+      info.appendChild(icon);
+      info.appendChild(document.createTextNode('Posting reversed'));
+      cell.appendChild(info);
+    }
   }
   function updateBoard(payload){
     if (!payload || !Array.isArray(payload.positions)) return;
@@ -383,6 +425,33 @@
       const n = payload.counted_accounts || 0;
       const t = payload.accounts_total || 0;
       summary.textContent = n + ' of ' + t + ' account' + (t === 1 ? '' : 's') + ' counted';
+    }
+    if (payload.posting) {
+      const lessEl = document.querySelector('[data-dr-counter="less"]');
+      const excessEl = document.querySelector('[data-dr-counter="excess"]');
+      const totalEl = document.querySelector('[data-dr-counter="total"]');
+      const cSumEl = document.querySelector('[data-dr-counter="summary"]');
+      if (lessEl) lessEl.textContent = rs(-(payload.posting.less_total || 0));
+      if (excessEl) excessEl.textContent = rs(payload.posting.excess_total || 0);
+      if (totalEl) {
+        const ct = Number(payload.counter_total || 0);
+        totalEl.textContent = rs(ct);
+        totalEl.classList.toggle('text-success', ct === 0);
+        totalEl.classList.toggle('text-danger', ct !== 0);
+      }
+      if (cSumEl) {
+        const cnt = payload.posting.count || 0;
+        const openCnt = payload.posting.open_count || 0;
+        cSumEl.textContent = cnt + ' difference' + (cnt === 1 ? '' : 's') + ' on this day' + (openCnt ? (' (' + openCnt + ' still unexplained)') : '');
+      }
+    }
+    if (payload.counter_less_name) {
+      const ln = document.querySelector('[data-dr-counter-name="less"]');
+      if (ln) ln.textContent = payload.counter_less_name;
+    }
+    if (payload.counter_excess_name) {
+      const en = document.querySelector('[data-dr-counter-name="excess"]');
+      if (en) en.textContent = payload.counter_excess_name;
     }
     payload.positions.forEach(function(p){
       const row = document.querySelector('[data-dr-row="' + p.account_id + '"]');
@@ -397,7 +466,7 @@
       };
       Object.keys(map).forEach(function(k){ const el = row.querySelector('[data-dr-field="' + k + '"]'); if (el) el.textContent = map[k]; });
       const diff = row.querySelector('[data-dr-field="difference"]');
-      if (diff) diff.innerHTML = diffHtml(p);
+      if (diff) renderDiffCell(diff, p);
       const input = row.querySelector('input[name="counted"]');
       if (input) {
         input.placeholder = money0.format(Number(p.expected_closing || 0));

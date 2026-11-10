@@ -86,7 +86,7 @@ def test_client_qr_generation_uses_worker_origin_and_revoke_invalidates_it(app, 
 
 
 def test_client_qr_dialog_fragment_generates_qr_with_download_and_print(app, client):
-    """More -> QR Code: the in-ledger dialog generates and shows the big QR."""
+    """More -> QR Code: the in-ledger dialog auto-generates and shows the big QR."""
     app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
     with app.app_context():
         row = Client(code="QR-DIALOG", name="Dialog QR Client", is_active=True)
@@ -99,15 +99,22 @@ def test_client_qr_dialog_fragment_generates_qr_with_download_and_print(app, cli
         sess["_user_id"] = str(admin_id)
         sess["_fresh"] = True
 
-    # The ledger's "More" menu opens this dialog.
+    # The ledger's "More" menu opens this dialog; an existing active client
+    # without a QR yet gets one automatically and renders the SVG immediately.
     dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
     assert dialog.status_code == 200
     body = dialog.get_data(as_text=True)
-    assert "Generate QR Code" in body
+    assert "clientLedgerQrCode" in body and "<svg" in body
+    assert "clientLedgerQrDownload" in body
+    assert "clientLedgerQrPrint" in body
+    assert body.index("clientLedgerQrCode") < body.index("clientLedgerQrDownload")
     assert 'name="dialog" value="1"' in body
+    with app.app_context():
+        first_hash = db.session.get(Client, client_id).client_ledger_qr_token_hash
+        assert first_hash
     nonce = re.search(r'name="qr_nonce" value="([^"]+)"', body).group(1)
 
-    # Generating inside the dialog returns the QR fragment (not a new page),
+    # Replacing inside the dialog returns the rotated QR fragment (not a new page),
     # with Download / Print directly below the code.
     generated = client.post(f"/client_ledger_qr/{client_id}", data={
         "action": "generate", "qr_nonce": nonce, "dialog": "1",
@@ -119,7 +126,8 @@ def test_client_qr_dialog_fragment_generates_qr_with_download_and_print(app, cli
     assert "clientLedgerQrPrint" in body
     assert body.index("clientLedgerQrCode") < body.index("clientLedgerQrDownload")
     with app.app_context():
-        assert db.session.get(Client, client_id).client_ledger_qr_token_hash
+        rotated_hash = db.session.get(Client, client_id).client_ledger_qr_token_hash
+        assert rotated_hash and rotated_hash != first_hash
 
     # The dialog needs staff permission.
     with client.session_transaction() as sess:
@@ -128,7 +136,7 @@ def test_client_qr_dialog_fragment_generates_qr_with_download_and_print(app, cli
 
 
 def test_client_qr_can_be_reprinted_without_rotating(app, client, monkeypatch):
-    """The active QR can be printed again — the same code stays valid."""
+    """Re-opening or printing the active QR never rotates it; replacing does."""
     monkeypatch.setattr(qr_routes, "_build_client_ledger_rows",
                         lambda _client: ([], [], 0, 0, 0, {}))
     monkeypatch.setattr(qr_routes, "client_material_summary", lambda _client: ({}, 0))
@@ -145,15 +153,10 @@ def test_client_qr_can_be_reprinted_without_rotating(app, client, monkeypatch):
         sess["_user_id"] = str(admin_id)
         sess["_fresh"] = True
 
-    # Generate the first QR.
+    # Opening the QR page auto-generates and renders the QR immediately.
     page = client.get(f"/client_ledger_qr/{client_id}")
-    nonce = re.search(r'name="qr_nonce" value="([^"]+)"',
-                      page.get_data(as_text=True)).group(1)
-    first = client.post(f"/client_ledger_qr/{client_id}", data={
-        "action": "generate", "qr_nonce": nonce,
-    })
-    assert first.status_code == 200
-    assert b"<svg" in first.data
+    assert page.status_code == 200
+    assert b"<svg" in page.data
 
     with app.app_context():
         row = db.session.get(Client, client_id)
@@ -165,10 +168,11 @@ def test_client_qr_can_be_reprinted_without_rotating(app, client, monkeypatch):
         assert hashlib.sha256(token.encode("ascii")).hexdigest() == hash_after_generate
     assert client.get(f"/c/{token}").status_code == 200
 
-    # The settings page now offers reprinting the active QR.
+    # Re-opening the page renders the exact same active QR without rotating it.
     page = client.get(f"/client_ledger_qr/{client_id}")
     body = page.get_data(as_text=True)
-    assert "Print current QR" in body
+    assert "<svg" in body
+    assert "current active QR" in body
     nonce = re.search(r'name="qr_nonce" value="([^"]+)"', body).group(1)
     reprint = client.post(f"/client_ledger_qr/{client_id}", data={
         "action": "print", "qr_nonce": nonce,
@@ -185,10 +189,11 @@ def test_client_qr_can_be_reprinted_without_rotating(app, client, monkeypatch):
         assert row.client_ledger_qr_token_salt == salt
     assert client.get(f"/c/{token}").status_code == 200
 
-    # The dialog also offers reprinting, without rotating.
+    # Opening the dialog also shows the active QR directly, without rotating.
     dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
     body = dialog.get_data(as_text=True)
-    assert "Print current QR" in body
+    assert "clientLedgerQrCode" in body and "<svg" in body
+    assert "clientLedgerQrPrint" in body
     nonce = re.search(r'name="qr_nonce" value="([^"]+)"', body).group(1)
     reprint_dialog = client.post(f"/client_ledger_qr/{client_id}", data={
         "action": "print", "qr_nonce": nonce, "dialog": "1",
@@ -288,7 +293,7 @@ def test_legacy_qr_without_salt_cannot_be_reprinted_but_offers_replacement(
 
 
 def test_material_ledger_page_opens_qr_dialog_and_generates_in_it(app, client):
-    """The Client Ledger page opens the QR dialog without the settings page."""
+    """The Client Ledger page opens the QR dialog and shows the QR automatically."""
     app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
     with app.app_context():
         row = Client(code="QR-MAT", name="Material QR Client", is_active=True)
@@ -313,7 +318,8 @@ def test_material_ledger_page_opens_qr_dialog_and_generates_in_it(app, client):
     dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
     assert dialog.status_code == 200
     frag = dialog.get_data(as_text=True)
-    assert "Generate QR Code" in frag
+    assert "clientLedgerQrCode" in frag and "<svg" in frag
+    assert "clientLedgerQrDownload" in frag and "clientLedgerQrPrint" in frag
     nonce = re.search(r'name="qr_nonce" value="([^"]+)"', frag).group(1)
     generated = client.post(f"/client_ledger_qr/{client_id}", data={
         "action": "generate", "qr_nonce": nonce, "dialog": "1",
@@ -416,6 +422,9 @@ def test_qr_dialog_csrf_errors_are_explicit_and_do_not_generate(app, client):
     dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
     form_nonce = re.search(r'name="qr_nonce" value="([^"]+)"',
                            dialog.get_data(as_text=True)).group(1)
+    with app.app_context():
+        initial_hash = db.session.get(Client, client_id).client_ledger_qr_token_hash
+        assert initial_hash
     rejected = client.post(f"/client_ledger_qr/{client_id}", data={
         "action": "generate", "dialog": "1", "qr_nonce": form_nonce,
         "_csrf_token": "invalid",
@@ -423,4 +432,199 @@ def test_qr_dialog_csrf_errors_are_explicit_and_do_not_generate(app, client):
     assert rejected.status_code == 400
     assert "Reload the page" in rejected.get_json()["error"]
     with app.app_context():
+        assert db.session.get(Client, client_id).client_ledger_qr_token_hash == initial_hash
+
+
+def test_add_client_auto_generates_qr_and_more_qr_displays_it(app, client, monkeypatch):
+    """Creating a new client generates a valid ledger QR immediately."""
+    monkeypatch.setattr(qr_routes, "_build_client_ledger_rows",
+                        lambda _client: ([], [], 0, 0, 0, {}))
+    monkeypatch.setattr(qr_routes, "client_material_summary", lambda _client: ({}, 0))
+    monkeypatch.setattr(qr_routes, "client_movement_rows", lambda _client: [])
+    with app.app_context():
+        admin_id = User.query.filter_by(username="Admin").first().id
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    resp = client.post("/add_client", data={
+        "name": "Auto QR Customer",
+        "code": "QR-AUTO-1",
+        "category": "Contractor",
+    }, follow_redirects=False)
+    assert resp.status_code in (302, 303)
+
+    with app.app_context():
+        row = Client.query.filter_by(code="QR-AUTO-1").one()
+        assert row.client_ledger_qr_token_hash
+        assert row.client_ledger_qr_token_salt
+        token = qr_routes._derive_token(row, row.client_ledger_qr_token_salt)
+        assert hashlib.sha256(token.encode("ascii")).hexdigest() == row.client_ledger_qr_token_hash
+        client_id = row.id
+
+    # The auto-generated bearer link immediately serves the public live ledger.
+    pub = client.get(f"/c/{token}")
+    assert pub.status_code == 200
+    assert b"Auto QR Customer" in pub.data
+
+    # Clicking More -> QR Code shows the exact active QR without rotating it.
+    dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
+    assert dialog.status_code == 200
+    body = dialog.get_data(as_text=True)
+    assert "clientLedgerQrCode" in body and "<svg" in body
+    assert "current active QR" in body
+    with app.app_context():
+        row = db.session.get(Client, client_id)
+        assert qr_routes._derive_token(row, row.client_ledger_qr_token_salt) == token
+
+
+def test_blank_public_base_url_falls_back_to_app_origin_without_503(app, client):
+    """When PUBLIC_BASE_URL and Settings are blank, QR uses the active request origin."""
+    from models import Settings
+    app.config["PUBLIC_BASE_URL"] = ""
+    with app.app_context():
+        s = Settings.query.first() or Settings()
+        s.public_base_url = ""
+        db.session.add(s)
+        row = Client(code="QR-FALLBACK", name="Fallback QR Client", is_active=True)
+        db.session.add(row)
+        db.session.commit()
+        client_id = row.id
+        admin_id = User.query.filter_by(username="Admin").first().id
+
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    dialog = client.get(
+        f"/client_ledger_qr/{client_id}/dialog",
+        headers={"X-Forwarded-Proto": "https", "X-Forwarded-Host": "preview-5000.e2b.app"},
+    )
+    assert dialog.status_code == 200
+    body = dialog.get_data(as_text=True)
+    assert "clientLedgerQrCode" in body and "<svg" in body
+    assert "PUBLIC_BASE_URL" not in body
+
+    with app.test_request_context(
+        "/",
+        headers={"X-Forwarded-Proto": "https", "X-Forwarded-Host": "preview-5000.e2b.app"},
+    ):
+        assert qr_routes._public_qr_origin() == "https://preview-5000.e2b.app"
+
+
+def test_standalone_revoke_does_not_auto_regenerate_immediately(app, client):
+    """Revoking on standalone page redirects with ?revoked=1 and keeps QR off."""
+    app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
+    with app.app_context():
+        row = Client(code="QR-REV", name="Revoke Stay Off", is_active=True)
+        db.session.add(row)
+        db.session.commit()
+        client_id = row.id
+        admin_id = User.query.filter_by(username="Admin").first().id
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    page = client.get(f"/client_ledger_qr/{client_id}")
+    assert page.status_code == 200
+    nonce = re.search(r'name="qr_nonce" value="([^"]+)"', page.get_data(as_text=True)).group(1)
+
+    revoked = client.post(
+        f"/client_ledger_qr/{client_id}",
+        data={"action": "revoke", "qr_nonce": nonce},
+        follow_redirects=True,
+    )
+    assert revoked.status_code == 200
+    html = revoked.get_data(as_text=True)
+    assert "No active public QR" in html
+    assert "clientLedgerQrCode" not in html
+    with app.app_context():
         assert db.session.get(Client, client_id).client_ledger_qr_token_hash is None
+
+
+def test_import_party_and_legacy_migration_auto_generate_qr(app):
+    """Client creation helpers used by imports and legacy migration auto-assign QR."""
+    from app.services.client_qr import ensure_client_ledger_qr
+    with app.app_context():
+        c1 = Client(code="QR-IMP-1", name="Imported Client", category="Contractor")
+        db.session.add(c1)
+        token1, created1 = ensure_client_ledger_qr(c1)
+        assert created1 is True and token1
+        assert c1.is_active is True
+        assert c1.client_ledger_qr_token_hash
+        # Inactive and OPEN-KHATA clients are skipped.
+        c2 = Client(code="QR-INACT", name="Inactive", category="Contractor", is_active=False)
+        db.session.add(c2)
+        assert ensure_client_ledger_qr(c2) == (None, False)
+        ok = Client(code="OPEN-KHATA", name="Walk-In", category="Cash")
+        db.session.add(ok)
+        assert ensure_client_ledger_qr(ok) == (None, False)
+        db.session.commit()
+
+
+def test_settings_and_wsgi_default_cloudflare_worker_url(app, client):
+    """Cloudflare Worker is the default in wsgi.py & Settings, and editable in UI."""
+    from pathlib import Path
+    import sqlite3
+    from models import Settings
+
+    wsgi_text = (Path(__file__).resolve().parents[1] / "wsgi.py").read_text()
+    assert "https://still-base-ac7a.rizwanahmedsora9.workers.dev" in wsgi_text
+
+    # Migration 0012 backfills NULL without clobbering edited or blank settings.
+    mig = (Path(__file__).resolve().parents[1] / "app" / "migrations" / "0012_public_base_url_setting.sql").read_text()
+    con = sqlite3.connect(":memory:")
+    con.execute("CREATE TABLE settings (id INTEGER PRIMARY KEY, public_base_url VARCHAR(300))")
+    con.executemany("INSERT INTO settings (id, public_base_url) VALUES (?, ?)", [
+        (1, None),
+        (2, "https://custom.example.workers.dev"),
+        (3, ""),
+    ])
+    con.executescript(mig)
+    con.executescript(mig)
+    rows = dict(con.execute("SELECT id, public_base_url FROM settings").fetchall())
+    assert rows[1] == "https://still-base-ac7a.rizwanahmedsora9.workers.dev"
+    assert rows[2] == "https://custom.example.workers.dev"
+    assert rows[3] == ""
+
+    with app.app_context():
+        admin_id = User.query.filter_by(username="Admin").first().id
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    # Settings UI shows the default Worker URL and saves edits + blank resets.
+    settings_page = client.get("/settings")
+    assert settings_page.status_code == 200
+    assert "https://still-base-ac7a.rizwanahmedsora9.workers.dev" in settings_page.get_data(as_text=True)
+
+    saved = client.post("/update_settings", data={
+        "company_name": "Test Shop",
+        "public_base_url": "https://custom-qr.workers.dev/",
+    }, follow_redirects=True)
+    assert saved.status_code == 200
+    with app.app_context():
+        assert Settings.query.first().public_base_url == "https://custom-qr.workers.dev"
+        from app.services.public_url import resolve_public_base_url
+        assert resolve_public_base_url() == "https://custom-qr.workers.dev"
+
+    # Reject invalid URLs cleanly without overwriting valid setting.
+    bad = client.post("/update_settings", data={
+        "company_name": "Test Shop",
+        "public_base_url": "https://custom-qr.workers.dev/some/path",
+    }, follow_redirects=True)
+    assert bad.status_code == 200
+    with app.app_context():
+        assert Settings.query.first().public_base_url == "https://custom-qr.workers.dev"
+
+    # Clearing to blank falls back cleanly without breaking.
+    cleared = client.post("/update_settings", data={
+        "company_name": "Test Shop",
+        "public_base_url": "",
+    }, follow_redirects=True)
+    assert cleared.status_code == 200
+    with app.app_context():
+        assert Settings.query.first().public_base_url == ""
+        from app.services.public_url import resolve_public_base_url
+        assert resolve_public_base_url() == ""
+

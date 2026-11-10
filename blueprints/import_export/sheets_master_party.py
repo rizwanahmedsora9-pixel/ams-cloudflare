@@ -52,6 +52,8 @@ def _process_clients(df, strategy, report):
                 is_active=True
             )
             db.session.add(new_client)
+            from app.services.client_qr import ensure_client_ledger_qr
+            ensure_client_ledger_qr(new_client)
             report['imported'] += 1
 
 
@@ -80,6 +82,8 @@ def _process_pending_bills(df, strategy, missing_client_strategy, report, allow_
                 client = Client(code=client_code, name=row.get('name', 'Imported Client'), is_active=True)
                 db.session.add(client)
                 db.session.flush() # Get ID
+                from app.services.client_qr import ensure_client_ledger_qr
+                ensure_client_ledger_qr(client)
         
         existing = PendingBill.query.filter_by(bill_no=bill_no).first() if bill_no else None
         
