@@ -172,6 +172,25 @@ def test_loan_register_records_principal_cash_movements_without_pnl(app, client)
     assert 'Test Lender' in response.get_data(as_text=True)
 
 
+def test_legacy_lender_accounts_are_not_company_account_documents(app, client):
+    _login(client)
+    with app.app_context():
+        legacy_loan = Account(
+            name='Outside Lender Legacy', type='loan', account_type='loan',
+            category='ledger', source_category='Loan', class_subcategory='Loans Payable',
+            balance=-100, balance_minor=to_minor(-100), is_active=True,
+        )
+        db.session.add(legacy_loan)
+        db.session.commit()
+        legacy_id = legacy_loan.id
+
+    response = client.get('/accounts/accounts?show=all')
+    assert response.status_code == 200
+    assert 'Outside Lender Legacy' not in response.get_data(as_text=True)
+    assert client.get(f'/accounts/ledger/{legacy_id}').status_code == 404
+    assert client.get(f'/accounts/{legacy_id}/edit').status_code == 404
+
+
 def test_loan_register_routes_record_opening_balance_and_new_movements(app, client):
     _login(client)
     with app.app_context():

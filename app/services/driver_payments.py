@@ -198,7 +198,7 @@ def save_driver_payment(
     *, payment_id=None, delivery_person_id=None, amount_paid=0, waive_off_amount=0,
     method="Cash", payment_account_id=None, allocation_id=None, sale_id=None,
     reference="", date_posted=None, note="", idempotency_key=None,
-    expected_revision=None, allow_overpay=False, actor=None,
+    expected_revision=None, actor=None,
 ):
     """Create or edit one driver payment and its single financial transaction."""
     from app.services.accounting import _sync_delivery_person_payment_accounting
@@ -277,13 +277,16 @@ def save_driver_payment(
     else:
         account = None
 
-    # Settlement may not exceed what the driver is actually owed.
-    if not allow_overpay:
-        outstanding_minor = driver_outstanding_minor(
-            person.id, exclude_payment_id=(payment.id if not created else None)
-        )
-        if paid_minor + waive_minor > outstanding_minor + _EPS_MINOR:
-            raise ValueError("Settlement exceeds the currently outstanding delivery-person balance.")
+    # Cash payments are true ledger movements and may exceed the current
+    # payable.  The resulting negative balance is automatically absorbed by
+    # later rent debits; do not reject it or turn it into a separate advance.
+    # A waive-off is different: it only extinguishes an existing payable and
+    # can never create a credit balance.
+    outstanding_minor = driver_outstanding_minor(
+        person.id, exclude_payment_id=(payment.id if not created else None)
+    )
+    if waive_minor > max(0, outstanding_minor - paid_minor) + _EPS_MINOR:
+        raise ValueError("Waive-off exceeds the payable remaining after this payment.")
 
     allocation = None
     if allocation_id not in (None, ""):
@@ -296,8 +299,8 @@ def save_driver_payment(
         if allocation.delivery_person_id != person.id:
             raise ValueError("The selected rent allocation belongs to a different delivery person.")
         due_minor = _allocation_due_minor(allocation, exclude_payment_id=(payment.id if not created else None))
-        if not allow_overpay and due_minor is not None and paid_minor + waive_minor > due_minor + _EPS_MINOR:
-            raise ValueError("Settlement exceeds the remaining rent amount for this delivery.")
+        if due_minor is not None and waive_minor > max(0, due_minor - paid_minor) + _EPS_MINOR:
+            raise ValueError("Waive-off exceeds the rent remaining after this payment.")
     elif created:
         allocation = _pick_allocation(person.id)
 
@@ -411,11 +414,16 @@ def restore_driver_payment(payment, actor=None) -> bool:
         if _account_minor(account) < paid_minor:
             raise ValueError("Insufficient balance to restore this driver payment.")
 
+    waive_minor = to_minor(payment.waive_off_amount or 0)
+    outstanding_minor = driver_outstanding_minor(payment.delivery_person_id)
+    if waive_minor > max(0, outstanding_minor - paid_minor) + _EPS_MINOR:
+        raise ValueError("This waive-off cannot be restored because the payable is already settled.")
+
     allocation = payment.allocation
     if allocation is not None and not allocation.is_void:
         due_minor = _allocation_due_minor(allocation, exclude_payment_id=payment.id)
-        if due_minor is not None and paid_minor + to_minor(payment.waive_off_amount or 0) > due_minor + _EPS_MINOR:
-            raise ValueError("This settlement cannot be restored because the allocation is already settled.")
+        if due_minor is not None and waive_minor > max(0, due_minor - paid_minor) + _EPS_MINOR:
+            raise ValueError("This waive-off cannot be restored because the rent is already settled.")
 
     before = driver_payment_snapshot(payment)
     payment.is_void = False
@@ -464,8 +472,8 @@ def settle_driver_fifo(
         raise ValueError("Delivery person not found.")
 
     outstanding_minor = driver_outstanding_minor(person.id)
-    if paid_minor + waive_minor > outstanding_minor + _EPS_MINOR:
-        raise ValueError("Settlement exceeds the currently outstanding delivery-person balance.")
+    if waive_minor > max(0, outstanding_minor - paid_minor) + _EPS_MINOR:
+        raise ValueError("Waive-off exceeds the payable remaining after this payment.")
 
     allocations = SaleDeliveryPerson.query.filter_by(
         delivery_person_id=person.id, is_void=False
@@ -492,7 +500,6 @@ def settle_driver_fifo(
             date_posted=date_posted,
             note=note,
             idempotency_key=(f"{key}:{seq}" if key else None),
-            allow_overpay=True,
             actor=actor,
         )
         seq += 1

@@ -3,6 +3,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from ._common import *  # noqa
+from .helpers import _company_accounts
 from app.services.loan_register import record_principal_movement
 
 
@@ -17,10 +18,10 @@ def loan_register():
             int(m.amount_minor or 0) * (1 if m.movement_type == 'received' else -1)
             for m in party.movements.all()
         )
-    cash_accounts = Account.query.filter(
-        func.coalesce(Account.is_active, True) == True,
-        func.lower(func.trim(Account.category)).in_(['cash', 'bank']),
-    ).order_by(Account.name.asc(), Account.id.asc()).all()
+    # Only company cash/bank accounts can fund a loan movement.  Lenders are
+    # outsider parties and never appear as either side of a company transfer.
+    cash_accounts = [a for a in _company_accounts()
+                     if (a.category or '').strip().lower() in ('cash', 'bank')]
     return render_template(
         'accounts/loan_register.html', parties=parties, movements=movements,
         outstanding_minor=totals, cash_accounts=cash_accounts,
