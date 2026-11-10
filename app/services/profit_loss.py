@@ -2097,8 +2097,18 @@ class _Projection:
         transactions = AccountTransaction.query.options(
             selectinload(AccountTransaction.from_account), selectinload(AccountTransaction.to_account)
         ).order_by(AccountTransaction.date_posted.asc(), AccountTransaction.id.asc()).all()
+        from app.services.system_accounts import account_is_reconciliation_source, is_reserved_account
         for tx in transactions:
             if not _active(tx) or _f(tx.amount) <= 0:
+                continue
+            # System reconciliation corrections/resolutions are balance-sheet
+            # clearing only, and loan principal is financing—not earned income
+            # or an expense.  Use source metadata/account identity, never the
+            # editable description, as the authoritative exclusion.
+            if ((tx.source_type or '').strip().lower() == 'loanprincipal'
+                    or account_is_reconciliation_source(tx)
+                    or is_reserved_account(tx.from_account)
+                    or is_reserved_account(tx.to_account)):
                 continue
             tx_type = (tx.transaction_type or "").strip()
             # A GRN payment settles a payable; it is never an operating
@@ -2138,7 +2148,12 @@ class _Projection:
                 # Other/manual payments are explicit expenses in the existing
                 # Accounts workflow.  Loan repayments and transfers are not.
                 combined = _norm(f"{description} {tx.note or ''}")
-                if any(term in combined for term in ("loan repayment", "account transfer", "supplier payment", "driver payment", "client refund")):
+                loan_account_movement = any(
+                    ((getattr(account, 'source_category', '') or '').strip().lower() == 'loan'
+                     or (getattr(account, 'class_subcategory', '') or '').strip().lower() == 'loans payable')
+                    for account in (tx.from_account, tx.to_account) if account is not None
+                )
+                if loan_account_movement or any(term in combined for term in ("loan repayment", "account transfer", "supplier payment", "driver payment", "client refund")):
                     continue
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction", source_label="Other Direct Payment / Expense",
@@ -2153,6 +2168,9 @@ class _Projection:
                     material="Other Loss", other_loss=amount, cost_basis="Explicit unlinked account loss",
                 ))
             elif tx_type == "Receipt" and not tx.source_type and _norm(description).startswith("money received from"):
+                receipt_text = _norm(f"{description} {tx.note or ''}")
+                if any(term in receipt_text for term in ('loan', 'borrowed', 'borrowing', 'lender')):
+                    continue
                 source_name = re.sub(r"^money received from\s*", "", description, flags=re.I)
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction", source_label="Other Earned Income",

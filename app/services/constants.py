@@ -116,6 +116,9 @@ DOMAIN_WIPE_REGISTRY = {
         'CashFlowEntry',
         'CashFlowReconciliationAudit',
         'CashFlowDifferenceAdjustment',
+        # Loan event history references both the lender and its cash ledger row.
+        'LoanMovement',
+        'LoanParty',
         # ledger (references account_reconciliation, so it goes before it)
         'AccountTransaction',
         # per-account reconciliation history + daily board counts/locks

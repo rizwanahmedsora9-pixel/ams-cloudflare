@@ -89,12 +89,12 @@ RESOLUTION_KINDS = {
         'hint': 'The extra cash was taken out of the cash account.',
     },
     'written_off': {
-        'label': 'Written off (loss)',
-        'hint': 'The shortfall is a real loss; it leaves the counter account.',
+        'label': 'Clear shortage outside P&L',
+        'hint': 'Move the cleared shortage to a selected non-counter account. Reconciliation outcomes never affect Profit & Loss.',
     },
     'income': {
-        'label': 'Recognised as income',
-        'hint': 'The extra cash is genuine income; it leaves the counter account.',
+        'label': 'Clear excess outside P&L',
+        'hint': 'Clear the excess to a selected non-counter account. Reconciliation outcomes never affect Profit & Loss.',
     },
 }
 
@@ -207,7 +207,8 @@ def counter_accounts():
 
 
 def is_counter_account(account) -> bool:
-    return bool(account) and (getattr(account, 'category', '') or '').strip().lower() == RECON_CATEGORY
+    from app.services.system_accounts import is_reserved_account
+    return is_reserved_account(account)
 
 
 def counter_name_for(kind) -> str:

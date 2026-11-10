@@ -207,14 +207,33 @@ def _supplier_payable_summary():
     return summary
 
 
+def _not_system_account_query(query):
+    """Exclude reserved system accounts from ordinary Accounts views/pickers."""
+    from app.services.system_accounts import RECON_ACCOUNT_TYPE, RECON_CATEGORY
+    return query.filter(
+        func.lower(func.trim(func.coalesce(Account.category, ''))) != RECON_CATEGORY,
+        func.lower(func.trim(func.coalesce(Account.account_type, ''))) != RECON_ACCOUNT_TYPE,
+        func.lower(func.trim(func.coalesce(Account.type, ''))) != RECON_ACCOUNT_TYPE,
+    )
+
+
+def _not_legacy_loan_query(query):
+    return query.filter(
+        func.lower(func.trim(func.coalesce(Account.source_category, ''))) != 'loan',
+        func.lower(func.trim(func.coalesce(Account.class_subcategory, ''))) != 'loans payable',
+    )
+
+
 def _company_accounts():
-    company_accounts = Account.query.filter(
+    company_accounts = _not_legacy_loan_query(_not_system_account_query(Account.query)).filter(
         func.coalesce(Account.is_active, True) == True,
         func.lower(func.trim(Account.account_type)) == 'company'
     ).order_by(Account.name.asc()).all()
     if company_accounts:
         return company_accounts
-    return Account.query.filter(func.coalesce(Account.is_active, True) == True).order_by(Account.name.asc()).all()
+    return _not_legacy_loan_query(_not_system_account_query(Account.query)).filter(
+        func.coalesce(Account.is_active, True) == True
+    ).order_by(Account.name.asc()).all()
 
 
 def _account_categories():
@@ -222,7 +241,9 @@ def _account_categories():
 
 
 def _active_accounts():
-    return Account.query.filter(func.coalesce(Account.is_active, True) == True)
+    return _not_legacy_loan_query(_not_system_account_query(Account.query)).filter(
+        func.coalesce(Account.is_active, True) == True
+    )
 
 
 def _is_account_active(account):

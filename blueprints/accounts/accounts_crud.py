@@ -13,6 +13,13 @@ def _deny_account_master_mutation():
     abort(403)
 
 
+def _deny_reserved_account(account):
+    from app.services.system_accounts import is_reserved_account
+    if is_reserved_account(account):
+        from flask import abort
+        abort(404)
+
+
 @accounts_bp.route('/accounts')
 @login_required
 def manage_accounts():
@@ -28,7 +35,9 @@ def manage_accounts():
     else:
         show_mode = 'active'
         q = q.filter(func.coalesce(Account.is_active, True) == True)
-    accounts = q.order_by(Account.name.asc(), Account.id.asc()).all()
+    from app.services.system_accounts import is_reserved_account
+    accounts = [a for a in q.order_by(Account.name.asc(), Account.id.asc()).all()
+                if not is_reserved_account(a)]
     categories = _account_categories()
     
     # Group accounts by category and type for better organization
@@ -181,6 +190,7 @@ def add_account():
 @login_required
 def account_ledger(account_id):
     account = Account.query.get_or_404(account_id)
+    _deny_reserved_account(account)
     page = request.args.get('page', 1, type=int)
     per_page = 50
     search = (request.args.get('q') or '').strip()
@@ -270,6 +280,7 @@ def account_data(account_id):
     """JSON data for an account (kept for backwards compatibility / tooling)."""
     from app.services.payments_crud import ledger_balance
     a = Account.query.get_or_404(account_id)
+    _deny_reserved_account(a)
     return jsonify({
         'id': a.id,
         'name': a.name,
@@ -318,6 +329,7 @@ def edit_account(account_id):
     from app.services.payments_crud import ledger_balance, _assert_period_open
 
     a = Account.query.get_or_404(account_id)
+    _deny_reserved_account(a)
 
     if request.method == 'POST':
         try:
@@ -585,6 +597,7 @@ def toggle_account(account_id):
     """Soft-deactivate / reactivate an account (never corrupts history)."""
     _deny_account_master_mutation()
     a = Account.query.get_or_404(account_id)
+    _deny_reserved_account(a)
     before = {'id': a.id, 'name': a.name, 'is_active': bool(a.is_active)}
     a.is_active = not bool(a.is_active)
     # Keep the 3-state status in sync with the legacy boolean so both the
@@ -616,6 +629,7 @@ def delete_account(account_id):
     integrity is preserved.  Only unreferenced accounts are hard-deleted.
     """
     a = Account.query.get_or_404(account_id)
+    _deny_reserved_account(a)
     before = {'id': a.id, 'name': a.name, 'balance': _money_round(a.balance), 'is_active': bool(a.is_active)}
     try:
         # Inspect every declared FK to account.id (payments, transactions, GRNs,
@@ -691,9 +705,12 @@ def reconciliations():
         AccountReconciliation.reconciliation_date.desc(),
         AccountReconciliation.id.desc()
     ).paginate(page=page, per_page=per_page, error_out=False)
+    from app.services.system_accounts import is_reserved_account
+    account_options = [a for a in Account.query.order_by(Account.name.asc()).all()
+                       if not is_reserved_account(a)]
     return render_template(
         'accounts/reconciliations.html', recs=recs, total_count=total_count,
-        accounts=Account.query.order_by(Account.name.asc()).all(),
+        accounts=account_options,
         account_id_f=account_id_f, status_f=status_f,
         date_from=date_from, date_to=date_to_excl - timedelta(days=1), per_page=per_page,
     )
@@ -707,6 +724,7 @@ def reconcile_account(account_id):
     from models import AccountReconciliation
 
     account = Account.query.get_or_404(account_id)
+    _deny_reserved_account(account)
     expected = ledger_balance(account.id)
     recent = AccountReconciliation.query.filter_by(account_id=account.id).order_by(
         AccountReconciliation.reconciliation_date.desc(), AccountReconciliation.id.desc()

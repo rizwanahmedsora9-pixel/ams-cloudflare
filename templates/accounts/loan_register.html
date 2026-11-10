@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+{% block title %}Loan Register{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="mb-1"><i class="bi bi-journal-check me-2"></i>Loan Register</h2>
+      <div class="text-muted">Track principal borrowed from lenders and principal repaid. These movements are not income or expenses.</div>
+    </div>
+    <a class="btn btn-outline-secondary" href="{{ url_for('accounts.dashboard') }}"><i class="bi bi-arrow-left me-1"></i>Accounts</a>
+  </div>
+
+  <div class="alert alert-info"><strong>Principal only.</strong> Loan received and principal repaid change the cash/bank balance and outstanding loan balance, but never Profit &amp; Loss. Record any interest or fee separately as an expense.</div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-xl-4">
+      <div class="card h-100">
+        <div class="card-header fw-bold">Add a lender</div>
+        <div class="card-body">
+          <form method="post" action="{{ url_for('accounts.add_loan_party') }}" class="vstack gap-2">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token or '' }}">
+            <label class="form-label mb-0" for="loanPartyName">Lender name</label>
+            <input class="form-control" id="loanPartyName" name="name" maxlength="160" required>
+            <label class="form-label mb-0" for="openingPrincipal">Opening principal (optional)</label>
+            <input class="form-control" id="openingPrincipal" name="opening_principal" type="number" min="0" step="0.01" value="0">
+            <label class="form-label mb-0" for="openingDate">Opening balance as of (optional)</label>
+            <input class="form-control" id="openingDate" name="opening_date" type="date">
+            <div class="small text-muted">Use this to carry forward a verified existing loan balance. It does not create a new cash movement.</div>
+            <label class="form-label mb-0" for="loanPartyNote">Note (optional)</label>
+            <textarea class="form-control" id="loanPartyNote" name="note" maxlength="500" rows="2"></textarea>
+            <button class="btn btn-primary mt-1" type="submit">Add lender</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-8">
+      <div class="card h-100">
+        <div class="card-header fw-bold">Record principal movement</div>
+        <div class="card-body">
+          <form method="post" action="{{ url_for('accounts.add_loan_movement') }}" class="row g-3">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token or '' }}">
+            <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+            <div class="col-md-6">
+              <label class="form-label">Lender</label>
+              <select class="form-select" name="loan_party_id" required>
+                <option value="">Select lender</option>
+                {% for party in parties if party.is_active %}<option value="{{ party.id }}">{{ party.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Movement</label>
+              <select class="form-select" name="movement_type" required>
+                <option value="received">Loan principal received</option>
+                <option value="repaid">Principal repaid</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Amount (Rs.)</label>
+              <input class="form-control" name="amount" type="number" min="0.01" step="0.01" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cash / bank account</label>
+              <select class="form-select" name="cash_account_id" required>
+                <option value="">Select account</option>
+                {% for account in cash_accounts %}<option value="{{ account.id }}">{{ account.name }} · {{ account.category|upper }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Date</label>
+              <input class="form-control" type="date" name="date_posted" value="{{ today }}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Reference (optional)</label>
+              <input class="form-control" name="reference" maxlength="100" placeholder="Receipt / voucher number">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Note (optional)</label>
+              <input class="form-control" name="note" maxlength="500">
+            </div>
+            <div class="col-12"><button class="btn btn-success" type="submit"><i class="bi bi-check2-circle me-1"></i>Record movement</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header fw-bold">Lenders and outstanding principal</div>
+    <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Lender</th><th>Status</th><th class="text-end">Outstanding principal</th><th>Note</th></tr></thead>
+      <tbody>
+      {% for party in parties %}
+        <tr><td class="fw-semibold">{{ party.name }}</td><td>{{ 'Active' if party.is_active else 'Inactive' }}</td><td class="text-end">Rs. {{ '%.2f'|format((outstanding_minor.get(party.id, 0) / 100)|float) }}{% if party.opening_principal_minor %}<div class="small text-muted">Opening as of {{ party.opening_principal_date or 'date not recorded' }}</div>{% endif %}</td><td>{{ party.note or '—' }}</td></tr>
+      {% else %}<tr><td colspan="4" class="text-muted text-center py-4">No lenders yet.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header fw-bold">Recent principal history</div>
+    <div class="table-responsive"><table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Date</th><th>Lender</th><th>Movement</th><th>Account</th><th>Reference / note</th><th class="text-end">Amount</th><th>Ledger</th></tr></thead>
+      <tbody>
+      {% for movement in movements %}
+        <tr>
+          <td>{{ movement.date_posted.strftime('%Y-%m-%d') if movement.date_posted else '—' }}</td>
+          <td>{{ movement.loan_party.name }}</td>
+          <td>{{ 'Received' if movement.movement_type == 'received' else 'Repaid' }}</td>
+          <td>{{ movement.cash_account.name }}</td>
+          <td>{{ movement.reference or '' }}{% if movement.note %}<div class="small text-muted">{{ movement.note }}</div>{% endif %}</td>
+          <td class="text-end">Rs. {{ '%.2f'|format((movement.amount_minor / 100)|float) }}</td>
+          <td>{% if movement.account_tx_id %}<span class="badge text-bg-light">ATX-{{ movement.account_tx_id }}</span>{% endif %}</td>
+        </tr>
+      {% else %}<tr><td colspan="7" class="text-muted text-center py-4">No principal movements recorded.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+</div>
+{% endblock %}

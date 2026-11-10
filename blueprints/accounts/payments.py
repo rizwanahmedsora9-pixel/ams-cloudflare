@@ -129,7 +129,8 @@ def client_payments():
     accounts = _active_accounts().filter(func.lower(func.trim(Account.category)).in_(['cash', 'bank'])).order_by(Account.name.asc(), Account.id.asc()).all()
     clients = _active_clients()
     all_clients = Client.query.order_by(Client.name.asc(), Client.id.asc()).all()
-    all_accounts = Account.query.order_by(Account.name.asc(), Account.id.asc()).all()
+    from .helpers import _not_system_account_query
+    all_accounts = _not_system_account_query(Account.query).order_by(Account.name.asc(), Account.id.asc()).all()
     client_options = [{'code': c.code, 'name': c.name} for c in clients]
     account_options = [{'id': a.id, 'label': _account_option_label(a)} for a in accounts]
     payment_meta = {}
@@ -204,7 +205,8 @@ def supplier_payments():
     suppliers = _active_suppliers()
     accounts = _active_accounts().filter(func.lower(func.trim(Account.category)).in_(['cash', 'bank'])).order_by(Account.name.asc(), Account.id.asc()).all()
     all_suppliers = Supplier.query.order_by(Supplier.name.asc(), Supplier.id.asc()).all()
-    all_accounts = Account.query.order_by(Account.name.asc(), Account.id.asc()).all()
+    from .helpers import _not_system_account_query
+    all_accounts = _not_system_account_query(Account.query).order_by(Account.name.asc(), Account.id.asc()).all()
     supplier_options = [{'id': s.id, 'name': s.name} for s in suppliers]
     account_options = [{'id': a.id, 'label': _account_option_label(a)} for a in accounts]
     payment_meta = {}

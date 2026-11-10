@@ -400,6 +400,10 @@ def delete_selected_data():
                 )
 
         if 'account_transactions' in targets:
+            # Loan principal events reference both the lender and ledger row.
+            # Remove them before deleting their linked AccountTransaction rows.
+            _tq(LoanMovement).delete()
+            _tq(LoanParty).delete()
             # Cash-flow rows link to ledger rows; drop the link before removal.
             _tq(CashFlowEntry).update({'account_tx_id': None}, synchronize_session=False)
             _tq(AccountTransaction).delete()

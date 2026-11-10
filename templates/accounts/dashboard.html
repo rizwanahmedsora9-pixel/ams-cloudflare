@@ -128,6 +128,9 @@
             <a href="{{ url_for('accounts.manage_accounts') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-gear me-1"></i> Manage Accounts
             </a>
+            <a href="{{ url_for('accounts.loan_register') }}" class="btn btn-outline-primary">
+                <i class="bi bi-journal-check me-1"></i> Loan Register
+            </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newTransactionModal">
                 <i class="bi bi-plus-lg me-1"></i> New Transaction
             </button>
@@ -432,7 +435,7 @@
                                     <label class="form-label">Receive From Transaction Group</label>
                                     <select class="form-select" name="receive_from_category" id="receive_from_category">
                                         <option value="client_ledger">Client Ledger</option>
-                                        {% for category in account_categories %}
+                                        {% for category in account_categories if (category.name or '').strip().lower() != 'loan' %}
                                         <option value="{{ category.name }}">{{ category.name }}</option>
                                         {% endfor %}
                                         <option value="other_source">Other Source</option>
@@ -522,7 +525,6 @@
                                         <option value="grn_payment">Pay GRN Expenses</option>
                                         <option value="driver">Driver Service Payment</option>
                                         <option value="client_refund">Client Refund</option>
-                                        <option value="loan">Loan Payment</option>
                                         <option value="personal_expense">Personal Expense</option>
                                         <option value="other_expense">Other Expense</option>
                                     </select>

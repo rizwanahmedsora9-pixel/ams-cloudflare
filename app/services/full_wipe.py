@@ -23,6 +23,7 @@ FULL_WIPE_TARGETS = frozenset({
 BUSINESS_TABLES = frozenset({
     'account', 'account_category', 'account_reconciliation', 'account_transaction',
     'accounting_audit_log', 'future_account_audit_log', 'bill_counter',
+    'loan_movement', 'loan_party',
     'booking', 'booking_item', 'booking_allocation', 'booking_allocation_repair_archive',
     'cash_day_account_position', 'cash_day_difference', 'cash_day_lock',
     'cash_day_shift_close', 'cash_day_shift_close_position', 'cash_flow_category',
