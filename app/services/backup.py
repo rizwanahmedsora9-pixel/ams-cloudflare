@@ -297,6 +297,11 @@ def _hourly_backup_worker_loop(flask_app):
     failures = 0
     while True:
         try:
+            # Copying the database file while an admin wipe is rewriting it
+            # takes the lock the wipe needs; skip this pass instead.
+            if getattr(state, 'WIPE_IN_PROGRESS', False):
+                time.sleep(30)
+                continue
             with flask_app.app_context():
                 now = pk_now()
                 slot = now.strftime('%Y%m%d%H')

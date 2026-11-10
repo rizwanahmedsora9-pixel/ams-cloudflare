@@ -18,6 +18,7 @@ import re
 import logging
 import importlib
 from itertools import zip_longest
+from pathlib import Path
 from urllib.parse import unquote
 from contextlib import redirect_stderr
 from email.message import EmailMessage
@@ -562,7 +563,50 @@ def _create_pre_wipe_safety_backups(targets):
     }
 
 
+def purge_import_artifacts():
+    """Remove the upload/report files that belonged to the wiped import records.
+
+    A full wipe deletes ``import_upload`` / ``import_job`` / ``import_history``
+    rows, so their spreadsheets and error reports become unreachable dead files.
+    Only the dedicated import directories are touched; operator backups and
+    uploaded business documents elsewhere under ``instance/`` are left alone.
+    """
+    removed = 0
+    try:
+        from app.services.import_artifacts import reports_dir, uploads_dir
+        for directory in (uploads_dir(), reports_dir()):
+            for entry in Path(directory).glob('*'):
+                try:
+                    if entry.is_file():
+                        entry.unlink()
+                        removed += 1
+                except OSError:
+                    continue
+    except Exception:  # noqa: BLE001 - housekeeping must never fail a wipe
+        logging.getLogger('wipe').exception('Could not clear temporary import files after the wipe')
+    if removed:
+        logging.getLogger('wipe').info('Full wipe removed %s temporary import file(s)', removed)
+    return removed
+
+
 def _complete_intentional_wipe_workflow(targets, deleted_info, backup_info, mode):
+    # The wipe committed: drop the per-process lookup caches so the very next
+    # page render cannot show clients/materials/services that no longer exist.
+    try:
+        from flask import current_app as _current_app
+        _current_app._dropdown_cache = None
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from app.services.lookups import invalidate_service_cache
+        invalidate_service_cache()
+    except Exception:  # noqa: BLE001
+        pass
+    if mode == 'full':
+        # The import records were wiped, so their temporary files are orphans.
+        removed_files = purge_import_artifacts()
+        if removed_files:
+            deleted_info.append(f'Temporary import files ({removed_files})')
     operation = {
         'operation': 'granular_wipe',
         'intentional': True,
