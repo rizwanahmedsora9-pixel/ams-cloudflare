@@ -485,3 +485,138 @@ def test_personal_expense_and_filters_target_expense_table(app, client, pl_split
     assert "4,000.00" in group_exp_card
     assert "Personal home utility bill" in group_exp_card
 
+
+def test_profit_summary_restored_cards_and_expenditures_losses_card(app, client, pl_split_data):
+    day = datetime(2026, 11, 10, 15, 0)
+    with app.app_context():
+        grn_item = GRNItem.query.first()
+        cash = db.session.get(Account, pl_split_data["cash_id"])
+
+        # 1) Non-expense loss: a sale sold below FIFO COGS (2 bags * Rs 800 = 1,600 vs COGS 2,000 -> -400 loss)
+        loss_sale = DirectSale(
+            client_name="Alpha Builders",
+            client_code="C-101",
+            category="Cash",
+            amount=1600.0,
+            paid_amount=1600.0,
+            manual_bill_no="INV-LOSS-1",
+            auto_bill_no="DS-LOSS-1",
+            date_posted=day,
+            is_void=False,
+        )
+        db.session.add(loss_sale)
+        db.session.flush()
+        db.session.add(
+            DirectSaleItem(
+                sale_id=loss_sale.id,
+                product_name="Cement OPC",
+                qty=2.0,
+                price_at_time=800.0,
+                grn_item_id=grn_item.id,
+                cost_rate_at_sale=1000.0,
+            )
+        )
+
+        # 2) Non-expense loss: an unlinked manual Loss AccountTransaction (-300 loss, NOT an expense)
+        db.session.add(
+            AccountTransaction(
+                from_account_id=cash.id,
+                to_account_id=None,
+                amount=300.0,
+                description="Damaged stock write-off",
+                note="Manual non-expense loss",
+                transaction_type="Loss",
+                date_posted=day,
+                is_void=False,
+            )
+        )
+
+        # 3) Expense loss: an unlinked manual Payment expense (-750 expense loss)
+        db.session.add(
+            AccountTransaction(
+                from_account_id=cash.id,
+                to_account_id=None,
+                amount=750.0,
+                description="Generator Fuel Expense",
+                note="Manual expense payment",
+                transaction_type="Payment",
+                date_posted=day,
+                is_void=False,
+            )
+        )
+        db.session.commit()
+
+        from app.services.profit_loss import build_profit_loss_report
+
+        report = build_profit_loss_report(
+            start_date="2026-11-10",
+            end_date="2026-11-10",
+            include_position=False,
+        )
+        # Profitable entries: INV-901 (+5,000)
+        # All loss entries:
+        #   Expenses: 2,500 (rent) + 400 (tea) + 600 (GRN unloading) + 750 (fuel payment) = 4,250 (4 entries)
+        #   Non-expenses: 200 (WaiveOff) + 400 (INV-LOSS-1) + 300 (Manual Loss) = 900 (3 entries)
+        #   Total Loss-making Entries = 4,250 + 900 = 5,150 (7 entries)
+        #   Net Profit = 5,000 - 5,150 = -150
+        assert report["summary"]["total_profit_sum"] == pytest.approx(5_000.0)
+        assert report["summary"]["total_loss_sum"] == pytest.approx(5_150.0)
+        assert report["summary"]["loss_entry_count"] == 7
+        assert report["summary"]["total_expense_loss_sum"] == pytest.approx(4_250.0)
+        assert report["summary"]["expense_loss_entry_count"] == 4
+        assert report["summary"]["total_profit"] == pytest.approx(-150.0)
+
+    # Full page and partial refresh show both restored cards and the new Expenditures Losses card
+    for url in (
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10",
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&partial=1",
+    ):
+        resp = client.get(url)
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        summary_grid = html[html.find("Profit Summary"):html.find("id=\"pl-cogs-bridge\"")]
+
+        assert "Profitable Entries Total" in summary_grid
+        assert "Loss-making Entries Total" in summary_grid
+        assert "5,150.00" in summary_grid
+        assert "7 loss entries; not the net result" in summary_grid
+
+        assert "Expenditures Losses" in summary_grid
+        assert "4,250.00" in summary_grid
+        assert "4 expense entries; losses by expenses only" in summary_grid
+        assert "metric=expense_loss" in summary_grid
+
+        assert "Profit (Money Kept)" in summary_grid
+        assert "-150.00" in summary_grid
+
+    # Clicking Expenditures Losses drills down ONLY to losses happened by expenses
+    drill_resp = client.get(
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&view=entries&metric=expense_loss"
+    )
+    assert drill_resp.status_code == 200
+    drill_html = drill_resp.get_data(as_text=True)
+    assert "Expenditures Losses" in drill_html
+    assert "4,250.00" in drill_html
+    assert "4 expense entries; losses by expenses only" in drill_html
+    # All 4 expense entries are shown
+    assert "November office rent" in drill_html
+    assert "Staff Tea &amp; Refreshments" in drill_html
+    assert "Godown Labour Unloading" in drill_html
+    assert "Generator Fuel Expense" in drill_html
+    # Non-expense losses (below-cost sale, waive-off, manual Loss) and profitable sales are excluded
+    assert "INV-LOSS-1" not in drill_html
+    assert "INV-901" not in drill_html
+    assert "WAIVE-1" not in drill_html
+    assert "Damaged stock write-off" not in drill_html
+
+    # Filtering by goods leaves Expenditures Losses at 0.00
+    goods_resp = client.get(
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&transaction_group=goods"
+    )
+    assert goods_resp.status_code == 200
+    goods_html = goods_resp.get_data(as_text=True)
+    goods_grid = goods_html[goods_html.find("Profit Summary"):goods_html.find("id=\"pl-cogs-bridge\"")]
+    assert "Expenditures Losses" in goods_grid
+    assert "0 expense entries; losses by expenses only" in goods_grid
+
+

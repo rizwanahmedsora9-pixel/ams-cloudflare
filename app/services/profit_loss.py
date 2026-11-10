@@ -2514,10 +2514,20 @@ def _reversed_sources(candidate, qty):
     return _merge_sources(reversed_rows)
 
 
+def _is_expense_loss_row(row):
+    """True only when a row is an operating expense that created a net loss."""
+    return (
+        bool(row.get("include_in_net"))
+        and (row.get("entry_type") == "expense" or _f(row.get("expense")) > EPS)
+        and _f(row.get("profit")) < -EPS
+    )
+
+
 def summarize_rows(rows):
     """Summarize the authoritative rows without recalculating any source event."""
     included = [row for row in rows if row.get("include_in_net")]
     unresolved = [row for row in rows if not row.get("include_in_net")]
+    expense_loss_rows = [row for row in included if _is_expense_loss_row(row)]
     total_revenue = _sum(rows, "revenue")
     total_discounts = _sum(rows, "discount")
     # Gross sales are the value before discount; the P&L shows
@@ -2567,8 +2577,10 @@ def summarize_rows(rows):
         "recorded_cost_profit": sum(_f(row.get("profit")) for row in included if row.get("cost_status") != COST_ESTIMATED),
         "total_profit_sum": sum(_f(row.get("profit")) for row in included if _f(row.get("profit")) > 0),
         "total_loss_sum": -sum(_f(row.get("profit")) for row in included if _f(row.get("profit")) < 0),
+        "total_expense_loss_sum": float(_pricing.round_money(-_sum(expense_loss_rows, "profit"))),
         "profit_entry_count": sum(1 for row in included if _f(row.get("profit")) > EPS),
         "loss_entry_count": sum(1 for row in included if _f(row.get("profit")) < -EPS),
+        "expense_loss_entry_count": len(expense_loss_rows),
         "profit_rows": sum(1 for row in included if _f(row.get("profit")) >= 0),
         "loss_rows": sum(1 for row in included if _f(row.get("profit")) < 0),
         "unknown_cost_rows": len(unresolved),
@@ -2620,6 +2632,7 @@ def _explorer_rows(rows, args):
         "unknown_cost": lambda r: not r.get("include_in_net"),
         "profit": lambda r: r.get("include_in_net") and _f(r.get("profit")) > EPS,
         "loss": lambda r: r.get("include_in_net") and _f(r.get("profit")) < -EPS,
+        "expense_loss": _is_expense_loss_row,
         "material_revenue": lambda r: abs(_f(r.get("material_revenue"))) > EPS,
         "delivery_revenue": lambda r: abs(_f(r.get("delivery_revenue"))) > EPS,
         "expenses": lambda r: _f(r.get("expense")) > 0,
@@ -3094,7 +3107,11 @@ def build_profit_loss_report(
     report.update({
         "client": filters["client"], "material": filters["material"], "supplier": filters["supplier"],
         "category": filters["category"], "grn_id": grn_id, "entry_metric": metric,
-        "entry_metric_label": {"profit": "Profit Entries", "loss": "Loss Entries"}.get(metric, ""),
+        "entry_metric_label": {
+            "profit": "Profit Entries",
+            "loss": "Loss Entries",
+            "expense_loss": "Expenditures Losses",
+        }.get(metric, ""),
         "payment_received_total": report["financial_position"]["payments_received"]["amount"] if include_position else _payments_received(context, start_date, end_date, filters)["amount"],
         "clients": context.clients,
     })
