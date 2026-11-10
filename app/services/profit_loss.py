@@ -2514,12 +2514,53 @@ def _reversed_sources(candidate, qty):
     return _merge_sources(reversed_rows)
 
 
-def _is_expense_loss_row(row):
-    """True only when a row is an operating expense that created a net loss."""
+#: Expense rows booked on a purchase receipt.  A GRN charge flagged EXPENSE —
+#: vehicle fare, transportation, loading, unloading, other receipt charges — is
+#: the cost of buying stock from a supplier, so the owner's rule keeps it with
+#: the loss-making entries instead of the day-to-day Expenditures card.
+PURCHASE_CHARGE_SOURCES = {"GRNCharge"}
+
+
+def _has_expense_amount(row):
+    return row.get("entry_type") == "expense" or _f(row.get("expense")) > EPS
+
+
+def _is_purchase_charge_expense_row(row):
+    """True for a supplier/purchase-linked expense (vehicle fare, loading ...)."""
+    return _has_expense_amount(row) and (
+        row.get("document_type") in PURCHASE_CHARGE_SOURCES
+        or row.get("source") in PURCHASE_CHARGE_SOURCES
+    )
+
+
+def _is_expenditure_row(row):
+    """True only for a day-to-day operating expenditure counted in net profit.
+
+    These are the money-out entries recorded in Accounts or the cash drawer —
+    tea, food, rent, utilities, fuel, salaries, stationery and similar.  A
+    purchase-receipt charge is never an expenditure, so no rupee can appear in
+    both the Expenditures card and the Loss-making Entries card.
+    """
     return (
         bool(row.get("include_in_net"))
-        and (row.get("entry_type") == "expense" or _f(row.get("expense")) > EPS)
+        and _has_expense_amount(row)
+        and not _is_purchase_charge_expense_row(row)
+    )
+
+
+def _is_loss_making_row(row):
+    """True for a loss on a business transaction; expenditures are excluded.
+
+    Loss-making entries are the client/supplier side of the business: discounts
+    and waive-offs given to clients, sales made below cost, returns, other
+    recorded losses, delivery/vehicle costs and the purchase-receipt charges
+    (vehicle fare, loading, unloading).  Day-to-day spending such as tea or food
+    is reported only as an expenditure.
+    """
+    return (
+        bool(row.get("include_in_net"))
         and _f(row.get("profit")) < -EPS
+        and not _is_expenditure_row(row)
     )
 
 
@@ -2527,7 +2568,13 @@ def summarize_rows(rows):
     """Summarize the authoritative rows without recalculating any source event."""
     included = [row for row in rows if row.get("include_in_net")]
     unresolved = [row for row in rows if not row.get("include_in_net")]
-    expense_loss_rows = [row for row in included if _is_expense_loss_row(row)]
+    # The two owner-facing loss buckets are mutually exclusive: a row is either
+    # a day-to-day expenditure (tea, food, rent, utilities ...) or a loss on a
+    # business transaction (client discounts/waive-offs, below-cost sales,
+    # returns, supplier-side losses, vehicle fare / loading / unloading).  The
+    # same rupee is therefore never reported twice.
+    expenditure_rows = [row for row in included if _is_expenditure_row(row)]
+    loss_making_rows = [row for row in included if _is_loss_making_row(row)]
     total_revenue = _sum(rows, "revenue")
     total_discounts = _sum(rows, "discount")
     # Gross sales are the value before discount; the P&L shows
@@ -2576,11 +2623,17 @@ def summarize_rows(rows):
         "total_profit": total_profit,
         "recorded_cost_profit": sum(_f(row.get("profit")) for row in included if row.get("cost_status") != COST_ESTIMATED),
         "total_profit_sum": sum(_f(row.get("profit")) for row in included if _f(row.get("profit")) > 0),
-        "total_loss_sum": -sum(_f(row.get("profit")) for row in included if _f(row.get("profit")) < 0),
-        "total_expense_loss_sum": float(_pricing.round_money(-_sum(expense_loss_rows, "profit"))),
+        # Loss-making entries are the client/supplier side only: discounts and
+        # waive-offs, below-cost sales, returns, other recorded losses, delivery
+        # costs and purchase-receipt charges (vehicle fare, loading, unloading).
+        "total_loss_sum": float(_pricing.round_money(-_sum(loss_making_rows, "profit"))),
+        # Money spent on day-to-day expenditures (tea, food, rent, utilities,
+        # fuel, salaries ...).  Reported once, here, and never inside
+        # ``total_loss_sum``.
+        "total_expenditure_sum": float(_pricing.round_money(_sum(expenditure_rows, "expense"))),
         "profit_entry_count": sum(1 for row in included if _f(row.get("profit")) > EPS),
-        "loss_entry_count": sum(1 for row in included if _f(row.get("profit")) < -EPS),
-        "expense_loss_entry_count": len(expense_loss_rows),
+        "loss_entry_count": len(loss_making_rows),
+        "expenditure_entry_count": len(expenditure_rows),
         "profit_rows": sum(1 for row in included if _f(row.get("profit")) >= 0),
         "loss_rows": sum(1 for row in included if _f(row.get("profit")) < 0),
         "unknown_cost_rows": len(unresolved),
@@ -2631,8 +2684,13 @@ def _explorer_rows(rows, args):
         "net_profit": lambda r: bool(r.get("include_in_net")),
         "unknown_cost": lambda r: not r.get("include_in_net"),
         "profit": lambda r: r.get("include_in_net") and _f(r.get("profit")) > EPS,
-        "loss": lambda r: r.get("include_in_net") and _f(r.get("profit")) < -EPS,
-        "expense_loss": _is_expense_loss_row,
+        # These two mirror the Profit Summary cards exactly, so a card and the
+        # entry list it opens can never disagree or repeat a row.
+        "loss": _is_loss_making_row,
+        "expenditure": _is_expenditure_row,
+        # Previous key for the same Expenditures drill-down; old bookmarks keep
+        # working.
+        "expense_loss": _is_expenditure_row,
         "material_revenue": lambda r: abs(_f(r.get("material_revenue"))) > EPS,
         "delivery_revenue": lambda r: abs(_f(r.get("delivery_revenue"))) > EPS,
         "expenses": lambda r: _f(r.get("expense")) > 0,
@@ -3109,8 +3167,9 @@ def build_profit_loss_report(
         "category": filters["category"], "grn_id": grn_id, "entry_metric": metric,
         "entry_metric_label": {
             "profit": "Profit Entries",
-            "loss": "Loss Entries",
-            "expense_loss": "Expenditures Losses",
+            "loss": "Loss-making Entries",
+            "expenditure": "Expenditures",
+            "expense_loss": "Expenditures",
         }.get(metric, ""),
         "payment_received_total": report["financial_position"]["payments_received"]["amount"] if include_position else _payments_received(context, start_date, end_date, filters)["amount"],
         "clients": context.clients,

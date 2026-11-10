@@ -486,13 +486,27 @@ def test_personal_expense_and_filters_target_expense_table(app, client, pl_split
     assert "Personal home utility bill" in group_exp_card
 
 
-def test_profit_summary_restored_cards_and_expenditures_losses_card(app, client, pl_split_data):
+def test_expenditures_and_loss_making_entries_never_share_a_row(app, client, pl_split_data):
+    """Expenditures get their own card and are never repeated as losses.
+
+    Owner rule enforced here:
+
+    * **Expenditures** = day-to-day money spent (tea, food, rent, utilities,
+      fuel, salaries ...), entered in Accounts or the cash drawer.
+    * **Loss-making entries** = losses on business transactions: client
+      discounts / waive-offs, sales made below cost, other client & supplier
+      losses, delivery costs and vehicle fare / loading / unloading booked on a
+      purchase receipt.
+
+    Every loss row lands in exactly one of the two cards.
+    """
     day = datetime(2026, 11, 10, 15, 0)
     with app.app_context():
         grn_item = GRNItem.query.first()
         cash = db.session.get(Account, pl_split_data["cash_id"])
 
-        # 1) Non-expense loss: a sale sold below FIFO COGS (2 bags * Rs 800 = 1,600 vs COGS 2,000 -> -400 loss)
+        # 1) Loss-making entry: a sale sold below FIFO COGS
+        #    (2 bags * Rs 800 = 1,600 vs COGS 2,000 -> -400 loss)
         loss_sale = DirectSale(
             client_name="Alpha Builders",
             client_code="C-101",
@@ -517,7 +531,8 @@ def test_profit_summary_restored_cards_and_expenditures_losses_card(app, client,
             )
         )
 
-        # 2) Non-expense loss: an unlinked manual Loss AccountTransaction (-300 loss, NOT an expense)
+        # 2) Loss-making entry: an unlinked manual Loss AccountTransaction
+        #    (-300 loss, NOT an expense and NOT an expenditure)
         db.session.add(
             AccountTransaction(
                 from_account_id=cash.id,
@@ -531,7 +546,7 @@ def test_profit_summary_restored_cards_and_expenditures_losses_card(app, client,
             )
         )
 
-        # 3) Expense loss: an unlinked manual Payment expense (-750 expense loss)
+        # 3) Expenditure: an unlinked manual Payment expense (-750 generator fuel)
         db.session.add(
             AccountTransaction(
                 from_account_id=cash.id,
@@ -546,27 +561,58 @@ def test_profit_summary_restored_cards_and_expenditures_losses_card(app, client,
         )
         db.session.commit()
 
-        from app.services.profit_loss import build_profit_loss_report
+        from app.services.profit_loss import (
+            _is_expenditure_row,
+            _is_loss_making_row,
+            build_profit_loss_report,
+        )
 
         report = build_profit_loss_report(
             start_date="2026-11-10",
             end_date="2026-11-10",
             include_position=False,
         )
-        # Profitable entries: INV-901 (+5,000)
-        # All loss entries:
-        #   Expenses: 2,500 (rent) + 400 (tea) + 600 (GRN unloading) + 750 (fuel payment) = 4,250 (4 entries)
-        #   Non-expenses: 200 (WaiveOff) + 400 (INV-LOSS-1) + 300 (Manual Loss) = 900 (3 entries)
-        #   Total Loss-making Entries = 4,250 + 900 = 5,150 (7 entries)
-        #   Net Profit = 5,000 - 5,150 = -150
-        assert report["summary"]["total_profit_sum"] == pytest.approx(5_000.0)
-        assert report["summary"]["total_loss_sum"] == pytest.approx(5_150.0)
-        assert report["summary"]["loss_entry_count"] == 7
-        assert report["summary"]["total_expense_loss_sum"] == pytest.approx(4_250.0)
-        assert report["summary"]["expense_loss_entry_count"] == 4
-        assert report["summary"]["total_profit"] == pytest.approx(-150.0)
+        summary = report["summary"]
 
-    # Full page and partial refresh show both restored cards and the new Expenditures Losses card
+        # Profitable entries: INV-901 (+5,000)
+        # Expenditures: 2,500 (office rent) + 400 (staff tea)
+        #             + 750 (generator fuel) = 3,650 (3 entries)
+        # Loss-making entries: 600 (GRN unloading — supplier/vehicle charge)
+        #                    + 200 (client waive-off)
+        #                    + 400 (below-cost sale INV-LOSS-1)
+        #                    + 300 (damaged stock write-off) = 1,500 (4 entries)
+        # Net profit = 5,000 - 3,650 - 1,500 = -150
+        assert summary["total_profit_sum"] == pytest.approx(5_000.0)
+        assert summary["total_expenditure_sum"] == pytest.approx(3_650.0)
+        assert summary["expenditure_entry_count"] == 3
+        assert summary["total_loss_sum"] == pytest.approx(1_500.0)
+        assert summary["loss_entry_count"] == 4
+        assert summary["total_profit"] == pytest.approx(-150.0)
+
+        # No row is counted twice, and the two cards add back up to every loss
+        # row of the period (3,650 + 1,500 = 5,150 over 7 rows).
+        loss_rows = [
+            row for row in report["rows"]
+            if row.get("include_in_net") and float(row.get("profit") or 0) < 0
+        ]
+        assert len(loss_rows) == summary["loss_entry_count"] + summary["expenditure_entry_count"]
+        assert -sum(float(row.get("profit") or 0) for row in loss_rows) == pytest.approx(
+            summary["total_loss_sum"] + summary["total_expenditure_sum"]
+        )
+        assert not any(
+            _is_expenditure_row(row) and _is_loss_making_row(row) for row in report["rows"]
+        ), "an expenditure must never also be reported as a loss-making entry"
+
+        # Vehicle fare / loading / unloading booked on a purchase receipt is a
+        # supplier-side loss, not a cup of tea: it stays out of Expenditures.
+        charge_row = next(
+            row for row in report["rows"]
+            if row["reference"] == f"GRNCH-{pl_split_data['grn_charge_id']}"
+        )
+        assert _is_loss_making_row(charge_row)
+        assert not _is_expenditure_row(charge_row)
+
+    # Full page and partial refresh show the renamed cards with their own totals
     for url in (
         "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10",
         "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&partial=1",
@@ -574,49 +620,82 @@ def test_profit_summary_restored_cards_and_expenditures_losses_card(app, client,
         resp = client.get(url)
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
-        summary_grid = html[html.find("Profit Summary"):html.find("id=\"pl-cogs-bridge\"")]
+        summary_grid = html[html.find("Profit Summary"):html.find('id="pl-cogs-bridge"')]
 
         assert "Profitable Entries Total" in summary_grid
         assert "Loss-making Entries Total" in summary_grid
-        assert "5,150.00" in summary_grid
-        assert "7 loss entries; not the net result" in summary_grid
+        assert "1,500.00" in summary_grid
+        assert "4 loss entries; client discounts" in summary_grid
+        assert "expenditures excluded" in summary_grid
 
-        assert "Expenditures Losses" in summary_grid
-        assert "4,250.00" in summary_grid
-        assert "4 expense entries; losses by expenses only" in summary_grid
-        assert "metric=expense_loss" in summary_grid
+        assert "Expenditures" in summary_grid
+        assert "Expenditures Losses" not in summary_grid
+        assert "3,650.00" in summary_grid
+        assert "3 expenditure entries; tea, food, rent, utilities" in summary_grid
+        assert "metric=expenditure" in summary_grid
+        assert "metric=expense_loss" not in summary_grid
 
         assert "Profit (Money Kept)" in summary_grid
         assert "-150.00" in summary_grid
 
-    # Clicking Expenditures Losses drills down ONLY to losses happened by expenses
+        headline = html[html.find("Headline move"):]
+        assert "Loss-making entries (expenditures excluded)" in headline
+        assert "Expenditures (tea, food, rent, utilities)" in headline
+
+    # Expenditures drill-down: day-to-day spending only
     drill_resp = client.get(
-        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&view=entries&metric=expense_loss"
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&view=entries&metric=expenditure"
     )
     assert drill_resp.status_code == 200
     drill_html = drill_resp.get_data(as_text=True)
-    assert "Expenditures Losses" in drill_html
-    assert "4,250.00" in drill_html
-    assert "4 expense entries; losses by expenses only" in drill_html
-    # All 4 expense entries are shown
+    assert "Expenditures" in drill_html
+    assert "3,650.00" in drill_html
+    assert "3 expenditure entries; day-to-day spending only" in drill_html
     assert "November office rent" in drill_html
     assert "Staff Tea &amp; Refreshments" in drill_html
-    assert "Godown Labour Unloading" in drill_html
     assert "Generator Fuel Expense" in drill_html
-    # Non-expense losses (below-cost sale, waive-off, manual Loss) and profitable sales are excluded
+    # Client/supplier losses and purchase charges are not expenditures
+    assert "Godown Labour Unloading" not in drill_html
     assert "INV-LOSS-1" not in drill_html
-    assert "INV-901" not in drill_html
     assert "WAIVE-1" not in drill_html
     assert "Damaged stock write-off" not in drill_html
+    assert "INV-901" not in drill_html
 
-    # Filtering by goods leaves Expenditures Losses at 0.00
+    # Loss-making drill-down: client/supplier losses and vehicle/loading charges
+    loss_resp = client.get(
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&view=entries&metric=loss"
+    )
+    assert loss_resp.status_code == 200
+    loss_html = loss_resp.get_data(as_text=True)
+    assert "Loss-making Entries" in loss_html
+    assert "1,500.00" in loss_html
+    assert "4 loss entries; expenditures excluded" in loss_html
+    assert "Godown Labour Unloading" in loss_html
+    assert "WAIVE-1" in loss_html
+    assert "INV-LOSS-1" in loss_html
+    assert "Damaged stock write-off" in loss_html
+    # Tea, food, rent and fuel must never be listed as loss-making entries
+    assert "Staff Tea &amp; Refreshments" not in loss_html
+    assert "November office rent" not in loss_html
+    assert "Generator Fuel Expense" not in loss_html
+    assert "INV-901" not in loss_html
+
+    # The previous drill-down key keeps working and shows the same Expenditures
+    legacy_resp = client.get(
+        "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&view=entries&metric=expense_loss"
+    )
+    assert legacy_resp.status_code == 200
+    legacy_html = legacy_resp.get_data(as_text=True)
+    assert "3,650.00" in legacy_html
+    assert "November office rent" in legacy_html
+    assert "Godown Labour Unloading" not in legacy_html
+
+    # Filtering by goods leaves Expenditures at 0.00
     goods_resp = client.get(
         "/profit_reports?period=custom&start_date=2026-11-10&end_date=2026-11-10&transaction_group=goods"
     )
     assert goods_resp.status_code == 200
     goods_html = goods_resp.get_data(as_text=True)
-    goods_grid = goods_html[goods_html.find("Profit Summary"):goods_html.find("id=\"pl-cogs-bridge\"")]
-    assert "Expenditures Losses" in goods_grid
-    assert "0 expense entries; losses by expenses only" in goods_grid
-
-
+    goods_grid = goods_html[goods_html.find("Profit Summary"):goods_html.find('id="pl-cogs-bridge"')]
+    assert "Expenditures" in goods_grid
+    assert "0 expenditure entries; tea, food, rent, utilities" in goods_grid
