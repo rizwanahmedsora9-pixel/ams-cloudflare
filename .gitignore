@@ -70,3 +70,5 @@ scratch/smoke/*.db
 scratch/smoke/*.health.json
 scratch/smoke/up/
 scratch/smoke/__pycache__/
+# Runtime health snapshot written by the smoke harness on boot
+scratch/smoke/health_snapshot.json
