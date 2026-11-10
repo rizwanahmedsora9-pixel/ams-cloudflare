@@ -63,11 +63,30 @@ def _report_from_request(*, include_position=False):
         client_category=request.args.get("client_category", ""),
         sort=request.args.get("sort", ""),
         order=request.args.get("order", ""),
+        exp_page=request.args.get("exp_page", 1),
+        exp_sort=request.args.get("exp_sort", ""),
+        exp_order=request.args.get("exp_order", ""),
     )
 
     def report_url(endpoint="profit_reports", **overrides):
         args = request.args.to_dict(flat=True)
-        args.pop("page", None)
+        # Keep each table's page independent while paging or sorting one
+        # table, and reset pagination when switching views, changing filters,
+        # or exporting.
+        is_sales_nav = "page" in overrides or "sort" in overrides or "order" in overrides
+        is_exp_nav = "exp_page" in overrides or "exp_sort" in overrides or "exp_order" in overrides
+        if not is_sales_nav and not is_exp_nav:
+            args.pop("page", None)
+            args.pop("exp_page", None)
+        if "sort" in overrides or "order" in overrides:
+            args.pop("page", None)
+        if "exp_sort" in overrides or "exp_order" in overrides:
+            args.pop("exp_page", None)
+        if overrides.get("view") == "entries" or endpoint != "profit_reports":
+            args.pop("page", None)
+            args.pop("exp_page", None)
+            args.pop("exp_sort", None)
+            args.pop("exp_order", None)
         # ``partial`` is a transport detail of the automatic filter refresh; it
         # must never leak into a bookmarkable or drill-down URL.
         args.pop("partial", None)
@@ -139,6 +158,7 @@ def profit_reports():
     template_name = "profit_entries.html" if view_mode == "entries" else "profit_reports.html"
     context = _template_context(report, period, period_label, report_url)
     context["sort_url"] = lambda **overrides: _sort_url(report_url, **overrides)
+    context["exp_sort_url"] = lambda **overrides: _sort_url(report_url, **overrides)
     # Automatic (no-button) filter updates fetch only the results region.
     if (request.args.get("partial") or "").strip() == "1":
         return render_template("partials/profit_loss_results.html", **context)

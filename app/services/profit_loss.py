@@ -81,10 +81,16 @@ from app.services.financial_ledgers import (
 )
 from app.services.profit_loss_breakdown import (
     BOOKING_STATUS_CHOICES,
+    GROUP_EXPENSES,
+    GROUP_GOODS,
+    GROUP_OTHER,
+    GROUP_RETURNS,
+    GROUP_SERVICES,
     PAYMENT_STATUS_CHOICES,
     TRANSACTION_GROUP_CHOICES,
     attach_document_status,
     build_breakdown,
+    row_group,
 )
 from app.services.grn_consumption import build_grn_consumption
 from app.services.grn_costing import lot_cost_rate, lot_cost_components, charge_effective_minor
@@ -279,6 +285,11 @@ def previous_equivalent_period(start_date, end_date):
     return prev_start, prev_end, "Immediately preceding equivalent period"
 
 
+def _clean_display_note(text):
+    cleaned = re.sub(r"\s*\[(?:SRC|account_tx):[^\]]+\]", "", str(text or ""), flags=re.I)
+    return " ".join(cleaned.split()).strip()
+
+
 def _base_row(**kwargs):
     row = {
         "date": None,
@@ -288,13 +299,16 @@ def _base_row(**kwargs):
         "entry_type": "other",
         "category": "Other",
         "subcategory": "",
+        "description": "",
         "reference": "",
+        "voucher_reference": "",
         "document_type": None,
         "document_id": None,
         "source_type": None,
         "source_id": None,
         "client": "",
         "client_code": "",
+        "recipient": "",
         "account": "",
         "supplier": "",
         "material": "-",
@@ -324,6 +338,7 @@ def _base_row(**kwargs):
         "include_in_net": True,
         "is_void": False,
         "note": "",
+        "display_note": "",
         "payment_status": "Not a settlement row",
         "booking_id": None,
         "booking_item_id": None,
@@ -334,6 +349,8 @@ def _base_row(**kwargs):
         "warnings": [],
     }
     row.update(kwargs)
+    if not row.get("display_note"):
+        row["display_note"] = _clean_display_note(row.get("note"))
     # A unit rate is money too: keep it at two decimals so a value-weighted
     # service rate can never print as 666.6666666666666.
     row["sale_rate"] = _pricing.money_float(row.get("sale_rate"))
@@ -2130,17 +2147,25 @@ class _Projection:
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction",
                     source_label=tx_type, transaction_type=tx_type, entry_type="other",
-                    category="reconciliation", material="Account Reconciliation",
+                    category="reconciliation", description=(description or tx_type),
+                    material="Account Reconciliation",
                     other_loss=(amount if is_loss else 0.0), other_gain=(0.0 if is_loss else amount),
                     cost_basis="Explicit finalized account reconciliation difference",
                 ))
             elif tx_type == "Expense":
+                flow_desc = (flow.description if flow and flow.description else "") or description or ""
+                flow_note = (flow.note if flow and flow.note else "")
+                flow_party = (flow.party.name if flow and flow.party else "")
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction", source_label="Operating Expense",
                     transaction_type="Operating Expense", entry_type="expense",
                     category=(flow.category.name if flow and flow.category else (description or "General Expense")),
                     subcategory=(flow.subcategory.name if flow and flow.subcategory else ""),
-                    client=(flow.party.name if flow and flow.party else ""),
+                    description=flow_desc,
+                    voucher_reference=(flow.reference if flow and flow.reference else ""),
+                    client=flow_party,
+                    recipient=flow_party,
+                    display_note=_clean_display_note(flow_note or (tx.note or "")),
                     material="Expense", expense=amount,
                     cost_basis="Direct dated operating expense; no source settlement mirror counted",
                 ))
@@ -2157,7 +2182,8 @@ class _Projection:
                     continue
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction", source_label="Other Direct Payment / Expense",
-                    transaction_type="Other Expense", entry_type="expense", category=(description or "Other Payment"),
+                    transaction_type="Other Expense", entry_type="expense",
+                    category=(description or "Other Payment"), description=(description or ""),
                     material="Expense", expense=amount,
                     cost_basis="Unlinked manual other payment; settlement-linked payment sources excluded",
                 ))
@@ -2165,6 +2191,7 @@ class _Projection:
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction", source_label="Other Recorded Loss",
                     transaction_type="Other Loss", entry_type="other", category="other_loss",
+                    description=(description or ""),
                     material="Other Loss", other_loss=amount, cost_basis="Explicit unlinked account loss",
                 ))
             elif tx_type == "Receipt" and not tx.source_type and _norm(description).startswith("money received from"):
@@ -2175,7 +2202,9 @@ class _Projection:
                 self.rows.append(_base_row(
                     **common, source="AccountTransaction", source_label="Other Earned Income",
                     transaction_type="Other Income", entry_type="other_income", category="other_income",
-                    client=source_name, material="Other Income", other_income=amount,
+                    description=(description or ""),
+                    client=source_name, recipient=source_name,
+                    material="Other Income", other_income=amount,
                     cost_basis="Explicit other-source receipt in Accounts (client settlements use a different source path)",
                 ))
 
@@ -2189,7 +2218,10 @@ class _Projection:
             self.rows.append(_base_row(
                 date=drawer.date_posted, source="FbmCashDrawerEntry", source_label="Cash Drawer Expense",
                 transaction_type="Operating Expense", entry_type="expense",
-                category=(drawer.category or "Cash Drawer Expense"), reference=f"DRAWER-{drawer.id}",
+                category=(drawer.category or "Cash Drawer Expense"),
+                description=(drawer.category or "Cash Drawer Expense"),
+                account="Cash Drawer",
+                reference=f"DRAWER-{drawer.id}",
                 document_type="FbmCashDrawerEntry", document_id=drawer.id,
                 source_type="FbmCashDrawerEntry", source_id=drawer.id, material="Expense",
                 expense=_f(drawer.amount), note=drawer.note or "",
@@ -2209,18 +2241,23 @@ class _Projection:
             grn = self.grn_by_id.get(charge.grn_id)
             if grn is None or not _active(grn):
                 continue
+            grn_ref = _grn_ref(grn)
             self.rows.append(_base_row(
                 date=_as_dt(grn.date_posted),
                 source="GRNCharge", source_label="GRN Separate Expense",
                 transaction_type="Purchase Charge Expense", entry_type="expense",
                 category=(charge.charge_type or "GRN Expense"),
                 subcategory=(charge.label or ""),
+                description=(charge.label or charge.charge_type or "GRN Expense"),
                 reference=f"GRNCH-{charge.id}",
+                voucher_reference=grn_ref,
                 document_type="GRNCharge", document_id=charge.id,
                 source_type="GRNCharge", source_id=charge.id,
                 material="Expense", expense=amount,
+                recipient=(charge.recipient_name or ""),
+                account=grn_ref,
                 supplier=grn.supplier or "", grn_ids=[grn.id],
-                note=(f"GRN #{charge.grn_id} · {charge.recipient_name or ''}").strip(),
+                note=(f"GRN #{charge.grn_id} · {charge.recipient_name or ''}").strip(" ·"),
                 cost_basis="Separately expensed purchase charge; excluded from inventory valuation",
             ))
 
@@ -2593,7 +2630,11 @@ def _explorer_rows(rows, args):
         selected = [row for row in selected if metric_map[metric](row)]
     query = _norm(args.get("q"))
     if query:
-        selected = [row for row in selected if query in _norm(" ".join(str(row.get(key) or "") for key in ("reference", "client", "material", "booked_material", "transaction_type", "category", "note")))]
+        selected = [row for row in selected if query in _norm(" ".join(str(row.get(key) or "") for key in (
+            "reference", "voucher_reference", "client", "recipient", "supplier", "account",
+            "material", "booked_material", "transaction_type", "category", "subcategory",
+            "description", "display_note", "note",
+        )))]
     entry_type = _norm(args.get("entry_type"))
     if entry_type:
         selected = [row for row in selected if entry_type in {_norm(row.get("entry_type")), _norm(row.get("category")), _norm(row.get("source"))}]
@@ -2616,6 +2657,11 @@ def _explorer_rows(rows, args):
         "customer": lambda row: (_norm(row.get("client")),),
         "qty": lambda row: (_f(row.get("qty")),),
         "material": lambda row: (_norm(row.get("material")),),
+        "category": lambda row: (_norm(row.get("category")), _norm(row.get("subcategory"))),
+        "party": lambda row: (_norm(row.get("recipient") or row.get("client") or row.get("supplier")),),
+        "account": lambda row: (_norm(row.get("account")),),
+        "expense": lambda row: (_f(row.get("expense")) + _f(row.get("other_loss")),),
+        "amount": lambda row: (_f(row.get("expense")) + _f(row.get("other_loss")),),
     }
     sort_key = _norm(args.get("sort"))
     order = _norm(args.get("order"))
@@ -2808,12 +2854,33 @@ def _filter_options(context):
     }
 
 
+def _paginate_rows(rows, page_raw, per_page):
+    try:
+        page = int(page_raw)
+    except (TypeError, ValueError):
+        page = 1
+    total = len(rows)
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = min(max(1, page), pages)
+    page_rows = rows[(page - 1) * per_page: page * per_page]
+    pagination = {
+        "page": page,
+        "pages": pages,
+        "per_page": per_page,
+        "total": total,
+        "start": ((page - 1) * per_page + 1 if total else 0),
+        "end": min(page * per_page, total),
+    }
+    return page_rows, pagination
+
+
 def build_profit_loss_report(
     *, start_date=None, end_date=None, client="", material="", supplier="",
     category="", grn_id=None, metric="", q="", entry_type="", cost_status="",
     page=1, per_page=25, include_position=False, previous=True, context=None,
     payment_status="", booking_status="", transaction_group="", entity_type="",
-    client_category="", sort="", order="", include_breakdown=True,
+    client_category="", sort="", order="", exp_page=1, exp_sort="", exp_order="",
+    include_breakdown=True,
 ):
     """Return the complete report view model from one authoritative projection.
 
@@ -2868,14 +2935,60 @@ def build_profit_loss_report(
     except (TypeError, ValueError):
         per_page = 25
     per_page = min(100, max(10, per_page))
-    try:
-        page = int(page)
-    except (TypeError, ValueError):
-        page = 1
-    total_entries = len(entries)
-    pages = max(1, (total_entries + per_page - 1) // per_page)
-    page = min(max(1, page), pages)
-    page_rows = entries[(page - 1) * per_page: page * per_page]
+    page_rows, pagination = _paginate_rows(entries, page, per_page)
+    total_entries = pagination["total"]
+
+    # Dedicated Control Center split: keep "Profit / loss by sales transaction"
+    # strictly on sales-side groups (goods, services, returns) and surface
+    # operating expenses in their own "Profit / loss by expense transaction"
+    # table (plus a separate bucket for any other gains/losses/waive-offs).
+    sales_groups = {GROUP_GOODS, GROUP_SERVICES, GROUP_RETURNS}
+    sales_entries = [
+        row for row in entries
+        if (row.get("transaction_group") or row_group(row)) in sales_groups
+    ]
+    sales_page_rows, sales_pagination = _paginate_rows(sales_entries, page, per_page)
+
+    expense_explorer_args = {
+        "metric": metric, "q": q, "entry_type": entry_type, "cost_status": cost_status,
+        "sort": (exp_sort or "").strip(), "order": (exp_order or "").strip(),
+    }
+    expense_entries = _explorer_rows(
+        [
+            row for row in current_rows
+            if (row.get("transaction_group") or row_group(row)) == GROUP_EXPENSES
+        ],
+        expense_explorer_args,
+    )
+    expense_page_rows, expense_pagination = _paginate_rows(expense_entries, exp_page, per_page)
+
+    other_entries = [
+        row for row in entries
+        if (row.get("transaction_group") or row_group(row)) == GROUP_OTHER
+    ]
+
+    sales_included = [r for r in sales_entries if r.get("include_in_net")]
+    sales_summary = {
+        "count": len(sales_entries),
+        "revenue": _sum(sales_entries, "revenue"),
+        "cogs": _sum(sales_included, "cogs"),
+        "profit": _sum(sales_included, "profit"),
+    }
+    expense_included = [r for r in expense_entries if r.get("include_in_net")]
+    expense_summary = {
+        "count": len(expense_entries),
+        "expense": _sum(expense_entries, "expense"),
+        "profit": _sum(expense_included, "profit"),
+    }
+    other_included = [r for r in other_entries if r.get("include_in_net")]
+    other_summary = {
+        "count": len(other_entries),
+        "other_income": _sum(other_entries, "other_income"),
+        "other_gain": _sum(other_entries, "other_gain"),
+        "other_loss": _sum(other_entries, "other_loss"),
+        "profit": _sum(other_included, "profit"),
+    }
+
     top_clients, top_items, daily, types = _insights(current_rows)
     export_summary = summarize_rows(entries)
     export_previous_rows = _explorer_rows(previous_rows, explorer_args)
@@ -2901,9 +3014,20 @@ def build_profit_loss_report(
         "all_rows": context.rows,
         "recent_transactions": list(reversed(current_rows))[:10],
         "transactions": page_rows,
+        "sales_transactions": sales_page_rows,
+        "sales_pagination": sales_pagination,
+        "sales_summary": sales_summary,
+        "expense_transactions": expense_page_rows,
+        "expense_pagination": expense_pagination,
+        "expense_summary": expense_summary,
+        "other_transactions": other_entries,
+        "other_summary": other_summary,
         "export_transactions": entries,
+        "export_sales_transactions": sales_entries,
+        "export_expense_transactions": expense_entries,
+        "export_other_transactions": other_entries,
         "entries_count": total_entries,
-        "pagination": {"page": page, "pages": pages, "per_page": per_page, "total": total_entries, "start": ((page - 1) * per_page + 1 if total_entries else 0), "end": min(page * per_page, total_entries)},
+        "pagination": pagination,
         "summary": summary,
         "previous_summary": previous_summary,
         "comparison": comparison,
@@ -2951,6 +3075,8 @@ def build_profit_loss_report(
         "inventory_view": inventory_view,
         "sort": explorer_args["sort"],
         "order": explorer_args["order"],
+        "exp_sort": expense_explorer_args["sort"],
+        "exp_order": expense_explorer_args["order"],
         "payment_status_choices": PAYMENT_STATUS_CHOICES,
         "booking_status_choices": BOOKING_STATUS_CHOICES,
         "transaction_group_choices": TRANSACTION_GROUP_CHOICES,

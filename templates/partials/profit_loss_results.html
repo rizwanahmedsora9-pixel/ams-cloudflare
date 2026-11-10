@@ -259,7 +259,10 @@
   <div class="row g-3">
     <div class="col-xl-5">
       <div class="ui-card h-100">
-        <div class="ui-card-header"><h5><i class="bi bi-receipt"></i> Operating expenses by category</h5></div>
+        <div class="ui-card-header">
+          <h5><i class="bi bi-receipt"></i> Operating expenses by category</h5>
+          <a class="small" href="#pl-expense-transactions">By expense transaction</a>
+        </div>
         <div class="ui-card-body flush">
           <div class="ui-table-wrap">
             <table class="ui-table pl-table">
@@ -354,12 +357,15 @@
     </div>
   </div>
 
-  {# ------------------------- TRANSACTIONS (PAGINATED) --------------------- #}
-  <div class="ui-card">
+  {# --------------------- SALES TRANSACTIONS (PAGINATED) ------------------- #}
+  <div class="ui-card" id="pl-sales-transactions">
     <div class="ui-card-header">
-      <h5><i class="bi bi-receipt"></i> Profit / loss by sales transaction</h5>
+      <div>
+        <h5><i class="bi bi-receipt"></i> Profit / loss by sales transaction</h5>
+        <span class="small text-muted">Goods sales, services &amp; returns only · <a href="#pl-expense-transactions">operating expenses are shown separately below</a></span>
+      </div>
       <div class="ui-toolbar">
-        <span class="small text-muted">Showing {{ pagination.start }}–{{ pagination.end }} of {{ pagination.total }} matching entries{% if pagination.pages > 1 %} · page {{ pagination.page }} of {{ pagination.pages }}{% endif %}</span>
+        <span class="small text-muted">Showing {{ sales_pagination.start }}–{{ sales_pagination.end }} of {{ sales_pagination.total }} sales entries{% if sales_pagination.pages > 1 %} · page {{ sales_pagination.page }} of {{ sales_pagination.pages }}{% endif %}</span>
       </div>
     </div>
     <div class="ui-card-body flush">
@@ -383,7 +389,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for t in transactions %}
+            {% for t in sales_transactions %}
             <tr>
               <td class="nowrap">{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td>
               <td>{% if t.document_type and t.document_id %}<a href="{{ url_for('profit_transaction_detail', document_type=t.document_type, document_id=t.document_id, start_date=start_date, end_date=end_date) }}">{{ t.reference }}</a>{% else %}{{ t.reference }}{% endif %}
@@ -401,31 +407,183 @@
               <td class="num">{% if t.document_outstanding %}Rs. {{ money(t.document_outstanding) }}{% else %}—{% endif %}</td>
             </tr>
             {% else %}
-            <tr><td colspan="13" class="ui-empty">No transactions match these filters. Try a wider date range or reset the filters.</td></tr>
+            <tr><td colspan="13" class="ui-empty">No sales transactions match these filters. Try a wider date range or reset the filters.</td></tr>
             {% endfor %}
           </tbody>
+          {% if sales_transactions %}
+          <tfoot>
+            <tr class="table-subtotal">
+              <td colspan="7">Total matching sales transactions ({{ sales_summary.count }}){% if sales_pagination.pages > 1 %} · all pages{% endif %}</td>
+              <td class="num">Rs. {{ money(sales_summary.revenue) }}</td>
+              <td class="num">Rs. {{ money(sales_summary.cogs) }}</td>
+              <td class="num">{{ signed(sales_summary.profit) }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+          {% endif %}
         </table>
       </div>
     </div>
-    {% if pagination.pages > 1 %}
+    {% if sales_pagination.pages > 1 %}
     <div class="ui-card-body">
-      <nav aria-label="Transaction pages">
+      <nav aria-label="Sales transaction pages">
         <ul class="pagination pagination-sm mb-0 flex-wrap">
-          <li class="page-item {{ 'disabled' if pagination.page <= 1 }}"><a class="page-link" data-pl-nav href="{{ report_url(view='entries', page=pagination.page-1) if pagination.page > 1 else '#' }}">Previous</a></li>
-          {% for n in range(1, pagination.pages + 1) %}
-          {% if n == 1 or n == pagination.pages or (n >= pagination.page - 2 and n <= pagination.page + 2) %}
-          <li class="page-item {{ 'active' if n == pagination.page }}"><a class="page-link" data-pl-nav href="{{ report_url(view='entries', page=n) }}">{{ n }}</a></li>
-          {% elif n == pagination.page - 3 or n == pagination.page + 3 %}
+          <li class="page-item {{ 'disabled' if sales_pagination.page <= 1 }}"><a class="page-link" data-pl-nav href="{{ report_url(page=sales_pagination.page-1) if sales_pagination.page > 1 else '#' }}">Previous</a></li>
+          {% for n in range(1, sales_pagination.pages + 1) %}
+          {% if n == 1 or n == sales_pagination.pages or (n >= sales_pagination.page - 2 and n <= sales_pagination.page + 2) %}
+          <li class="page-item {{ 'active' if n == sales_pagination.page }}"><a class="page-link" data-pl-nav href="{{ report_url(page=n) }}">{{ n }}</a></li>
+          {% elif n == sales_pagination.page - 3 or n == sales_pagination.page + 3 %}
           <li class="page-item disabled"><span class="page-link">…</span></li>
           {% endif %}
           {% endfor %}
-          <li class="page-item {{ 'disabled' if pagination.page >= pagination.pages }}"><a class="page-link" data-pl-nav href="{{ report_url(view='entries', page=pagination.page+1) if pagination.page < pagination.pages else '#' }}">Next</a></li>
+          <li class="page-item {{ 'disabled' if sales_pagination.page >= sales_pagination.pages }}"><a class="page-link" data-pl-nav href="{{ report_url(page=sales_pagination.page+1) if sales_pagination.page < sales_pagination.pages else '#' }}">Next</a></li>
         </ul>
       </nav>
-      <p class="section-note mb-0 mt-2">Totals above cover every matching entry, not just this page. Filters are kept while paging.</p>
+      <p class="section-note mb-0 mt-2">Totals above cover every matching sales entry, not just this page. Filters are kept while paging.</p>
     </div>
     {% endif %}
   </div>
+
+  {# -------------------- EXPENSE TRANSACTIONS (DEDICATED) ------------------ #}
+  <div class="ui-card" id="pl-expense-transactions">
+    <div class="ui-card-header">
+      <div>
+        <h5><i class="bi bi-wallet2"></i> Profit / loss by expense transaction</h5>
+        <span class="small text-muted">Dedicated operating expense entries · deducted from Gross Profit to reach Net Profit / Loss</span>
+      </div>
+      <div class="ui-toolbar">
+        <span class="small text-muted">Showing {{ expense_pagination.start }}–{{ expense_pagination.end }} of {{ expense_pagination.total }} expense entries{% if expense_pagination.pages > 1 %} · page {{ expense_pagination.page }} of {{ expense_pagination.pages }}{% endif %}</span>
+        <a href="{{ report_url(view='entries', transaction_group='expenses') }}" class="btn btn-outline-secondary btn-sm">Explore expenses</a>
+      </div>
+    </div>
+    <div class="ui-card-body flush">
+      <div class="ui-table-wrap">
+        <table class="ui-table pl-table pl-table--transactions">
+          <thead>
+            <tr>
+              <th><a href="{{ exp_sort_url(exp_sort='date', exp_order=('asc' if exp_sort == 'date' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Date</a></th>
+              <th><a href="{{ exp_sort_url(exp_sort='reference', exp_order=('asc' if exp_sort == 'reference' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Reference</a></th>
+              <th><a href="{{ exp_sort_url(exp_sort='category', exp_order=('asc' if exp_sort == 'category' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Category</a></th>
+              <th><a href="{{ exp_sort_url(exp_sort='party', exp_order=('asc' if exp_sort == 'party' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Party / recipient</a></th>
+              <th><a href="{{ exp_sort_url(exp_sort='account', exp_order=('asc' if exp_sort == 'account' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Account / source</a></th>
+              <th>Description / note</th>
+              <th class="num"><a href="{{ exp_sort_url(exp_sort='expense', exp_order=('asc' if exp_sort == 'expense' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Expense</a></th>
+              <th class="num"><a href="{{ exp_sort_url(exp_sort='expense', exp_order=('asc' if exp_sort == 'expense' and exp_order == 'desc' else 'desc')) }}" data-pl-nav>Profit / loss</a></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in expense_transactions %}
+            <tr>
+              <td class="nowrap">{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td>
+              <td>
+                {% if t.document_type and t.document_id %}<a href="{{ url_for('profit_transaction_detail', document_type=t.document_type, document_id=t.document_id, start_date=start_date, end_date=end_date) }}">{{ t.reference }}</a>{% else %}{{ t.reference }}{% endif %}
+                {% if t.voucher_reference and t.voucher_reference != t.reference %}<br><span class="small text-muted">{{ t.voucher_reference }}</span>{% endif %}
+              </td>
+              <td>
+                <span class="fw-bold">{{ t.category or 'Operating Expense' }}</span>
+                {% if t.subcategory %}<br><span class="small text-muted">{{ t.subcategory }}</span>{% endif %}
+                {% if t.transaction_type and t.transaction_type != 'Operating Expense' %}<br><span class="pl-pill">{{ t.transaction_type }}</span>{% endif %}
+              </td>
+              <td>{{ t.recipient or t.client or t.supplier or '—' }}</td>
+              <td>{{ t.account or t.source_label or '—' }}</td>
+              <td>
+                {% if t.description %}<div>{{ t.description }}</div>{% endif %}
+                {% if t.display_note and t.display_note != t.description %}<div class="small text-muted">{{ t.display_note }}</div>{% endif %}
+                {% if not t.description and not t.display_note %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="num fw-bold">Rs. {{ money(t.expense) }}</td>
+              <td class="num">{{ signed(t.profit) }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="ui-empty">No operating expense transactions match these filters.</td></tr>
+            {% endfor %}
+          </tbody>
+          {% if expense_transactions %}
+          <tfoot>
+            <tr class="table-subtotal">
+              <td colspan="6">Total matching operating expenses ({{ expense_summary.count }}){% if expense_pagination.pages > 1 %} · all pages{% endif %}</td>
+              <td class="num">Rs. {{ money(expense_summary.expense) }}</td>
+              <td class="num">{{ signed(expense_summary.profit) }}</td>
+            </tr>
+          </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+    {% if expense_pagination.pages > 1 %}
+    <div class="ui-card-body">
+      <nav aria-label="Expense transaction pages">
+        <ul class="pagination pagination-sm mb-0 flex-wrap">
+          <li class="page-item {{ 'disabled' if expense_pagination.page <= 1 }}"><a class="page-link" data-pl-nav href="{{ report_url(exp_page=expense_pagination.page-1) if expense_pagination.page > 1 else '#' }}">Previous</a></li>
+          {% for n in range(1, expense_pagination.pages + 1) %}
+          {% if n == 1 or n == expense_pagination.pages or (n >= expense_pagination.page - 2 and n <= expense_pagination.page + 2) %}
+          <li class="page-item {{ 'active' if n == expense_pagination.page }}"><a class="page-link" data-pl-nav href="{{ report_url(exp_page=n) }}">{{ n }}</a></li>
+          {% elif n == expense_pagination.page - 3 or n == expense_pagination.page + 3 %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+          {% endfor %}
+          <li class="page-item {{ 'disabled' if expense_pagination.page >= expense_pagination.pages }}"><a class="page-link" data-pl-nav href="{{ report_url(exp_page=expense_pagination.page+1) if expense_pagination.page < expense_pagination.pages else '#' }}">Next</a></li>
+        </ul>
+      </nav>
+      <p class="section-note mb-0 mt-2">Totals above cover every matching operating expense entry, not just this page.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if other_transactions %}
+  {# -------------- OTHER RECOGNIZED INCOME, GAINS & LOSSES --------------- #}
+  <div class="ui-card" id="pl-other-transactions">
+    <div class="ui-card-header">
+      <div>
+        <h5><i class="bi bi-sliders2"></i> Other recognized income, gains &amp; losses</h5>
+        <span class="small text-muted">Waive-off concessions, other income/losses and legacy account reconciliations — outside sales &amp; operating expenses</span>
+      </div>
+      <div class="ui-toolbar">
+        <span class="small text-muted">{{ other_summary.count }} matching entries</span>
+      </div>
+    </div>
+    <div class="ui-card-body flush">
+      <div class="ui-table-wrap pl-scroll">
+        <table class="ui-table pl-table pl-table--transactions">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Type</th>
+              <th>Party / source</th>
+              <th>Note</th>
+              <th class="num">Loss</th>
+              <th class="num">Income / gain</th>
+              <th class="num">Profit / loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in other_transactions %}
+            <tr>
+              <td class="nowrap">{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td>
+              <td>{% if t.document_type and t.document_id %}<a href="{{ url_for('profit_transaction_detail', document_type=t.document_type, document_id=t.document_id, start_date=start_date, end_date=end_date) }}">{{ t.reference }}</a>{% else %}{{ t.reference }}{% endif %}</td>
+              <td><span class="pl-pill">{{ t.transaction_type }}</span></td>
+              <td>{{ t.recipient or t.client or t.account or 'Business' }}</td>
+              <td>{{ t.display_note or t.description or '—' }}</td>
+              <td class="num">{% if t.other_loss %}Rs. {{ money(t.other_loss) }}{% else %}—{% endif %}</td>
+              <td class="num">{% if t.other_income or t.other_gain %}Rs. {{ money(t.other_income + t.other_gain) }}{% else %}—{% endif %}</td>
+              <td class="num">{{ signed(t.profit) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-subtotal">
+              <td colspan="5">Total other entries ({{ other_summary.count }})</td>
+              <td class="num">Rs. {{ money(other_summary.other_loss) }}</td>
+              <td class="num">Rs. {{ money(other_summary.other_income + other_summary.other_gain) }}</td>
+              <td class="num">{{ signed(other_summary.profit) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   {# --------------------------- PAYMENT & CREDIT --------------------------- #}
   <div class="row g-3">

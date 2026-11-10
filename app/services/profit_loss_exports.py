@@ -412,6 +412,76 @@ def build_profit_loss_excel(report):
             stock_ws.cell(note_row + 1, 2, _value(grn_section.get("landed_purchase_value"))).number_format = '#,##0.00;[Red]-#,##0.00'
             stock_ws.cell(note_row + 2, 1, grn_section.get("note", ""))
 
+    # Dedicated Sales vs. Expense sheets matching the Control Center split.
+    sales_ws = wb.create_sheet("Sales Transactions")
+    sales_headers = [
+        "Date", "Type", "Reference", "Customer", "Item / Service", "Booked Material",
+        "Qty", "Sale Rate", "Revenue", "COGS / Direct Cost", "Net Profit",
+        "Cost Status", "Payment Status", "Source GRNs", "GRN Cost Layers",
+    ]
+    sales_rows = [
+        [
+            row.get("date"), row.get("transaction_type"), row.get("reference"),
+            row.get("client") or row.get("account") or "Business",
+            row.get("material"), row.get("booked_material"),
+            _value(row.get("qty")), _value(row.get("sale_rate")),
+            _value(row.get("revenue")),
+            (_value(row.get("cogs")) if row.get("include_in_net") else None),
+            (_value(row.get("profit")) if row.get("include_in_net") else None),
+            row.get("cost_status"), row.get("payment_status_label") or row.get("payment_status"),
+            source_grn_text(row), cost_layer_text(row),
+        ]
+        for row in report.get("export_sales_transactions", [])
+    ]
+    _write_table(sales_ws, sales_headers, sales_rows, {
+        "Customer": 32, "Source GRNs": 34, "GRN Cost Layers": 80,
+    })
+    for row in sales_ws.iter_rows(min_row=2):
+        row[0].number_format = "yyyy-mm-dd hh:mm"
+        for index in range(6, 11):
+            row[index].number_format = '#,##0.00;[Red]-#,##0.00'
+
+    exp_ws = wb.create_sheet("Expense Transactions")
+    exp_headers = [
+        "Date", "Type", "Reference", "Voucher Ref", "Category", "Subcategory",
+        "Party / Recipient", "Account / Source", "Description", "Note",
+        "Expense", "Profit / Loss Impact",
+    ]
+    exp_rows = [
+        [
+            row.get("date"), row.get("transaction_type"), row.get("reference"),
+            row.get("voucher_reference", ""), row.get("category"), row.get("subcategory"),
+            row.get("recipient") or row.get("client") or row.get("supplier") or "",
+            row.get("account") or row.get("source_label") or "",
+            row.get("description") or "",
+            row.get("display_note") or "",
+            _value(row.get("expense")), _value(row.get("profit")),
+        ]
+        for row in report.get("export_expense_transactions", [])
+    ]
+    _write_table(exp_ws, exp_headers, exp_rows, {
+        "Category": 26, "Party / Recipient": 26, "Account / Source": 24,
+        "Description": 38, "Note": 38,
+    })
+    for row in exp_ws.iter_rows(min_row=2):
+        row[0].number_format = "yyyy-mm-dd hh:mm"
+        for index in (10, 11):
+            row[index].number_format = '#,##0.00;[Red]-#,##0.00'
+
+    if breakdown:
+        exp_cat_ws = wb.create_sheet("Expenses by Category")
+        _write_table(
+            exp_cat_ws,
+            ["Category", "Amount", "Entries"],
+            [
+                [row["category"], _value(row["expenses"]), row.get("rows", 0)]
+                for row in breakdown.get("by_expense_category", [])
+            ],
+            {"Category": 36},
+        )
+        for row in exp_cat_ws.iter_rows(min_row=2, min_col=2, max_col=2):
+            row[0].number_format = '#,##0.00;[Red]-#,##0.00'
+
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)
