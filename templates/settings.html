@@ -84,6 +84,11 @@
                             <input type="text" name="company_note_ur" dir="rtl" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.company_note_ur or '' }}" placeholder="سیمنٹ، سریا، اینٹ ... تعمیراتی سامان دستیاب ہے">
                             <div class="form-text text-white-50">The availability strip above the bill panel. Left blank, the bill's own note is used.</div>
                         </div>
+                        <div class="col-12 mb-2">
+                            <label class="form-label small text-white-50">Public QR / Cloudflare Worker URL</label>
+                            <input type="text" inputmode="url" name="public_base_url" class="form-control form-control-sm bg-dark text-white border-secondary" value="{{ settings.public_base_url if settings.public_base_url is not none else (config.get('PUBLIC_BASE_URL') or 'https://still-base-ac7a.rizwanahmedsora9.workers.dev') }}" placeholder="https://still-base-ac7a.rizwanahmedsora9.workers.dev">
+                            <div class="form-text text-white-50">Origin used in client ledger &amp; bill QR links (e.g. <code>https://still-base-ac7a.rizwanahmedsora9.workers.dev</code>). Leave blank to fall back to the active app URL.</div>
+                        </div>
                     </div>
                     <hr class="border-secondary my-2">
                     <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" name="allow_global_negative_stock" id="globalNegativeStock" {% if settings.allow_global_negative_stock %}checked{% endif %}><label class="form-check-label text-danger small" for="globalNegativeStock">Always Allow Negative Stock</label></div>

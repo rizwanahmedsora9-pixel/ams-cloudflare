@@ -823,27 +823,40 @@ def _refresh_forward_lock_openings(from_day):
     return changed
 
 
-def postable_differences(day):
-    """Differences of *day* that still have to reach the ledger."""
+def postable_differences(day, *, account_id=None):
+    """Differences of *day* (optionally for one account) that still have to reach the ledger."""
+    q = CashDayDifference.query.filter(
+        CashDayDifference.position_date == _day_day(day),
+        CashDayDifference.status == 'open',
+        or_(CashDayDifference.posted_status.is_(None),
+            CashDayDifference.posted_status.in_([STATUS_PENDING, STATUS_REVERSED])),
+    )
+    if account_id is not None:
+        q = q.filter(CashDayDifference.account_id == int(account_id))
     return [
-        row for row in CashDayDifference.query.filter(
-            CashDayDifference.position_date == _day_day(day),
-            CashDayDifference.status == 'open',
-            or_(CashDayDifference.posted_status.is_(None),
-                CashDayDifference.posted_status.in_([STATUS_PENDING, STATUS_REVERSED])),
-        ).order_by(CashDayDifference.id.asc()).all()
+        row for row in q.order_by(CashDayDifference.id.asc()).all()
         if row.difference
     ]
 
 
+def day_posted_abs_total(day):
+    """Total absolute difference posted (or resolved) for *day*."""
+    rows = CashDayDifference.query.filter(
+        CashDayDifference.position_date == _day_day(day),
+        CashDayDifference.posted_status.in_([STATUS_POSTED, STATUS_RESOLVED]),
+    ).all()
+    return _money_round(sum(abs(float(r.difference or 0)) for r in rows))
+
+
 def difference_summary(day):
-    """Per-account posting state for the board's locked rows."""
+    """Per-account posting state for the board's rows."""
     out = {}
     for row in CashDayDifference.query.filter(
         CashDayDifference.position_date == _day_day(day)
     ).order_by(CashDayDifference.id.asc()).all():
         out[row.account_id] = {
             'status': row.posted_status,
+            'diff_status': row.status,
             'kind': row.kind,
             'difference': _money_round(row.difference or 0),
             'posted_out_tx_id': row.posted_out_tx_id,

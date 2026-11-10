@@ -45,6 +45,8 @@ def add_client():
                    opening_balance=opening_balance,
                    opening_balance_date=opening_balance_date)
     db.session.add(new_c)
+    from app.services.client_qr import ensure_client_ledger_qr
+    ensure_client_ledger_qr(new_c)
     db.session.commit()
     flash('Client Registered', 'success')
     return redirect(url_for('clients'))

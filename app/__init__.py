@@ -141,10 +141,11 @@ def create_app(test_config: dict | None = None) -> Flask:
         IMPORT_ARTIFACT_RETENTION_SECONDS=int(
             os.environ.get("IMPORT_ARTIFACT_RETENTION_SECONDS", str(7 * 24 * 3600)) or "0"
         ),
-        # Origin printed into the QR code on an Urdu receipt.  Empty means
-        # "use the address the bill was requested from" (so a yard PC prints
-        # its own LAN address).  Set it when the app sits behind a proxy:
-        #   PUBLIC_BASE_URL=https://erp.example.com
+        # Origin printed into the QR code on an Urdu receipt or client ledger.
+        # Empty means "use Settings or the active request address". Set it
+        # when the app sits behind a Cloudflare Worker or proxy:
+        #   PUBLIC_BASE_URL=https://still-base-ac7a.rizwanahmedsora9.workers.dev
+        _ENV_PUBLIC_BASE_URL=(os.environ.get("PUBLIC_BASE_URL") or "").strip(),
         PUBLIC_BASE_URL=(os.environ.get("PUBLIC_BASE_URL") or "").strip(),
         UPLOAD_DIR=os.environ.get("UPLOAD_DIR", str(root / "static" / "uploads")),
         # Daily database backups deliberately live OUTSIDE instance/ so they

@@ -83,6 +83,8 @@ def _process_dispatch(df, strategy, missing_client_strategy, report, allow_missi
                         )
                         db.session.add(client)
                         db.session.flush()
+                        from app.services.client_qr import ensure_client_ledger_qr
+                        ensure_client_ledger_qr(client)
                 elif missing_client_strategy == 'stop':
                     raise Exception(f"Missing client '{client_code or client_name}' for dispatch")
                 else: # 'skip' is the default

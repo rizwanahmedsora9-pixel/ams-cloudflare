@@ -46,7 +46,21 @@
       {% else %}
       <p class="warning">This is the client's current active QR — the same code stays valid, so previously printed copies keep working. Anyone with the QR can see the live ledger.</p>
       {% endif %}
-      <a class="link secondary" href="{{ url_for('ledgers.client_ledger_qr', client_id=client.id) }}">QR settings / revoke</a>
+      {% if can_generate %}
+      <form method="post">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="action" value="generate">
+        <button class="secondary" type="submit">Generate replacement and show QR</button>
+      </form>
+      {% endif %}
+      <form method="post" onsubmit="return confirm('Revoke this client ledger QR? The printed code will stop working.');">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="qr_nonce" value="{{ qr_nonce }}">
+        <input type="hidden" name="action" value="revoke">
+        <button class="danger" type="submit">Revoke current QR</button>
+      </form>
+      <a class="link secondary" href="{{ url_for('ledgers.client_ledger', id=client.id) }}">Back to client ledger</a>
     </div>
   {% else %}
     <h1>Client Ledger QR</h1>

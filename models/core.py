@@ -119,6 +119,14 @@ class Settings(db.Model):
     # migration.
     recon_less_account_id = db.Column(db.Integer, nullable=True)
     recon_excess_account_id = db.Column(db.Integer, nullable=True)
+    # Public QR / Cloudflare Worker origin printed into bill & client ledger QRs.
+    # None = not yet configured; '' = intentionally cleared to fall back to the
+    # active app origin.
+    public_base_url = db.Column(
+        db.String(300),
+        nullable=True,
+        default='https://still-base-ac7a.rizwanahmedsora9.workers.dev',
+    )
 
 
 class TermsAndCondition(db.Model):

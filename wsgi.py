@@ -16,6 +16,7 @@ DB_PATH = os.path.join(BASE_DIR, "instance", "ahmed_cement_v44_fresh.db")
 # is retired and is never opened.
 os.environ.setdefault("APP_DB_PATH", DB_PATH)
 os.environ.setdefault("ALLOW_EMPTY_DB", "1")
+os.environ.setdefault("PUBLIC_BASE_URL", "https://still-base-ac7a.rizwanahmedsora9.workers.dev")
 # The web process must not create scheduled backup/database copies.
 os.environ["BACKUP_EMBEDDED_SCHEDULER"] = "0"
 

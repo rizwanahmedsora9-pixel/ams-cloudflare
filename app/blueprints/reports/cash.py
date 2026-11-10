@@ -1126,6 +1126,8 @@ def _dr_wants_json():
 
 def _dr_json_context(day_str):
     ctx = _dr_build_context(day_str)
+    counter_less = ctx.get('counter_less')
+    counter_excess = ctx.get('counter_excess')
     return {
         'day_str': ctx['day_str'],
         'total_expected': ctx['total_expected'],
@@ -1134,6 +1136,10 @@ def _dr_json_context(day_str):
         'net_difference': ctx['net_difference'],
         'counted_accounts': ctx['counted_accounts'],
         'accounts_total': ctx['accounts_total'],
+        'counter_total': ctx.get('counter_total', 0),
+        'counter_less_name': counter_less.name if counter_less else 'Counter Less Account',
+        'counter_excess_name': counter_excess.name if counter_excess else 'Counter Excess Account',
+        'posting': ctx.get('posting'),
         'positions': ctx['positions'],
     }
 
@@ -1164,19 +1170,23 @@ def daily_reconciliation():
         status = 'success'
         try:
             if action == 'save_count':
-                recon.save_count(
+                pos = recon.save_count(
                     day_str,
                     request.form.get('account_id'),
                     counted_raw,
                     actor=current_user,
                 )
-                message = 'Counted balance saved.'
+                posted_messages = getattr(pos, 'posting_messages', None) or []
+                message = (
+                    'Counted balance saved. ' + ' '.join(posted_messages)
+                    if posted_messages else 'Counted balance saved.'
+                )
                 status = 'success'
             elif action == 'refresh_differences':
                 checked = recon.refresh_differences(day_str, actor=current_user)
                 if checked:
                     message = ('Saved counts checked against current expected balances; '
-                               'differences report updated.')
+                               'Accounts and differences report updated.')
                 else:
                     message = (f'Day {day_str} is finalised, so its differences are fixed. '
                                'Unlock the day to correct them.')
@@ -1208,14 +1218,13 @@ def daily_reconciliation():
                     reason=request.form.get('note') or '',
                 )
                 message = (
-                    f'Day {day_str} unlocked. '
-                    + (f'{removed} counter-account posting(s) reversed. '
-                       if removed else '')
+                    f'Day {day_str} unlocked for editing. Edit or clear counts below to update Accounts.'
+                    + (f' {removed} counter-account posting(s) reversed.' if removed else '')
                 )
                 status = 'warning'
             elif action == 'clear_count':
                 recon.delete_count(day_str, request.form.get('account_id'), actor=current_user)
-                message = 'Counted balance cleared.'
+                message = 'Counted balance cleared and any posted difference reversed.'
                 status = 'warning'
             else:
                 raise ValueError('Unsupported reconciliation action. Reload the page and try again.')
