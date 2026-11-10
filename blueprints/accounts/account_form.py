@@ -171,6 +171,8 @@ def validate_account_form(form, *, is_edit=False):
 
     if not is_valid_triple(category, subcategory, atype):
         raise ValueError("The selected category / subcategory / account type combination is not valid.")
+    if subcategory.strip().lower() == 'loans payable' or _strip(_form_get(form, "source_category")).lower() == 'loan':
+        raise ValueError("Loan parties are outsider ledgers, not company accounts. Add them in the Loan Register.")
 
     node = resolve_node(category, subcategory, atype)
     if node is None:  # defensive; is_valid_triple already guarded

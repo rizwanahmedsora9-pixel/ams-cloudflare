@@ -604,8 +604,8 @@
       </div>
       <div class="modal-body">
         <div class="alert alert-dark border-secondary small mb-3">
-          Outstanding to {{ entity.name }}: <strong class="text-warning">Rs. {{ "{:,.2f}".format(ledger.closing_balance or 0) }}</strong>.
-          The amount is allocated FIFO across open rent items, and the selected account is reduced by the same amount.
+          Net ledger balance for {{ entity.name }}: <strong class="text-warning">Rs. {{ "{:,.2f}".format(ledger.closing_balance or 0) }}</strong>.
+          Payment may exceed the current payable. Any excess remains in this ledger and is automatically adjusted against future delivery rent; the selected account is reduced by the full amount paid.
         </div>
         <div class="row g-3">
           <div class="col-6">

@@ -39,8 +39,11 @@ def record_principal_movement(*, loan_party_id, movement_type, amount, cash_acco
     if party is None or not party.is_active:
         raise ValueError('Select an active lender.')
     account = db.session.get(Account, cash_account_id)
-    if account is None or not account.is_active or (account.category or '').strip().lower() not in ('cash', 'bank'):
-        raise ValueError('Select an active cash or bank account.')
+    from app.services.system_accounts import is_legacy_loan_account, is_reserved_account
+    if (account is None or not account.is_active
+            or (account.category or '').strip().lower() not in ('cash', 'bank')
+            or is_legacy_loan_account(account) or is_reserved_account(account)):
+        raise ValueError('Select an active company cash or bank account.')
     posted = date_posted or pk_now()
     if not isinstance(posted, datetime):
         raise ValueError('A valid posting date is required.')

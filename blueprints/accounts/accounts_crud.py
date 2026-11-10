@@ -14,8 +14,9 @@ def _deny_account_master_mutation():
 
 
 def _deny_reserved_account(account):
-    from app.services.system_accounts import is_reserved_account
-    if is_reserved_account(account):
+    """System and lender records are not ordinary company account documents."""
+    from app.services.system_accounts import is_legacy_loan_account, is_reserved_account
+    if is_reserved_account(account) or is_legacy_loan_account(account):
         from flask import abort
         abort(404)
 
@@ -35,9 +36,9 @@ def manage_accounts():
     else:
         show_mode = 'active'
         q = q.filter(func.coalesce(Account.is_active, True) == True)
-    from app.services.system_accounts import is_reserved_account
+    from app.services.system_accounts import is_legacy_loan_account, is_reserved_account
     accounts = [a for a in q.order_by(Account.name.asc(), Account.id.asc()).all()
-                if not is_reserved_account(a)]
+                if not is_reserved_account(a) and not is_legacy_loan_account(a)]
     categories = _account_categories()
     
     # Group accounts by category and type for better organization
@@ -706,8 +707,9 @@ def reconciliations():
         AccountReconciliation.id.desc()
     ).paginate(page=page, per_page=per_page, error_out=False)
     from app.services.system_accounts import is_reserved_account
+    from app.services.system_accounts import is_legacy_loan_account
     account_options = [a for a in Account.query.order_by(Account.name.asc()).all()
-                       if not is_reserved_account(a)]
+                       if not is_reserved_account(a) and not is_legacy_loan_account(a)]
     return render_template(
         'accounts/reconciliations.html', recs=recs, total_count=total_count,
         accounts=account_options,
