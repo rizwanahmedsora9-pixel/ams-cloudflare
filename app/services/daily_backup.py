@@ -694,6 +694,12 @@ def _scheduler_worker(app) -> None:
     poll = max(30, min(900, int(app.config.get("DAILY_BACKUP_POLL_SECONDS", 120))))
     while True:
         try:
+            from app.services import state as _state
+            if getattr(_state, 'WIPE_IN_PROGRESS', False):
+                # An admin wipe owns the database right now; a backup copy
+                # would take the lock it needs. Try again on the next poll.
+                time.sleep(poll)
+                continue
             with app.app_context():
                 row = get_settings(create=False)
                 if row is not None and row.enabled:

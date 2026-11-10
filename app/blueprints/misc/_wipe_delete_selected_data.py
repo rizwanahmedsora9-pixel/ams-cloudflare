@@ -1,7 +1,45 @@
 """wipe — split from misc.py."""
 from ._common import *  # noqa
 from models import Service  # noqa: F401  (Service master wipe target)
-from app.services.full_wipe import FULL_WIPE_TARGETS, wipe_all_business_data
+from app.services.full_wipe import (
+    FULL_WIPE_TARGETS,
+    WipeError,
+    is_transient_lock_error,
+    wipe_all_business_data,
+)
+
+
+def _wipe_failure_text(exc):
+    """A short, honest reason the operator can act on.
+
+    The generic "a data error occurred" flash used to hide *why* a wipe stopped
+    (it also replaced the engine's own message).  Every branch below stays free
+    of SQL/table/driver detail so the central sanitiser keeps it visible.
+    """
+    if isinstance(exc, WipeError):
+        return str(exc)
+    if is_transient_lock_error(exc):
+        if 'disk i/o error' in str(exc or '').lower():
+            return (
+                'The database drive could not be written while wiping. No changes '
+                'were saved — check the disk (space, network drive) and retry.'
+            )
+        return (
+            'The database was in use while wiping (another window, a running backup '
+            'or an import). No changes were saved — close other windows on this PC, '
+            'wait a minute and try again.'
+        )
+    detail = str(exc or '').lower()
+    if 'constraint failed' in detail or 'integrityerror' in detail:
+        return (
+            'A stored database rule blocked the wipe. No changes were saved — '
+            'run Admin → Rebuild ERP Consistency, then retry; if it still fails, '
+            'contact support with the time of this attempt.'
+        )
+    return (
+        'Wipe failed and no changes were saved. Please retry; if the problem '
+        'persists, contact support with the time of this attempt.'
+    )
 
 @bp.route('/delete_selected_data', methods=['POST'])
 @login_required
@@ -192,6 +230,10 @@ def delete_selected_data():
         return redirect(url_for('settings'))
 
     _RESET_CONTEXT = 'granular_wipe'
+    # Tell background workers (backup / auto-reconcile) to stand back: their
+    # writes are what turn a wipe into "database is locked" on a busy PC.
+    from app.services import state as _wipe_state
+    _wipe_state.WIPE_IN_PROGRESS = True
     try:
         deleted_info = []
         # Keep core config intact: Users/Roles, login sessions, and Settings.
@@ -612,8 +654,8 @@ def delete_selected_data():
         flash(f'Data Wiped: {", ".join(deleted_info)}', 'danger')
     except Exception as exc:
         db.session.rollback()
-        # Log the full technical detail server-side; the user gets a clean
-        # message (never SQL, table names or driver URLs).
+        # Log the full technical detail server-side; the user gets a clean,
+        # specific reason (never SQL, table names or driver URLs).
         logging.getLogger('wipe').exception('Data wipe failed')
         if history_row:
             try:
@@ -622,9 +664,10 @@ def delete_selected_data():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-        flash(f'Wipe failed: {exc or "the operation could not be completed and no data was changed. Please try again; if the problem persists, contact support."}', 'danger')
+        flash(_wipe_failure_text(exc), 'danger')
     finally:
         _RESET_CONTEXT = None
+        _wipe_state.WIPE_IN_PROGRESS = False
 
     return redirect(url_for('settings'))
 

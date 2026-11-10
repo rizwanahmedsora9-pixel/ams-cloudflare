@@ -361,6 +361,16 @@ def run_auto_reconcile(app, *, interval_seconds=600, tolerance=0.01, fix=True) -
         if not fix:
             time.sleep(interval_seconds)
             continue
+        # An admin wipe rebuilds the whole ledger; reconciling it concurrently
+        # only competes for the SQLite write lock and can abort the reset.
+        try:
+            from app.services import state as _state
+            wipe_running = bool(getattr(_state, 'WIPE_IN_PROGRESS', False))
+        except Exception:  # noqa: BLE001
+            wipe_running = False
+        if wipe_running:
+            time.sleep(min(5, interval_seconds))
+            continue
         if not _RECON_LOCK.acquire(blocking=False):
             time.sleep(interval_seconds)
             continue
