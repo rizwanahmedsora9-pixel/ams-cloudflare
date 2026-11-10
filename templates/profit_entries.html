@@ -62,7 +62,7 @@
 
   <div class="ui-card">
     <div class="ui-card-header">
-      <h5><i class="bi bi-receipt"></i> {{ entry_metric_label or 'Every Sale in This Period' }}</h5>
+      <h5><i class="bi bi-receipt"></i> {{ entry_metric_label or ('Operating Expense Entries' if selected.transaction_group == 'expenses' else 'Matching P&L Entries') }}</h5>
       <div class="ui-toolbar"><span class="small text-muted">{{ entries_count }} entries · showing {{ pagination.start }}–{{ pagination.end }}</span>{% if entry_metric %}<a class="btn btn-outline-secondary btn-sm" href="{{ all_url }}">Show all entries</a>{% endif %}</div>
     </div>
     <div class="ui-card-body">
@@ -73,8 +73,8 @@
           <div class="row g-3 align-items-center">
             <div class="col-lg-5 min-w-0">
               <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><span class="fw-bold">{{ t.transaction_type }}</span><span class="cost-badge {{ 'text-warning' if t.cost_status == 'missing' else ('text-info' if t.cost_status == 'estimated' else 'text-muted') }}">{{ {'actual':'Recorded cost','estimated':'Estimated cost','missing':'Unresolved cost','not_applicable':'No stock cost'}.get(t.cost_status,t.cost_status) }}</span></div>
-              <div class="fw-bold text-truncate">{{ t.client or t.account or 'Business / Account' }}</div>
-              <div class="small text-muted">{{ t.date.strftime('%Y-%m-%d %H:%M') if t.date else 'Undated' }}{% if t.material and t.material != '-' %} · {{ t.material }}{% endif %}{% if t.booked_material and t.booked_material != t.material %} · booked {{ t.booked_material }}{% endif %}{% if t.qty %} · Qty {{ '{:,.2f}'.format(t.qty) }}{% endif %}</div>
+              <div class="fw-bold text-truncate">{{ t.recipient or t.client or t.account or 'Business / Account' }}</div>
+              <div class="small text-muted">{{ t.date.strftime('%Y-%m-%d %H:%M') if t.date else 'Undated' }}{% if t.material and t.material != '-' %} · {{ t.material }}{% endif %}{% if t.booked_material and t.booked_material != t.material %} · booked {{ t.booked_material }}{% endif %}{% if t.qty %} · Qty {{ '{:,.2f}'.format(t.qty) }}{% endif %}{% if t.description %} · {{ t.description }}{% endif %}</div>
               {% if t.reference %}<div class="small text-muted">Bill / Ref: <a href="{{ url_for('profit_transaction_detail', document_type=t.document_type, document_id=t.document_id, start_date=start_date, end_date=end_date) }}">{{ t.reference }}</a></div>{% endif %}
               {% if t.category %}<div class="small text-muted">Category: {{ t.category }}{% if t.subcategory %} / {{ t.subcategory }}{% endif %}</div>{% endif %}
             </div>

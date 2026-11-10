@@ -126,13 +126,37 @@
 {% endif %}
 {% endif %}
 
-<h2>Transaction Detail ({{ export_transactions|length }} filtered rows; no pagination)</h2>
+<h2>Profit / loss by sales transaction ({{ export_sales_transactions|length }} rows; no pagination)</h2>
 <table>
-  <thead><tr><th style="width:9%">Date</th><th style="width:13%">Type / ref</th><th style="width:13%">Customer</th><th style="width:13%">Item</th><th class="num" style="width:8%">Qty</th><th class="num" style="width:10%">Revenue</th><th class="num" style="width:9%">Cost</th><th class="num" style="width:9%">Expense / loss</th><th class="num" style="width:8%">Gain</th><th class="num" style="width:8%">Profit</th></tr></thead>
+  <thead><tr><th style="width:9%">Date</th><th style="width:14%">Type / ref</th><th style="width:15%">Customer</th><th style="width:16%">Item / service</th><th class="num" style="width:8%">Qty</th><th class="num" style="width:12%">Revenue</th><th class="num" style="width:13%">COGS / direct cost</th><th class="num" style="width:13%">Profit / loss</th></tr></thead>
   <tbody>
-    {% for t in export_transactions %}<tr><td>{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td><td>{{ t.transaction_type }}<br>{{ t.reference }}</td><td>{{ t.client or t.account or 'Business' }}</td><td>{{ t.material }}{% if t.booked_material and t.booked_material != t.material %}<br>Booked: {{ t.booked_material }}{% endif %}<br><span class="small muted">{{ t.cost_status }}</span>{% if t.cost_sources %}{% for src in t.cost_sources %}<br><span class="small muted">{{ src.reference or src.type }}{% if src.grn_item_id %} Lot #{{ src.grn_item_id }}{% endif %} {{ '{:,.2f}'.format(src.qty or 0) }} &times; {{ '{:,.2f}'.format(src.rate or 0) }}</span>{% endfor %}{% endif %}</td><td class="num">{{ '{:,.2f}'.format(t.qty) }}</td><td class="num">{{ '{:,.2f}'.format(t.revenue) }}</td><td class="num">{% if t.include_in_net %}{{ '{:,.2f}'.format(t.cogs) }}{% else %}N/A{% endif %}</td><td class="num">{{ '{:,.2f}'.format(t.expense + t.other_loss) }}</td><td class="num">{{ '{:,.2f}'.format(t.other_gain) }}</td><td class="num {{ 'pos' if t.profit >= 0 else 'neg' }}">{% if t.include_in_net %}{{ '{:,.2f}'.format(t.profit) }}{% else %}N/A{% endif %}</td></tr>{% else %}<tr><td colspan="10">No transactions match the selected filters.</td></tr>{% endfor %}
+    {% for t in export_sales_transactions %}<tr><td>{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td><td>{{ t.transaction_type }}<br>{{ t.reference }}</td><td>{{ t.client or t.account or 'Business' }}</td><td>{{ t.material }}{% if t.booked_material and t.booked_material != t.material %}<br>Booked: {{ t.booked_material }}{% endif %}<br><span class="small muted">{{ t.cost_status }}</span>{% if t.cost_sources %}{% for src in t.cost_sources %}<br><span class="small muted">{{ src.reference or src.type }}{% if src.grn_item_id %} Lot #{{ src.grn_item_id }}{% endif %} {{ '{:,.2f}'.format(src.qty or 0) }} &times; {{ '{:,.2f}'.format(src.rate or 0) }}</span>{% endfor %}{% endif %}</td><td class="num">{{ '{:,.2f}'.format(t.qty) }}</td><td class="num">{{ '{:,.2f}'.format(t.revenue) }}</td><td class="num">{% if t.include_in_net %}{{ '{:,.2f}'.format(t.cogs) }}{% else %}N/A{% endif %}</td><td class="num {{ 'pos' if t.profit >= 0 else 'neg' }}">{% if t.include_in_net %}{{ '{:,.2f}'.format(t.profit) }}{% else %}N/A{% endif %}</td></tr>{% else %}<tr><td colspan="8">No sales transactions match the selected filters.</td></tr>{% endfor %}
+  </tbody>
+  {% if export_sales_transactions %}
+  <tfoot><tr class="total"><td colspan="5">Total sales transactions ({{ sales_summary.count }})</td><td class="num">{{ '{:,.2f}'.format(sales_summary.revenue) }}</td><td class="num">{{ '{:,.2f}'.format(sales_summary.cogs) }}</td><td class="num {{ 'pos' if sales_summary.profit >= 0 else 'neg' }}">{{ '{:,.2f}'.format(sales_summary.profit) }}</td></tr></tfoot>
+  {% endif %}
+</table>
+
+<h2>Profit / loss by expense transaction ({{ export_expense_transactions|length }} rows; no pagination)</h2>
+<table>
+  <thead><tr><th style="width:10%">Date</th><th style="width:12%">Ref</th><th style="width:18%">Category</th><th style="width:15%">Party / recipient</th><th style="width:13%">Account / source</th><th style="width:16%">Description / note</th><th class="num" style="width:8%">Expense</th><th class="num" style="width:8%">Profit / loss</th></tr></thead>
+  <tbody>
+    {% for t in export_expense_transactions %}<tr><td>{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td><td>{{ t.reference }}{% if t.voucher_reference and t.voucher_reference != t.reference %}<br><span class="small muted">{{ t.voucher_reference }}</span>{% endif %}</td><td>{{ t.category or 'Operating Expense' }}{% if t.subcategory %}<br><span class="small muted">{{ t.subcategory }}</span>{% endif %}</td><td>{{ t.recipient or t.client or t.supplier or '—' }}</td><td>{{ t.account or t.source_label or '—' }}</td><td>{{ t.description or '' }}{% if t.display_note and t.display_note != t.description %}{% if t.description %}<br>{% endif %}<span class="small muted">{{ t.display_note }}</span>{% endif %}</td><td class="num">{{ '{:,.2f}'.format(t.expense) }}</td><td class="num neg">{{ '{:,.2f}'.format(t.profit) }}</td></tr>{% else %}<tr><td colspan="8">No operating expense transactions match the selected filters.</td></tr>{% endfor %}
+  </tbody>
+  {% if export_expense_transactions %}
+  <tfoot><tr class="total"><td colspan="6">Total operating expenses ({{ expense_summary.count }})</td><td class="num">{{ '{:,.2f}'.format(expense_summary.expense) }}</td><td class="num neg">{{ '{:,.2f}'.format(expense_summary.profit) }}</td></tr></tfoot>
+  {% endif %}
+</table>
+
+{% if export_other_transactions %}
+<h2>Other recognized income, gains &amp; losses ({{ export_other_transactions|length }} rows)</h2>
+<table>
+  <thead><tr><th style="width:10%">Date</th><th style="width:14%">Type / ref</th><th style="width:18%">Party / source</th><th style="width:26%">Note</th><th class="num" style="width:11%">Loss</th><th class="num" style="width:11%">Income / gain</th><th class="num" style="width:10%">Profit / loss</th></tr></thead>
+  <tbody>
+    {% for t in export_other_transactions %}<tr><td>{{ t.date.strftime('%Y-%m-%d') if t.date else 'Undated' }}</td><td>{{ t.transaction_type }}<br>{{ t.reference }}</td><td>{{ t.recipient or t.client or t.account or 'Business' }}</td><td>{{ t.display_note or t.description or '—' }}</td><td class="num">{{ '{:,.2f}'.format(t.other_loss) }}</td><td class="num">{{ '{:,.2f}'.format(t.other_income + t.other_gain) }}</td><td class="num {{ 'pos' if t.profit >= 0 else 'neg' }}">{{ '{:,.2f}'.format(t.profit) }}</td></tr>{% endfor %}
   </tbody>
 </table>
+{% endif %}
 
 <h2>Cost Qualification &amp; Accounting Policy</h2>
 {% if summary.unknown_cost_rows %}<p class="warning">{{ summary.unknown_cost_rows }} unresolved-cost rows are excluded from net. Positive affected revenue: Rs. {{ '{:,.2f}'.format(summary.unknown_cost_revenue) }}.</p>{% endif %}
