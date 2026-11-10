@@ -104,23 +104,57 @@ def _staff_only():
         abort(403)
 
 
+def _current_qr_token(client) -> str | None:
+    """Return the client's active token when it can be reproduced right now.
+
+    ``None`` means the stored QR cannot be shown again: the client has no QR
+    yet, only a legacy fingerprint was kept (no salt), or the server key
+    changed so the stored salt no longer reproduces the stored digest.
+    """
+    if not _can_print(client):
+        return None
+    token = _derive_token(client, client.client_ledger_qr_token_salt)
+    if _token_hash(token) != client.client_ledger_qr_token_hash:
+        return None
+    return token
+
+
 def _active_qr_view_state(client, *, auto_generate: bool = False) -> tuple[str, str, bool]:
     """Return ``(qr_url, error, replaced)`` for displaying a client's active QR.
 
-    When ``auto_generate`` is true and an eligible client has no active QR yet,
-    generates and persists a derivable QR immediately so opening More -> QR Code
-    shows the scannable QR code without requiring a manual generate click.
-    Legacy hash-only QRs (missing salt) are never rotated automatically.
+    Opening More -> QR Code always lands on a scannable code for an eligible
+    client: one is created when the client has none, and a stored QR that can
+    no longer be reproduced (a legacy fingerprint-only code, or one left
+    behind by a server key change) is replaced straight away instead of
+    leaving staff on an explanation page with nothing to show.
+
+    A QR that *can* still be shown is never rotated, so a code that was
+    already printed and handed out keeps working.
     """
     if not is_qr_eligible_client(client):
         return "", "", False
 
-    if not client.client_ledger_qr_token_hash and auto_generate:
-        _token, created = ensure_client_ledger_qr(client)
+    had_active_qr = bool(client.client_ledger_qr_token_hash)
+    token = _current_qr_token(client)
+    replaced = False
+
+    if token is None and auto_generate:
+        # Nothing displayable: first QR, or one that can no longer be shown.
+        _new_token, created = ensure_client_ledger_qr(client, force_rotate=True)
         if created:
             db.session.commit()
+            # Rotating an undisplayable code retires it; a first-ever QR is
+            # not "replacing" anything the client was still using.
+            replaced = had_active_qr
+            token = _current_qr_token(client)
 
-    if not _can_print(client):
+    if token is None:
+        if had_active_qr:
+            return (
+                "",
+                "The current QR can no longer be shown because the server key changed. Generate a replacement to print another copy.",
+                False,
+            )
         return "", "", False
 
     origin = _public_qr_origin()
@@ -131,16 +165,8 @@ def _active_qr_view_state(client, *, auto_generate: bool = False) -> tuple[str, 
             False,
         )
 
-    token = _derive_token(client, client.client_ledger_qr_token_salt)
-    if _token_hash(token) != client.client_ledger_qr_token_hash:
-        return (
-            "",
-            "The current QR can no longer be reprinted because the server key changed. Generate a replacement to print another copy.",
-            False,
-        )
-
     qr_url = f"{origin}{url_for('ledgers.public_client_ledger', token=token)}"
-    return qr_url, "", False
+    return qr_url, "", replaced
 
 
 def _qr_dialog_fragment(client, *, qr_url="", error="", status=200,

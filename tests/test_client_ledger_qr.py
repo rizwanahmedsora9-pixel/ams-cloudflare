@@ -249,18 +249,25 @@ def test_client_qr_reprint_rejects_stale_forms(app, client):
     assert b"<svg" not in rejected.data
 
 
-def test_legacy_qr_without_salt_cannot_be_reprinted_but_offers_replacement(
+def test_legacy_qr_without_salt_shows_a_qr_immediately_and_replaces_it(
         app, client, monkeypatch):
-    """QRs created before reprint support stay usable but can only be replaced."""
+    """More -> QR Code shows a code on the first click, even for legacy QRs.
+
+    A client whose QR predates reprint support only has a fingerprint stored,
+    never the code, so it can never be shown again.  Rather than leaving staff
+    on an explanation with nothing to scan, opening the dialog issues a fresh
+    derivable QR right away and retires the unreachable one.
+    """
     monkeypatch.setattr(qr_routes, "_build_client_ledger_rows",
                         lambda _client: ([], [], 0, 0, 0, {}))
     monkeypatch.setattr(qr_routes, "client_material_summary", lambda _client: ({}, 0))
     monkeypatch.setattr(qr_routes, "client_movement_rows", lambda _client: [])
     app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
-    token = secrets.token_urlsafe(32)
+    legacy_token = secrets.token_urlsafe(32)
     with app.app_context():
         row = Client(code="QR-LEGACY", name="Legacy QR", is_active=True)
-        row.client_ledger_qr_token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
+        row.client_ledger_qr_token_hash = hashlib.sha256(legacy_token.encode("ascii")).hexdigest()
+        row.client_ledger_qr_token_salt = None
         db.session.add(row)
         db.session.commit()
         client_id = row.id
@@ -268,28 +275,65 @@ def test_legacy_qr_without_salt_cannot_be_reprinted_but_offers_replacement(
     with client.session_transaction() as sess:
         sess["_user_id"] = str(admin_id)
         sess["_fresh"] = True
+
+    # First click on the standalone page: a QR is rendered straight away.
     page = client.get(f"/client_ledger_qr/{client_id}")
     body = page.get_data(as_text=True)
-    assert "Print current QR" not in body
-    assert "before reprint support" in body
-    # The legacy state must not claim reprint is possible, and must point to
-    # the replacement flow instead.
-    assert "again any time" not in body
-    assert "Generate replacement and show QR" in body
+    assert "<svg" in body
+    assert "before reprint support" not in body
+    # It is a replacement, so staff are told the old printed code is retired.
+    assert "This new QR replaces any previously printed code" in body
+
+    # First click in the ledger dialog: the big QR with Download / Print.
     dialog = client.get(f"/client_ledger_qr/{client_id}/dialog")
     frag = dialog.get_data(as_text=True)
-    assert "Print current QR" not in frag
-    assert "before reprint support" in frag
-    assert "again any time" not in frag
-    assert "Generate replacement and show QR" in frag
-    nonce = re.search(r'name="qr_nonce" value="([^"]+)"', body).group(1)
-    rejected = client.post(f"/client_ledger_qr/{client_id}", data={
-        "action": "print", "qr_nonce": nonce,
-    })
-    assert rejected.status_code == 409
-    assert b"before reprint support" in rejected.data
-    # The existing public link still works.
-    assert client.get(f"/c/{token}").status_code == 200
+    assert "clientLedgerQrCode" in frag and "<svg" in frag
+    assert "clientLedgerQrDownload" in frag
+    assert "clientLedgerQrPrint" in frag
+    assert "before reprint support" not in frag
+    # A regenerate option is still offered.
+    assert 'name="action" value="generate"' in frag
+
+    # The code is now derivable and the stale one is gone.
+    with app.app_context():
+        row = db.session.get(Client, client_id)
+        assert row.client_ledger_qr_token_salt
+        new_token = qr_routes._derive_token(row, row.client_ledger_qr_token_salt)
+        assert hashlib.sha256(new_token.encode("ascii")).hexdigest() == \
+            row.client_ledger_qr_token_hash
+    assert client.get(f"/c/{new_token}").status_code == 200
+    assert client.get(f"/c/{legacy_token}").status_code == 404
+
+
+def test_displayable_qr_is_never_rotated_by_opening_the_dialog(app, client, monkeypatch):
+    """Opening More -> QR Code must not invalidate a code already printed."""
+    monkeypatch.setattr(qr_routes, "_build_client_ledger_rows",
+                        lambda _client: ([], [], 0, 0, 0, {}))
+    monkeypatch.setattr(qr_routes, "client_material_summary", lambda _client: ({}, 0))
+    monkeypatch.setattr(qr_routes, "client_movement_rows", lambda _client: [])
+    app.config["PUBLIC_BASE_URL"] = "https://qr.example.workers.dev"
+    with app.app_context():
+        row = Client(code="QR-STABLE", name="Stable QR", is_active=True)
+        db.session.add(row)
+        db.session.commit()
+        client_id = row.id
+        admin_id = User.query.filter_by(username="Admin").first().id
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(admin_id)
+        sess["_fresh"] = True
+
+    client.get(f"/client_ledger_qr/{client_id}/dialog")
+    with app.app_context():
+        row = db.session.get(Client, client_id)
+        first_hash = row.client_ledger_qr_token_hash
+        first_salt = row.client_ledger_qr_token_salt
+    for _ in range(3):
+        client.get(f"/client_ledger_qr/{client_id}/dialog")
+        client.get(f"/client_ledger_qr/{client_id}")
+    with app.app_context():
+        row = db.session.get(Client, client_id)
+        assert row.client_ledger_qr_token_hash == first_hash
+        assert row.client_ledger_qr_token_salt == first_salt
 
 
 def test_material_ledger_page_opens_qr_dialog_and_generates_in_it(app, client):
