@@ -74,8 +74,8 @@
   </div>
   <div class="ui-kpi-grid">
     {{ ui_tile(href=profit_url, label='Profitable Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_profit_sum))), icon='bi-arrow-up-circle', colour='green', sub=(profit_entry_count ~ ' profitable entries; not the net result'), cta='View profit entries') }}
-    {{ ui_tile(href=loss_url, label='Loss-making Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries; not the net result'), cta='View loss entries') }}
-    {{ ui_tile(href=expense_loss_url, label='Expenditures Losses', value=("Rs. " ~ ("{:,.2f}".format(total_expense_loss_sum))), icon='bi-receipt', colour='rose', sub=(expense_loss_entry_count ~ ' expense entries; losses by expenses only'), cta='View expense losses') }}
+    {{ ui_tile(href=loss_url, label='Loss-making Entries Total', value=("Rs. " ~ ("{:,.2f}".format(total_loss_sum))), icon='bi-arrow-down-circle', colour='red', sub=(loss_entry_count ~ ' loss entries; client discounts, clients/suppliers, vehicle fare &amp; loading — expenditures excluded'), cta='View loss entries') }}
+    {{ ui_tile(href=expenditure_url, label='Expenditures', value=("Rs. " ~ ("{:,.2f}".format(total_expenditure_sum))), icon='bi-receipt', colour='rose', sub=(expenditure_entry_count ~ ' expenditure entries; tea, food, rent, utilities and similar spending'), cta='View expenditures') }}
     {{ ui_tile(href=entries_url, label='Profit (Money Kept)', value=("Rs. " ~ ("{:,.2f}".format(total_profit))), icon='bi-cash-coin', colour=('green' if total_profit >= 0 else 'red'), sub='Net result after FIFO cost, service cost and expenses', cta='See transactions') }}
     {{ ui_tile(href=report_url(view='entries', metric='revenue'), label='Sales (Money In)', value=("Rs. " ~ ("{:,.2f}".format(total_revenue))), icon='bi-bag-cash', colour='sky', sub='Earned material + delivery + other income, net of returns', cta='See revenue entries') }}
     {{ ui_tile(href=report_url(view='entries', metric='cogs'), label='COGS + Direct Service Cost', value=("Rs. " ~ ("{:,.2f}".format(total_cogs))), icon='bi-truck', colour='amber', sub='Goods COGS + direct delivery/service cost; the split is shown below', cta='See cost entries') }}
@@ -773,7 +773,7 @@
         </div></div>
         <div class="col-md-4"><div class="h-100 p-3 rounded-3" style="background:var(--ui-surface-2)">
           <div class="fw-bold mb-1">3. Net result is the remainder</div>
-          <div class="small text-muted">Gross profit plus service margin plus other income, less operating expenses and other losses. "Loss-making Entries Total" sums loss rows; it is not the final net loss. Credit, advances and inventory value are positions and are never added in.</div>
+          <div class="small text-muted">Gross profit plus service margin plus other income, less operating expenses and other losses. "Loss-making Entries Total" sums the client/supplier loss rows and leaves expenditures to their own card; it is not the final net loss. Credit, advances and inventory value are positions and are never added in.</div>
           <div class="small mt-2">Net result for this period: <strong class="{{ 'pos' if total_profit >= 0 else 'neg' }}">Rs. {{ money(total_profit) }}</strong>.</div>
         </div></div>
       </div>
@@ -809,12 +809,12 @@
         <div class="ui-card-header"><h5><i class="bi bi-list-check"></i> Headline move</h5><a href="{{ entries_url }}" class="btn btn-outline-secondary btn-sm">Drill down</a></div>
         <div class="ui-card-body">
           <div class="pl-mini-row"><span>Profitable entries</span><strong class="pos">Rs. {{ money(total_profit_sum) }} <span class="small text-muted">({{ profit_entry_count }})</span></strong></div>
-          <div class="pl-mini-row"><span>Loss entries</span><strong class="neg">Rs. {{ money(total_loss_sum) }} <span class="small text-muted">({{ loss_entry_count }})</span></strong></div>
-          <div class="pl-mini-row"><span>Expenditures losses (expenses only)</span><strong class="neg">Rs. {{ money(total_expense_loss_sum) }} <span class="small text-muted">({{ expense_loss_entry_count }})</span></strong></div>
+          <div class="pl-mini-row"><span>Loss-making entries (expenditures excluded)</span><strong class="neg">Rs. {{ money(total_loss_sum) }} <span class="small text-muted">({{ loss_entry_count }})</span></strong></div>
+          <div class="pl-mini-row"><span>Expenditures (tea, food, rent, utilities)</span><strong class="neg">Rs. {{ money(total_expenditure_sum) }} <span class="small text-muted">({{ expenditure_entry_count }})</span></strong></div>
           <div class="pl-mini-row"><span>Sales (money in)</span><strong>Rs. {{ money(total_revenue) }}</strong></div>
           <div class="pl-mini-row"><span>Cost of goods (money out)</span><strong>Rs. {{ money(total_cogs) }}</strong></div>
           <div class="pl-mini-row"><span>Discounts on this period's sales</span><strong>Rs. {{ money(summary.total_discounts) }}</strong></div>
-          <p class="section-note mt-2 mb-0">“Loss entries” sums the loss-making rows only; it is not the final net result.</p>
+          <p class="section-note mt-2 mb-0">A row is counted once: expenditures (tea, food, rent, utilities) sit in “Expenditures”, while client/supplier losses and vehicle fare / loading / unloading sit in “Loss-making entries”. Neither figure is the final net result.</p>
         </div>
       </div>
     </div>
