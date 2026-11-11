@@ -1230,21 +1230,28 @@ def sync_charges_from_form(grn, form, *, actor=None, preserve_legacy=True):
                 pass
         if charge is None:
             continue
-        # A charge that already has money posted against it in Accounts must
-        # not be silently rewritten: void those payments first (historical
-        # safety, owner requirement 10).
-        if charge.id is not None and _paid_minor_for(int(charge.id)) > 0:
-            changed = (
-                _charge_minor(charge) != amount_minor
-                or (getattr(charge, 'recipient_type', None) or '').upper() != recipient
-                or (getattr(charge, 'cost_treatment', None) or '').upper() != treatment
-                or (getattr(charge, 'charge_type', None) or '').upper() != ctype
-            )
-            if changed:
-                raise ValueError(
-                    f"Charge '{charge.label or CHARGE_TYPE_LABELS.get(ctype, ctype)}' already has "
-                    "payments recorded in Accounts. Void those GRN payments before changing it."
-                )
+        # A charge that Accounts has already paid can still be corrected —
+        # editing must go through (EDIT_POLICY.md).  The only impossible
+        # numbers are: an amount below what was paid, and paying a *different*
+        # recipient than the money already went to.  Increasing the amount,
+        # renaming the expense or changing its cost treatment is allowed and
+        # keeps the posted payment honest.
+        if charge.id is not None:
+            paid_minor = _paid_minor_for(int(charge.id))
+            if paid_minor > 0:
+                charge_label = charge.label or CHARGE_TYPE_LABELS.get(ctype, ctype)
+                if amount_minor < paid_minor:
+                    raise ValueError(
+                        f"Charge '{charge_label}' already has Rs {paid_minor / 100:,.2f} paid in "
+                        f"Accounts, so its amount cannot be set below that. Enter at least "
+                        f"Rs {paid_minor / 100:,.2f}, or void that payment first. Nothing was saved."
+                    )
+                if (getattr(charge, 'recipient_type', None) or '').upper() != recipient:
+                    raise ValueError(
+                        f"Charge '{charge_label}' already has Rs {paid_minor / 100:,.2f} paid to "
+                        "its current recipient. Void that payment before paying a different "
+                        "recipient for this expense. Nothing was saved."
+                    )
         charge.charge_type = ctype
         charge.label = at(labels, idx, '').strip()
         charge.amount_minor = amount_minor

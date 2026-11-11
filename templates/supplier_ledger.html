@@ -237,9 +237,10 @@
                     <td class="text-end pe-4 fw-bold" data-label="Pending">{{ "{:,.2f}".format(row.balance) }}</td>
                     <td class="text-end pe-4 actions-cell stack-actions-cell" data-label="Actions">
                         {% if row.type == 'GRN' and row.bill_no %}
-                        <a href="{{ url_for('view_bill', bill_no=row.bill_no, src='grn', src_id=row.id) }}" class="btn btn-sm btn-outline-light me-1" title="View Bill"><i class="bi bi-eye"></i></a>
-                        <a href="{{ url_for('download_invoice', bill_no=row.bill_no, src='grn', src_id=row.id) }}" class="btn btn-sm btn-outline-info me-1" title="Download GRN PDF"><i class="bi bi-download"></i></a>
-                        <a href="{{ url_for('download_invoice', bill_no=row.bill_no, src='grn', src_id=row.id, action='print') }}" target="_blank" class="btn btn-sm btn-outline-success me-1" title="Print GRN PDF"><i class="bi bi-printer"></i></a>
+                        {% set grn_row_ref = row.bill_no or ('GRN-' ~ row.id) %}
+                        <a href="{{ url_for('view_bill', bill_no=grn_row_ref, src='grn', src_id=row.id) }}" class="btn btn-sm btn-outline-light me-1" title="View Bill"><i class="bi bi-eye"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=grn_row_ref, src='grn', src_id=row.id) }}" class="btn btn-sm btn-outline-info me-1" title="Download GRN PDF"><i class="bi bi-download"></i></a>
+                        <a href="{{ url_for('download_invoice', bill_no=grn_row_ref, src='grn', src_id=row.id, action='print') }}" target="_blank" class="btn btn-sm btn-outline-success me-1" title="Print GRN PDF"><i class="bi bi-printer"></i></a>
                         <a href="{{ url_for('edit_grn', id=row.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Edit GRN"><i class="bi bi-pencil"></i></a>
                         <form action="{{ url_for('grn') }}" method="POST" class="d-inline" onsubmit="return confirm('Permanently delete this GRN? Stock will be reversed.');">
                             <input type="hidden" name="action" value="delete">
