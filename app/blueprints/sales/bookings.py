@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ._common import *  # noqa
 from app.services import pricing as _pricing
+from app.services.edit_policy import resolve_payment_account  # noqa: E402
 
 
 def _form_named_discounts(form):
@@ -101,11 +102,24 @@ def _sync_booking_paid_into_account(booking, *, payment_account_id, method='Cash
     acc = Account.query.get(acc_id) if acc_id else None
     if paid > 0:
         if not acc or not getattr(acc, 'is_active', True):
-            if require_account:
+            # Auto-pick the obvious account instead of refusing the save: a
+            # booking whose Paid Now exceeds the old figure was previously
+            # rejected unless the operator re-picked a dropdown they had
+            # already chosen on the original form.
+            auto_id, auto_acc = resolve_payment_account(None, method)
+            if auto_acc is not None:
+                acc, acc_id = auto_acc, auto_id
+                booking.receive_in_account_id = acc.id
+                flash(
+                    f'Paid Now auto-posted to {acc.account_holder_name or acc.name} ({expected}).',
+                    'info',
+                )
+            elif require_account:
                 raise ValueError('Select the cash/bank account that should receive Paid Now.')
-            # Legacy bookings often have Paid Now with no receive-into account.
-            # Leave any existing receipt / account link untouched.
-            return None
+            else:
+                # Legacy bookings often have Paid Now with no receive-into account.
+                # Leave any existing receipt / account link untouched.
+                return None
         acc_cat = (acc.category or '').strip().lower()
         if acc_cat and acc_cat != expected:
             raise ValueError(f'Selected account must be a {expected} account for method "{method}".')

@@ -34,7 +34,7 @@ from flask import (
     current_app as app,
     render_template, request, redirect, url_for, flash, jsonify,
     send_file, Response, make_response, send_from_directory,
-    got_request_exception, abort, session, g,
+    got_request_exception, abort, session, g, has_request_context,
 )
 from flask_login import login_user, login_required, logout_user, current_user
 
@@ -337,22 +337,47 @@ def sync_grn_entry_timestamps(grn, when=None):
 
 
 def _is_grn_backdate_restricted_user():
-    if not current_user.is_authenticated:
-        return False
-    if current_user.role in ('admin', 'root'):
-        return False
-    return bool(getattr(current_user, 'restrict_backdated_edit', False))
+    """Kept for callers that only ask "is this profile restricted?".
+
+    The rule itself now lives in ``app/services/edit_policy`` so GRN, dispatch
+    and sales all answer the question the same way.
+    """
+    from app.services.edit_policy import is_backdate_restricted
+
+    return is_backdate_restricted(current_user)
 
 
-def _enforce_grn_backdate_policy(grn_dt, action_label, redirect_endpoint='grn', **redirect_kwargs):
+def _enforce_grn_backdate_policy(grn_dt, action_label, redirect_endpoint='grn',
+                                 entity_id=None, **redirect_kwargs):
+    """Shared back-date policy for GRN add/edit/cancel.
+
+    Returns ``None`` when the action may proceed, or a redirect response when
+    the policy refuses.  A restricted user may still edit a back-dated GRN
+    inside the licensed window (``AMS_BACKDATE_DAYS``) as long as a reason is
+    supplied with the form — the old rule refused every back-dated GRN edit
+    outright, even one day old, which is what made GRN maintenance feel
+    stuck.  Out-of-window records stay blocked for restricted users only.
+    """
+    from app.services.edit_policy import (
+        EditBlocked, authorise_edit, audit_override, form_reason,
+    )
+
     if not _is_grn_backdate_restricted_user():
         return None
     if not grn_dt:
         return None
-    grn_date = grn_dt.date() if isinstance(grn_dt, datetime) else grn_dt
-    if grn_date < pk_today():
-        flash(f'{action_label} blocked: back-dated GRN edits are restricted for your account.', 'danger')
+    reason = form_reason(request.form) if has_request_context() else None
+    try:
+        authorise_edit(current_user, grn_dt, action_label=action_label, reason=reason)
+    except EditBlocked as blocked:
+        flash(blocked.message, 'danger')
         return redirect(url_for(redirect_endpoint, **redirect_kwargs))
+
+    # Allowed: leave an audit row for the back-dated change.
+    audit_override(
+        current_user, action=action_label.lower(), entity='GRN',
+        entity_id=entity_id, reason=reason,
+    )
     return None
 
 

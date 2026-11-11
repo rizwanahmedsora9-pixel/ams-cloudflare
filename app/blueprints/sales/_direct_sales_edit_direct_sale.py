@@ -1,5 +1,6 @@
 """direct_sales — split from sales.py."""
 from ._common import *  # noqa
+from app.services.edit_policy import resolve_payment_account
 
 @bp.route('/edit_bill/DirectSale/<int:id>', methods=['POST'])
 @login_required
@@ -398,10 +399,34 @@ def edit_direct_sale(id):
                 return _fail_edit('This sale type requires chargeable items with rate > 0.')
 
         if category == 'Cash' and (paid_amount + discount) < (amount - 0.01):
-            return _fail_edit('Cash Sale must be fully paid. Transaction not complete.')
+            # A cash bill that is short of its total is a data-entry slip, not an
+            # invalid transaction: post the shortfall as an unpaid balance on the
+            # client's khata instead of refusing the save.  The ledger, the
+            # pending-bill rebuild below and the receipt all derive from
+            # paid_amount, so the money still reconciles.
+            shortfall = round((amount - discount) - paid_amount, 2)
+            flash(
+                f'Cash sale saved with Rs. {shortfall:,.2f} shown as unpaid '
+                'instead of rejecting it — collect it from the client ledger.',
+                'warning',
+            )
 
+        # Auto-pick the cash/bank account when the dropdown was left empty so a
+        # missing selection never blocks an otherwise complete save.
         if paid_amount > 0 and expected_pay_category in ['cash', 'bank'] and not payment_account_id:
-            return _fail_edit('Select a cash/bank account for the paid amount to post into Accounts.')
+            auto_id, auto_account = resolve_payment_account(None, payment_method)
+            if auto_account is not None:
+                payment_account_id = auto_id
+                bank_name = auto_account.bank_name or ''
+                account_name = auto_account.account_holder_name or auto_account.name or ''
+                account_no = auto_account.account_number or ''
+                flash(f'Paid amount posted to {account_name} ({expected_pay_category}) '
+                      '— no account was selected.', 'info')
+            else:
+                return _fail_edit(
+                    f'No active {expected_pay_category} account exists to receive the paid '
+                    'amount. Add one under Accounts, or set the paid amount to 0 and save.'
+                )
         if paid_amount <= 0:
             payment_method = ''
             payment_account_id = None

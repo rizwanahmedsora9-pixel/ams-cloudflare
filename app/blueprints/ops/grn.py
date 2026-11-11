@@ -270,7 +270,7 @@ def grn():
             grn_id = request.form.get('id')
             grn_obj = db.session.get(GRN, grn_id)
             if grn_obj:
-                restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Cancel GRN')
+                restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Cancel GRN', entity_id=grn_obj.id)
                 if restricted:
                     return restricted
                 # Soft cancellation: preserve the GRN, its charge obligations

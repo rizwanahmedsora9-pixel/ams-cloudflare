@@ -1,5 +1,9 @@
 """dispatch — split from ops.py."""
 from ._common import *  # noqa
+from app.services.edit_policy import (
+    EditBlocked, authorise_edit, audit_override, form_reason,
+    is_backdate_restricted, record_date_of,
+)
 
 @bp.route('/edit_entry/<int:id>', methods=['POST'])
 @login_required
@@ -8,10 +12,22 @@ def edit_entry(id):
     if not e:
         return redirect(url_for('index'))
 
-    today_str = pk_today().strftime('%Y-%m-%d')
-    if current_user.role != 'admin' and e.date != today_str:
-        flash('Permission Denied: Only Admins can edit back-dated records.', 'danger')
-        return redirect(url_for('index'))
+    # Back-dated edits are governed by the shared policy (app/services/edit_policy).
+    # Admins/root always pass; a normal profile passes; a restricted profile may
+    # edit older records inside the licensed window with a reason attached.
+    # Previously this was a hard "admins only" stop, which blocked staff from
+    # correcting their own mistake the morning after it was posted.
+    edit_reason = form_reason(request.form)
+    try:
+        authorise_edit(
+            current_user,
+            record_date_of(e, 'date'),
+            action_label='Edit dispatch',
+            reason=edit_reason or request.form.get('note', ''),
+        )
+    except EditBlocked as blocked:
+        flash(blocked.message, 'danger')
+        return redirect(request.referrer or url_for('tracking'))
 
     old_bill_no = e.bill_no
     old_client_code = e.client_code
@@ -73,6 +89,11 @@ def edit_entry(id):
         pass
 
     db.session.commit()
+    if is_backdate_restricted(current_user):
+        audit_override(
+            current_user, action='edit', entity='Entry', entity_id=e.id,
+            reason=edit_reason or None,
+        )
     flash('Entry Updated', 'success')
 
     redirect_to = request.form.get('redirect_to')
