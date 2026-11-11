@@ -442,7 +442,20 @@ def save_client_payment(
             account = None
     account_required = amount_minor != 0
     if account_required and account is None:
-        raise ValueError(f"Select a {_expected_account_category(normal_method)} account for this {kind.lower()}.")
+        # A complete receipt must not be lost because the account dropdown was
+        # left empty.  Resolve the account the operator meant (only one active
+        # cash/bank account, else the stable lowest-id one) via the shared
+        # policy, which keeps repeated receipts posting to the same account.
+        from app.services.edit_policy import resolve_payment_account
+
+        _auto_id, auto_account = resolve_payment_account(None, normal_method)
+        if auto_account is None:
+            raise ValueError(
+                f"No active {_expected_account_category(normal_method)} account exists for this "
+                f"{kind.lower()}. Add one under Accounts, then save again."
+            )
+        account = auto_account
+        payment_account_id = auto_account.id
     same_account = bool(old and account and old["payment_account_id"] == account.id)
     if account:
         _validate_account_for_method(account, normal_method, allow_inactive=same_account)

@@ -1,5 +1,6 @@
 """direct_sales — split from sales.py."""
 from ._common import *  # noqa
+from app.services.edit_policy import resolve_payment_account
 import secrets
 from sqlalchemy.exc import IntegrityError
 from app.services.sales_core import (
@@ -120,7 +121,24 @@ def add_direct_sale():
         bank_name = ''
 
     if paid_amount > 0 and expected_pay_category in ['cash', 'bank'] and not payment_account_id:
-        return _fail_sale('Select a cash/bank account for the paid amount to post into Accounts.')
+        # Auto-pick instead of refusing: a complete sale must not be lost to an
+        # empty dropdown.  The chosen account is reported back in the flash.
+        auto_id, auto_account = resolve_payment_account(None, payment_method)
+        if auto_account is None:
+            return _fail_sale(
+                f'No active {expected_pay_category} account exists to receive the paid '
+                'amount. Add one under Accounts, or set the paid amount to 0 and save.'
+            )
+        payment_account_id = auto_id
+        if expected_pay_category == 'bank':
+            bank_name = auto_account.bank_name or ''
+        account_name = auto_account.account_holder_name or auto_account.name or ''
+        account_no = auto_account.account_number or ''
+        flash(
+            f'Paid amount auto-posted to {account_name} ({expected_pay_category}) '
+            'because no account was selected.',
+            'info',
+        )
 
     # If nothing is paid now, do not store payment linkage details.
     if paid_amount <= 0:
@@ -589,9 +607,17 @@ def add_direct_sale():
         discount_reason = ''
         item_discount_shares = [0.0] * len(processed_items)
 
-    # Validation: Unbilled Cash Sale must be fully paid
+    # A cash bill short of its total used to be rejected outright, losing the
+    # operator's whole entry.  Post it with the shortfall as an unpaid balance
+    # instead and tell them to collect it from the ledger.
     if category == 'Cash' and (paid_amount + discount) < (amount - 0.01):
-        return _fail_sale('Cash Sale must be fully paid. Transaction not complete.')
+        shortfall = round((amount - discount) - paid_amount, 2)
+        if shortfall > 0:
+            flash(
+                f'Cash sale saved with Rs. {shortfall:,.2f} left unpaid — '
+                'collect it from the client ledger.',
+                'warning',
+            )
     
     # Auto bill is enough when no manual number is provided.
 

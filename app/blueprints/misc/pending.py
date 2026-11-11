@@ -187,7 +187,7 @@ def import_pending_bills():
 def edit_grn(id):
     from app.blueprints.ops.grn import _parse_grn_money
     grn_obj = GRN.query.get_or_404(id)
-    restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Edit GRN')
+    restricted = _enforce_grn_backdate_policy(grn_obj.date_posted, 'Edit GRN', entity_id=grn_obj.id)
     if restricted:
         return restricted
 
@@ -372,8 +372,26 @@ def edit_grn(id):
                     payment_account_id = None
 
             if float(grn_obj.paid_amount or 0) > 0 and expected_pay_category in ['cash', 'bank'] and not payment_account_id:
-                flash('Select a cash/bank account to post the GRN paid amount into Accounts.', 'danger')
-                return redirect(url_for('edit_grn', id=grn_obj.id))
+                # Auto-pick rather than refuse: the GRN header, items and costs
+                # are already complete, and losing them over an empty dropdown
+                # is exactly the kind of mid-CRUD blocker being removed.  The
+                # chosen account is shown to the operator in the flash.
+                from app.services.edit_policy import resolve_payment_account
+
+                auto_id, auto_account = resolve_payment_account(None, grn_obj.payment_type)
+                if auto_account is None:
+                    flash(
+                        f'No active {expected_pay_category} account exists to pay this GRN from. '
+                        'Add one under Accounts, or set the paid amount to 0 and save.',
+                        'danger',
+                    )
+                    return redirect(url_for('edit_grn', id=grn_obj.id))
+                payment_account_id = auto_id
+                flash(
+                    f'GRN paid amount auto-posted to '
+                    f'{auto_account.account_holder_name or auto_account.name} ({expected_pay_category}).',
+                    'info',
+                )
 
             if payment_account_id:
                 pay_account = Account.query.get(payment_account_id)
@@ -430,7 +448,7 @@ def edit_grn(id):
                 return redirect(url_for('edit_grn', id=grn_obj.id))
 
             if date_posted != grn_obj.date_posted:
-                restricted = _enforce_grn_backdate_policy(date_posted, 'Edit GRN')
+                restricted = _enforce_grn_backdate_policy(date_posted, 'Edit GRN', entity_id=grn_obj.id)
                 if restricted:
                     return restricted
                 grn_obj.date_posted = date_posted
