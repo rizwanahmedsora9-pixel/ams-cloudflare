@@ -520,15 +520,38 @@
 
             <div class="card-header bg-primary text-white">
 
-                {{ 'Edit Record #' ~ edit_grn.auto_bill_no if edit_grn else 'Add New Record' }}
+                {{ 'Edit Record #' ~ (edit_grn.manual_bill_no or edit_grn.auto_bill_no or edit_grn.id) if edit_grn else 'Add New Record' }}
 
             </div>
+
+            {% if edit_grn and grn_has_sold_stock|default(false) %}
+
+            <div class="alert alert-info border-0 rounded-0 mb-0 small">
+
+                <i class="bi bi-info-circle me-1"></i>
+
+                Part of this GRN has already been sold. You can still edit it: the lots keep their
+
+                identity, stock is corrected, and the sales that used this stock are re-costed to
+
+                the corrected landed cost automatically. The only change that is refused is
+
+                reducing a lot below the quantity already sold from it.
+
+            </div>
+
+            {% endif %}
 
             <div class="card-body">
 
                 <form action="{{ url_for('edit_grn', id=edit_grn.id) if edit_grn else url_for('grn') }}" method="POST" enctype="multipart/form-data" id="grnForm">
 
                     {% if not edit_grn %}<input type="hidden" name="action" value="add">{% endif %}
+
+                    {# Tells the edit route that this POST carries the whole item grid — even when the operator
+                       removed every row — so an emptied grid is applied instead of being mistaken for a
+                       header-only update from another screen. #}
+                    <input type="hidden" name="item_grid_present" value="1">
 
                     
 
@@ -1163,13 +1186,26 @@
 
                                         <div class="grn-row-actions">
 
-                                            <a href="{{ url_for('view_bill', bill_no=grn.manual_bill_no or grn.auto_bill_no, src='grn', src_id=grn.id) }}"
-                                               class="btn btn-sm btn-outline-info"
-                                               title="View this GRN" aria-label="View GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-eye"></i></a>
+                                            {% set grn_ref = grn.manual_bill_no or grn.auto_bill_no %}
 
-                                            <a href="{{ url_for('download_invoice', bill_no=grn.manual_bill_no or grn.auto_bill_no, src='grn', src_id=grn.id) }}"
+                                            {% if grn_ref %}
+
+                                            <a href="{{ url_for('view_bill', bill_no=grn_ref, src='grn', src_id=grn.id) }}"
+                                               class="btn btn-sm btn-outline-info"
+                                               title="View this GRN" aria-label="View GRN {{ grn_ref }}"><i class="bi bi-eye"></i></a>
+
+                                            <a href="{{ url_for('download_invoice', bill_no=grn_ref, src='grn', src_id=grn.id) }}"
                                                class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener"
-                                               title="Print this GRN" aria-label="Print GRN {{ grn.manual_bill_no or grn.auto_bill_no or grn.id }}"><i class="bi bi-printer"></i></a>
+                                               title="Print this GRN" aria-label="Print GRN {{ grn_ref }}"><i class="bi bi-printer"></i></a>
+
+                                            {% else %}
+
+                                            {# A GRN with no bill number (legacy/imported) still gets its row and its
+                                               edit/delete controls; url_for('view_bill', bill_no='') would 500 the page. #}
+
+                                            <span class="btn btn-sm btn-outline-secondary disabled" title="No bill number on this GRN yet"><i class="bi bi-eye-slash"></i></span>
+
+                                            {% endif %}
 
                                             <a href="{{ url_for('edit_grn', id=grn.id) }}"
                                                class="btn btn-sm btn-outline-warning"

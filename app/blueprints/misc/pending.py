@@ -191,69 +191,11 @@ def edit_grn(id):
     if restricted:
         return restricted
 
-    def _grn_submitted_item_lines_unchanged(grn):
-        """True when the submitted item lines exactly match the stored items.
-
-        Used to permit header-only edits (supplier, freight, note, …) on a
-        GRN whose lots are locked by cash/credit sales: stock-affecting
-        fields stay blocked, non-stock fields remain editable.
-        """
-        item_ids = request.form.getlist('grn_item_id[]')
-        mat_names = request.form.getlist('mat_name[]')
-        qtys = request.form.getlist('qty[]')
-        prices = request.form.getlist('price[]')
-        existing = {
-            int(i.id): i
-            for i in (grn.items or [])
-            if getattr(i, 'id', None) is not None and not bool(getattr(i, 'is_void', False))
-        }
-        submitted = {}
-        for idx in range(max(len(mat_names), len(qtys), len(prices), len(item_ids))):
-            name = (mat_names[idx] if idx < len(mat_names) else '') or ''
-            qty = (qtys[idx] if idx < len(qtys) else '') or ''
-            price = (prices[idx] if idx < len(prices) else '') or ''
-            raw_id = (item_ids[idx] if idx < len(item_ids) else '') or ''
-            name = name.strip()
-            if not name:
-                continue
-            if not str(raw_id).strip().isdigit():
-                return False
-            submitted[int(str(raw_id).strip())] = (name, qty, price)
-        if set(submitted.keys()) != set(existing.keys()):
-            return False
-        for iid, (name, qty, price) in submitted.items():
-            item = existing[iid]
-            try:
-                qty_f = float(qty or 0)
-            except Exception:
-                qty_f = 0.0
-            try:
-                price_f = float(price or 0)
-            except Exception:
-                price_f = 0.0
-            if (
-                (item.mat_name or '').strip() != name
-                or abs(float(item.qty or 0) - qty_f) > 1e-9
-                or abs(float(item.price_at_time or 0) - price_f) > 1e-9
-            ):
-                return False
-        return True
-
     if request.method == 'POST':
-        from app.services.grn_costing import landed_cost_signature, grn_has_consumed_quantity
+        from app.services.grn_costing import recompute_landed_costs
+        from app.services.grn_edit import recost_consuming_sales, sync_items_from_form
+
         is_landed = (getattr(grn_obj, 'costing_mode', '') or '').upper() == 'LANDED'
-        cost_before_edit = landed_cost_signature(grn_obj) if is_landed else None
-        header_only_edit = False
-        if _grn_has_locked_lots(grn_obj):
-            if not _grn_submitted_item_lines_unchanged(grn_obj):
-                flash(
-                    'This GRN has locked lots used by cash/credit sales. '
-                    'Changing item quantity/rate, adding or removing items is blocked — '
-                    'delete those sales first. No changes were saved.',
-                    'danger'
-                )
-                return redirect(url_for('edit_grn', id=grn_obj.id))
-            header_only_edit = True
         old_supplier_id = grn_obj.supplier_id
         old_auto_pay = _find_grn_auto_supplier_payment(grn_obj)
         old_pay_account_id = None
@@ -261,27 +203,9 @@ def edit_grn(id):
         if old_auto_pay and not bool(getattr(old_auto_pay, 'is_void', False)):
             old_pay_account_id = getattr(old_auto_pay, 'payment_account_id', None)
             old_pay_amount = float(getattr(old_auto_pay, 'amount', 0) or 0)
-        if not header_only_edit:
-            # 1. Reverse Stock for existing items (only active items)
-            for item in [i for i in (grn_obj.items or []) if not bool(getattr(i, 'is_void', False))]:
-                mat = Material.query.filter_by(name=item.mat_name).first()
-                if mat:
-                    mat.total = (mat.total or 0) - (item.qty or 0)
-
-            # 2. Remove the superseded lines and their stock entries outright
-            #    (policy: no void flags — a replaced row is deleted).
-            for item in list(grn_obj.items or []):
-                # detach first: the relationship is delete-orphan, and the
-                # edit code below rebuilds the lines from the form
-                try:
-                    grn_obj.items.remove(item)
-                except Exception:
-                    pass
-                db.session.delete(item)
-            for e in Entry.query.filter(Entry.auto_bill_no == grn_obj.auto_bill_no, Entry.type == 'IN').all():
-                db.session.delete(e)
-        
-        # 3. Update GRN fields
+        # 1. Update GRN header fields.  Stock lines are synced in place further
+        #    down (app/services/grn_edit.py), after the supplier / date / bill
+        #    fields they are stamped with are final.
         supplier_input = request.form.get('supplier', '').strip()
         supplier_id_input = (request.form.get('supplier_id') or '').strip()
         supplier_obj = None
@@ -476,80 +400,23 @@ def edit_grn(id):
             except ValueError:
                 pass
 
-        if not header_only_edit:
-            # 4. Add / update items (preserve GRNItem IDs so linked DirectSaleItem.grn_item_id stays valid)
-            item_ids = request.form.getlist('grn_item_id[]')
-            mat_names = request.form.getlist('mat_name[]')
-            qtys = request.form.getlist('qty[]')
-            prices = request.form.getlist('price[]')
-            edit_skipped_lines = []
-
-            existing_by_id = {
-                int(i.id): i
-                for i in (grn_obj.items or [])
-                if getattr(i, 'id', None) is not None
-            }
-
-            for idx in range(max(len(mat_names), len(qtys), len(prices), len(item_ids))):
-                name = (mat_names[idx] if idx < len(mat_names) else '') or ''
-                qty = (qtys[idx] if idx < len(qtys) else '') or ''
-                price = (prices[idx] if idx < len(prices) else '') or ''
-                raw_id = (item_ids[idx] if idx < len(item_ids) else '') or ''
-
-                name = name.strip()
-                try:
-                    qty_val = float(qty or 0)
-                except Exception:
-                    qty_val = 0.0
-                try:
-                    price_val = float(price or 0)
-                except Exception:
-                    price_val = 0.0
-
-                if not name or qty_val <= 0:
-                    if name and qty_val <= 0:
-                        edit_skipped_lines.append(f"{name} (qty={qty or 0})")
-                    continue
-                if is_service_name(name) or get_service_by_input(name):
-                    db.session.rollback()
-                    flash(f'"{name}" is a service/charge and cannot be received on a GRN.', 'danger')
-                    return redirect(url_for('edit_grn', id=grn_obj.id))
-
-                item_obj = None
-                if str(raw_id).strip().isdigit():
-                    iid = int(str(raw_id).strip())
-                    candidate = existing_by_id.get(iid)
-                    if candidate and candidate.grn_id == grn_obj.id:
-                        item_obj = candidate
-
-                if item_obj is None:
-                    item_obj = GRNItem(grn_id=grn_obj.id)
-                    db.session.add(item_obj)
-
-                item_obj.is_void = False
-                item_obj.mat_name = name
-                item_obj.qty = qty_val
-                item_obj.price_at_time = price_val
-
-                mat = Material.query.filter_by(name=name).first()
-                if mat:
-                    mat.total = (mat.total or 0) + qty_val
-
-                entry = Entry(
-                    date=grn_obj.date_posted.strftime('%Y-%m-%d'),
-                    time=grn_obj.date_posted.strftime('%H:%M:%S'),
-                    type='IN',
-                    material=name,
-                    client=grn_obj.supplier,
-                    qty=qty_val,
-                    bill_no=grn_obj.manual_bill_no or '',
-                    auto_bill_no=grn_obj.auto_bill_no,
-                    created_by=current_user.username,
-                    note=grn_obj.note
-                )
-                db.session.add(entry)
-        else:
-            edit_skipped_lines = []
+        # 2. Stock lines: updated IN PLACE so every lot keeps its GRNItem.id
+        #    and the sales that already consumed it keep pointing at it.  Only
+        #    impossible numbers are refused (a lot cannot shrink below what it
+        #    already sold, a sold lot cannot be removed, a delivered line
+        #    cannot be renamed) — see app/services/grn_edit.py.
+        #    A POST that carries no item rows at all (header-only update from
+        #    another screen) leaves the stored lines untouched.
+        edit_skipped_lines = []
+        if ('item_grid_present' in request.form
+                or any(key in request.form for key in ('mat_name[]', 'grn_item_id[]', 'qty[]'))):
+            try:
+                item_result = sync_items_from_form(grn_obj, request.form, actor=current_user.username)
+            except ValueError as ve:
+                db.session.rollback()
+                flash(str(ve), 'danger')
+                return redirect(url_for('edit_grn', id=grn_obj.id))
+            edit_skipped_lines = item_result.get('skipped') or []
 
         # Charge grid (LANDED) and exact landed-cost recomputation.  Each
         # expense carries its own supplier-billing choice.  A charge or billing
@@ -572,10 +439,12 @@ def edit_grn(id):
                 return redirect(url_for('edit_grn', id=grn_obj.id))
         if is_landed:
             recompute_landed_costs(grn_obj, actor=current_user.username)
-            if cost_before_edit != landed_cost_signature(grn_obj) and grn_has_consumed_quantity(grn_obj):
-                db.session.rollback()
-                flash('This GRN already has delivered stock. Changing its material cost would make stock value disagree with the frozen sale COGS. No changes were saved. Reverse the related sales before changing received cost, or record a separate operating expense.', 'danger')
-                return redirect(url_for('edit_grn', id=grn_obj.id))
+
+        # 3. Sales that already consumed these lots carry a frozen FIFO cost.
+        #    Rather than refusing the edit (the old behaviour, which blocked
+        #    almost every real correction), re-cost them to the corrected
+        #    landed cost so stock value and those sales' COGS still agree.
+        recost = recost_consuming_sales(grn_obj)
 
         # The auto supplier payment follows the GRN's date/time (and paid
         # amount).  Moving a paid GRN into an already-reconciled period is
@@ -599,8 +468,26 @@ def edit_grn(id):
                 + '; '.join(edit_skipped_lines),
                 'warning'
             )
+        if recost.get('sale_items'):
+            flash(
+                f"Sale COGS re-costed: {recost['sale_items']} sold line(s) on "
+                f"{recost['sales']} sale(s) now use this GRN's corrected landed cost.",
+                'info',
+            )
         flash('GRN updated successfully', 'success')
         return redirect(url_for('grn'))
+
+    def _grn_has_consumed_for_edit(grn):
+        """True when some of this GRN's stock has already left the yard.
+
+        Only used to explain the rule on screen (saving re-costs those sales);
+        it never blocks the save.
+        """
+        try:
+            from app.services.grn_costing import grn_has_consumed_quantity
+            return bool(grn_has_consumed_quantity(grn))
+        except Exception:
+            return False
 
     grns = GRN.query.options(selectinload(GRN.items)).order_by(
         GRN.date_posted.desc(),
@@ -638,6 +525,9 @@ def edit_grn(id):
         today_date=pk_today().strftime('%Y-%m-%d'),
         now_time=pk_now().strftime('%H:%M'),
         edit_grn=grn_obj,
+        # True when part of this GRN has already been sold: the wizard shows
+        # that saving a cost change re-costs those sales (nothing is blocked).
+        grn_has_sold_stock=_grn_has_consumed_for_edit(grn_obj),
         search='',
         sort='date',
         start_date=None,
