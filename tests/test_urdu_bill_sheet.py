@@ -832,6 +832,19 @@ def test_reference_proprietor_fallback_and_override():
     assert _document(settings=_settings(company_name='Other', proprietor_name_ur=''))['proprietor'] == ''
 
 
+def test_kohat_uses_correct_urdu_spelling_on_receipts():
+    from app.services.urdu_names import urdu_name
+
+    for spelling in ('kohat', 'Kohat', 'KOHAT'):
+        assert urdu_name(spelling) == 'کوہاٹ'
+    assert urdu_name('Kohat, Pakistan') == 'کوہاٹ, پاکستان'
+    assert urdu_name('Kohat', preferred='کوہاٹ شہر') == 'کوہاٹ شہر'
+
+    doc = _document(settings=_settings(company_address='KOHAT, PAKISTAN'))
+    assert doc['company_address'] == 'کوہاٹ, پاکستان'
+    assert 'کوہاٹ' in bill_urdu.render_html(doc)
+
+
 def test_standalone_m_is_muhammad_and_ahmed_uses_proper_urdu_spelling():
     from app.services.urdu_names import urdu_name
 

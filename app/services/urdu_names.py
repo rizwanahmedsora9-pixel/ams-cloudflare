@@ -88,7 +88,7 @@ _WORDS = {
     'jhelum': 'جہلم', 'sialkot': 'سیالکوٹ', 'gujranwala': 'گوجرانوالہ',
     'rawalpindi': 'راولپنڈی', 'lahore': 'لاہور', 'mandi': 'منڈی',
     'bahauddin': 'بہاؤالدین', 'mirpur': 'میرپور', 'bhimber': 'بھمبر',
-    'pakistan': 'پاکستان',
+    'kohat': 'کوہاٹ', 'pakistan': 'پاکستان',
     # ---- Walk-in / ledger vocabulary seen in client and driver names ----
     'open': 'اوپن', 'khata': 'کھاتہ', 'cash': 'کیش', 'paid': 'پیڈ',
     'sale': 'سیل', 'credit': 'کریڈٹ', 'advance': 'ایڈوانس', 'rent': 'رینٹ',
