@@ -3,20 +3,23 @@ from ._common import *  # noqa
 from app.services.urdu_names import urdu_name
 from app.services.terms import get_selected_terms
 
-# Optional sections of the Urdu sheet the print dialog can switch off.  They
-# map straight onto ``bill_urdu.build_document(sections=...)``.
-_URDU_SECTION_KEYS = ('qr', 'note', 'prev', 'sig', 'delivery')
+# Optional marks on the Urdu sheet the print dialog can switch off.  The list
+# lives in the sheet module itself so the page map, the route and the layout
+# cannot drift apart; it maps onto ``bill_urdu.build_document(sections=...)``.
+from app.services.urdu_receipt import SHEET_OPTIONS as _URDU_SECTION_KEYS
+
 _TRUTHY = {'1', 'yes', 'true', 'on', 'show'}
 _FALSY = {'0', 'no', 'false', 'off', 'hide'}
 
 
 def _urdu_section_flags(args):
-    """``{key: bool}`` for the Urdu receipt's optional sections.
+    """``{key: bool}`` for the Urdu receipt's page map.
 
-    Every section defaults to **on**, so an old bookmark or a direct link that
-    carries no section parameters still prints the approved full sheet.  A key
-    may be repeated (the dialog posts a hidden ``0`` plus the checkbox's ``1``
-    so an unchecked box is never silently dropped); the last value wins.
+    Every mark on the sheet defaults to **on**, so an old bookmark or a direct
+    link that carries no section parameters still prints the approved full
+    sheet.  A key may be repeated (the dialog posts a hidden ``0`` plus the
+    checkbox's ``1`` so an unchecked box is never silently dropped); the last
+    value wins.
     """
     flags = {key: True for key in _URDU_SECTION_KEYS}
     for key in _URDU_SECTION_KEYS:
