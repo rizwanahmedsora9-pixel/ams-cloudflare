@@ -89,7 +89,7 @@ def login():
             return False
 
         if user and _verify_and_upgrade_password(user, password):
-            if (user.status or '').strip().lower() != 'active':
+            if not user.is_active:
                 flash('Account suspended', 'danger')
                 return render_template('login.html')
             # Remember by default so LAN HTTP sessions survive the post-login redirect.
@@ -208,7 +208,7 @@ def root_recovery_codes():
     )
 
 
-@bp.route('/logout')
+@bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     from utils.sessions import close_login_session

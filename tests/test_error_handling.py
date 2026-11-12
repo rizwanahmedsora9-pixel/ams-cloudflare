@@ -188,7 +188,7 @@ def test_load_user_retries_a_transient_database_lock(monkeypatch):
             _Session.calls += 1
             if _Session.calls == 1:
                 raise sqlite3.OperationalError("database is locked")
-            return SimpleNamespace(id=uid, username="Admin")
+            return SimpleNamespace(id=uid, username="Admin", is_active=True)
 
         def rollback(self):
             pass

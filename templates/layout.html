@@ -541,9 +541,12 @@
                 <i class="bi bi-moon-stars-fill"></i>
                 <span class="theme-label">Dark</span>
             </button>
-            <a href="/logout" class="btn btn-sm btn-outline-danger rounded-pill px-3">
-                <i class="bi bi-box-arrow-right"></i>
-            </a>
+            <form action="{{ url_for('logout') }}" method="post" class="m-0">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3" aria-label="Log out">
+                    <i class="bi bi-box-arrow-right"></i>
+                </button>
+            </form>
         </div>
     </div>
 
@@ -617,9 +620,12 @@
                 <i class="bi bi-moon-stars-fill"></i>
                 <span class="theme-label">Dark</span>
             </button>
-            <a href="/logout" class="btn btn-outline-danger w-100 btn-sm fw-bold py-2 rounded-pill">
-                <i class="bi bi-box-arrow-right me-2"></i> Logout
-            </a>
+            <form action="{{ url_for('logout') }}" method="post" class="m-0">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="btn btn-outline-danger w-100 btn-sm fw-bold py-2 rounded-pill">
+                    <i class="bi bi-box-arrow-right me-2"></i> Logout
+                </button>
+            </form>
         </div>
     </div>
 {% endif %}

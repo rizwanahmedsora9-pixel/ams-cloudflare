@@ -12,9 +12,44 @@ def edit_ledger_transaction(trans_type, trans_id):
         
         payment = Payment.query.get_or_404(trans_id)
         client = get_client_by_input(payment.client_name or '')
-        
+
+        # Editing a receipt downwards removes the difference from its cash/bank
+        # account. Do not allow that legacy route to spend money the account no
+        # longer has (the current balance already includes the original receipt).
+        try:
+            new_amount = float(request.form.get('amount', 0) or 0)
+            if payment.amount and payment.amount > 0 and new_amount < payment.amount and payment.payment_account_id:
+                account = db.session.get(Account, payment.payment_account_id)
+                if account:
+                    from utils.money import to_minor
+                    current_minor = int(account.balance_minor) if account.balance_minor is not None else to_minor(account.balance or 0)
+                    debit_minor = to_minor(payment.amount) - to_minor(new_amount)
+                    if current_minor < debit_minor:
+                        flash('Insufficient balance in the selected account to reduce this payment. Record the difference as a new adjustment instead.', 'danger')
+                        return redirect(url_for('financial_ledger', client_id=client.id) if client else (request.referrer or url_for('index')))
+        except (TypeError, ValueError):
+            flash('Enter a valid payment amount.', 'danger')
+            return redirect(url_for('financial_ledger', client_id=client.id) if client else (request.referrer or url_for('index')))
+
+        # A payment's posting period is immutable while its account/day is closed.
+        # Check both the original posting and the requested date before mutation.
+        try:
+            from app.services.payments_crud import _assert_day_open, _assert_period_open
+            from app.services.time_money import resolve_posted_datetime
+            requested_date = (request.form.get('date_posted') or '').strip()
+            new_posted = resolve_posted_datetime(requested_date, fallback_dt=payment.date_posted or pk_now()) if requested_date else payment.date_posted
+            if new_amount != payment.amount or new_posted != payment.date_posted:
+                _assert_period_open(payment.payment_account_id, payment.date_posted, operation='edited')
+                _assert_day_open(payment.payment_account_id, payment.date_posted, operation='edited')
+                if new_posted != payment.date_posted:
+                    _assert_period_open(payment.payment_account_id, new_posted, operation='posted')
+                    _assert_day_open(payment.payment_account_id, new_posted, operation='posted')
+        except ValueError as exc:
+            flash(str(exc), 'danger')
+            return redirect(url_for('financial_ledger', client_id=client.id) if client else (request.referrer or url_for('index')))
+
         # Update payment fields
-        payment.amount = float(request.form.get('amount', 0) or 0)
+        payment.amount = new_amount
         payment.method = request.form.get('method', 'Cash')
         payment.bank_name = request.form.get('bank_name', '').strip()
         payment.account_name = request.form.get('account_name', '').strip()
@@ -92,9 +127,21 @@ def edit_ledger_transaction(trans_type, trans_id):
         
         sale = DirectSale.query.get_or_404(trans_id)
         client = get_client_by_input(sale.client_name or '')
+
+        # This compact ledger form has no item editor. Refuse to change a bill
+        # total here when item rows exist; the full Direct Sale editor updates
+        # the header, stock, and accounting projections together.
+        try:
+            requested_amount = float(request.form.get('amount', 0) or 0)
+        except (TypeError, ValueError):
+            flash('Enter a valid sale amount.', 'danger')
+            return redirect(url_for('financial_ledger', client_id=client.id) if client else (request.referrer or url_for('index')))
+        if DirectSaleItem.query.filter_by(sale_id=sale.id).first() and requested_amount != float(sale.amount or 0):
+            flash('Sale totals with item lines must be changed from the full Direct Sale editor so stock and reports stay in sync.', 'danger')
+            return redirect(url_for('financial_ledger', client_id=client.id) if client else (request.referrer or url_for('index')))
         
         # Update sale fields
-        sale.amount = float(request.form.get('amount', 0) or 0)
+        sale.amount = requested_amount
         sale.manual_bill_no = (request.form.get('manual_bill_no', '') or '').strip()
         sale.category = (request.form.get('category', '') or '').strip()
         sale.payment_method = (request.form.get('payment_method', '') or '').strip()

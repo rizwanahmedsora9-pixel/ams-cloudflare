@@ -122,6 +122,11 @@ def load_user(user_id):
     report holds the write lock) is retried first: giving up immediately logs
     the user out and bounces every page to ``/login`` — which is exactly what
     a shop sees when a long job overlaps normal work.
+
+    A suspended account must not be restored from either the session cookie or
+    the remember-me cookie. Flask-Login calls this loader on every request, so
+    reusing User.is_active here enforces the current database status without
+    changing the concurrent-login policy or logging out other active users.
     """
     try:
         uid = int(str(user_id).strip())
@@ -134,7 +139,10 @@ def load_user(user_id):
     delays = (0.5, 1.5)
     for attempt in range(len(delays) + 1):
         try:
-            return db.session.get(User, uid)
+            user = db.session.get(User, uid)
+            if user is not None and not user.is_active:
+                return None
+            return user
         except Exception as exc:
             try:
                 db.session.rollback()

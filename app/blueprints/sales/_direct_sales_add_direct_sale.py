@@ -75,6 +75,14 @@ def _resolve_line_discounts(form, items, *, bill_discount, discount_reason):
 @login_required
 def add_direct_sale():
   try:
+    # SQLite's default deferred transactions let concurrent requests both read
+    # the same stock before either writes. Serialize sale creation before any
+    # stock reads so the second request validates against the first sale's
+    # committed stock movement. Other database engines keep their normal locking.
+    if db.engine.dialect.name == 'sqlite':
+        db.session.rollback()  # discard only request-hook reads/touches
+        db.session.connection().exec_driver_sql('BEGIN IMMEDIATE')
+
     def as_bool(val):
         return str(val).strip().lower() in ['1', 'true', 'on', 'yes']
 

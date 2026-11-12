@@ -215,19 +215,6 @@ def register_hooks(app):
             session['_csrf_token'] = token
         return {'csrf_token': token}
 
-    @app.before_request
-    def _http_lan_session_cookies():
-        """Other PCs open login over http://192.168.x.x — never mark cookies Secure."""
-        proto = (request.headers.get('X-Forwarded-Proto') or request.scheme or 'http').split(',')[0].strip().lower()
-        https = proto == 'https' or bool(request.is_secure)
-        if https:
-            return None
-        app.config['SESSION_COOKIE_SECURE'] = False
-        app.config['REMEMBER_COOKIE_SECURE'] = False
-        if str(app.config.get('SESSION_COOKIE_SAMESITE') or '').lower() == 'none':
-            app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-            app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
-
     @app.after_request
     def _strip_secure_cookie_on_http(response):
         proto = (request.headers.get('X-Forwarded-Proto') or request.scheme or 'http').split(',')[0].strip().lower()
