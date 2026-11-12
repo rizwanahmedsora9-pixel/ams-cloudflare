@@ -128,8 +128,13 @@ def _payment_account_name(bill):
     return ''
 
 
-def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
-    """``[(urdu label, value)]`` for the sheet's left-hand panel column."""
+def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None,
+                 show_delivery=True):
+    """``[(urdu label, value)]`` for the sheet's left-hand panel column.
+
+    ``show_delivery=False`` omits the delivery-person line from the printed
+    panel; the rest of the panel is unchanged.
+    """
     rows = []
     method = _payment_method(bill)
     account_name = _payment_account_name(bill)
@@ -165,7 +170,7 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
     people = [urdu_name(p) for p in (delivery_people or []) if p]
     if not people and driver_name_ur:
         people = [urdu_name(driver_name_ur)]
-    if people:
+    if people and show_delivery:
         rows.append(('ڈیلیوری', '، '.join(people)))
     return rows[:4]
 
@@ -199,13 +204,20 @@ def _item_rows(items):
     return rows
 
 
-def _summary_rows(bill_type, amount, paid, discount, previous):
-    """Sales totals first, then the carried-forward balance."""
+def _summary_rows(bill_type, amount, paid, discount, previous,
+                  show_previous=True):
+    """Sales totals first, then the carried-forward balance.
+
+    ``show_previous=False`` leaves the carried-forward line off the sheet.  The
+    closing balance is still the real one - one row is hidden, no figure is
+    recomputed - so a receipt cannot disagree with the ledger.
+    """
     rows = []
     if bill_type in _RECEIPT_TYPES or bill_type == 'Payment':
         rows.append({'label': L_RECEIVED, 'value': _money(amount)})
         if previous:
-            rows.append({'label': L_PREVIOUS, 'value': _money(previous)})
+            if show_previous:
+                rows.append({'label': L_PREVIOUS, 'value': _money(previous)})
             rows.append({'label': L_BALANCE_AFTER,
                          'value': _money(previous - amount), 'total': True})
         else:
@@ -216,7 +228,7 @@ def _summary_rows(bill_type, amount, paid, discount, previous):
         return rows
 
     rows.append({'label': L_TOTAL_SALES, 'value': _money(amount)})
-    if previous:
+    if previous and show_previous:
         rows.append({'label': L_PREVIOUS, 'value': _money(previous)})
     if discount:
         rows.append({'label': L_DISCOUNT, 'value': _money(discount)})
@@ -442,8 +454,20 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
                    previous_balance=0, client_balance=0, delivery_people=None,
                    driver_name_ur='', client_name_ur='', transaction_label='',
                    transaction_note='', settings=None, terms=None,
-                   grn_bd=None, party_label='', qr_text=None, qr_caption=None):
-    """Return the :mod:`app.services.urdu_receipt` document for one bill."""
+                   grn_bd=None, party_label='', qr_text=None, qr_caption=None,
+                   sections=None):
+    """Return the :mod:`app.services.urdu_receipt` document for one bill.
+
+    ``sections`` is the print dialog's optional-section map.  Keys ``qr``,
+    ``note``, ``sig``, ``prev`` and ``delivery`` switch the matching sheet
+    section off when set to a false value; anything absent stays on, so every
+    existing caller (and a direct link) still gets the approved full sheet.
+    """
+    sections = dict(sections or {})
+
+    def _show(key):
+        return bool(sections.get(key, True))
+
     bill = bill
     amount = float(getattr(bill, 'amount', 0) or 0)
     paid = float(getattr(bill, 'paid_amount', 0) or 0)
@@ -511,9 +535,11 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         date_posted = getattr(bill, 'created_at', None)
 
     detail_rows = _detail_rows(bill_type, bill, delivery_people,
-                               driver_name_ur, grn_bd=grn_bd)
+                               driver_name_ur, grn_bd=grn_bd,
+                               show_delivery=_show('delivery'))
     item_rows = _item_rows(items)
-    summary_rows = _summary_rows(bill_type, amount, paid, discount, previous)
+    summary_rows = _summary_rows(bill_type, amount, paid, discount, previous,
+                                 show_previous=_show('prev'))
     # Build the sheet document once without a QR so the payload quotes the
     # exact bill number, date, time and totals that are printed on it.
     document = R.build_document(
@@ -537,11 +563,14 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         terms=term_rows,
         signature_label=L_SIGN,
         items_title=L_ITEMS,
+        show_qr=_show('qr'),
+        show_note=_show('note'),
+        show_signature=_show('sig'),
     )
     # The header QR is the bill itself: shop, number, type, date and time,
     # client name and ID, delivery person, the line items and the totals.
     qr_error = ''
-    if qr_text is None:
+    if qr_text is None and _show('qr'):
         delivery = '، '.join(urdu_name(p) for p in (delivery_people or []) if p)
         if delivery:
             delivery = f"ڈیلیوری {delivery}"

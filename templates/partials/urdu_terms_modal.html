@@ -75,6 +75,67 @@
                         {% endfor %}
                     </div>
                 </div>
+
+                <div class="mb-3 border rounded p-2 bg-dark-subtle">
+                    <div class="small text-warning fw-bold text-uppercase mb-1">
+                        <i class="bi bi-layout-text-window-reverse me-1"></i> Sections on this receipt
+                    </div>
+                    <div class="text-white-50 small mb-2">
+                        All sections are on by default — untick any you do not want printed.
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-sm-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="urduSecQr"
+                                       data-urdu-section="qr" checked>
+                                <label class="form-check-label text-white" for="urduSecQr">
+                                    <i class="bi bi-qr-code me-1 text-info"></i> QR code
+                                    <span class="text-white-50">(<bdi dir="rtl">بارکوڈ</bdi>)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="urduSecNote"
+                                       data-urdu-section="note" checked>
+                                <label class="form-check-label text-white" for="urduSecNote">
+                                    <i class="bi bi-card-text me-1 text-info"></i> Shop note
+                                    <span class="text-white-50">(<bdi dir="rtl">سامان کی معلومات</bdi>)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="urduSecPrev"
+                                       data-urdu-section="prev" checked>
+                                <label class="form-check-label text-white" for="urduSecPrev">
+                                    <i class="bi bi-clock-history me-1 text-info"></i> Previous balance
+                                    <span class="text-white-50">(<bdi dir="rtl">پچھلا بقایا</bdi>)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="urduSecSig"
+                                       data-urdu-section="sig" checked>
+                                <label class="form-check-label text-white" for="urduSecSig">
+                                    <i class="bi bi-pen me-1 text-info"></i> Signature line
+                                    <span class="text-white-50">(<bdi dir="rtl">دستخط</bdi>)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="urduSecDelivery"
+                                       data-urdu-section="delivery" checked>
+                                <label class="form-check-label text-white" for="urduSecDelivery">
+                                    <i class="bi bi-truck me-1 text-info"></i> Delivery detail
+                                    <span class="text-white-50">(<bdi dir="rtl">ڈیلیوری</bdi>)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">
@@ -113,6 +174,9 @@
         var downloadBtn = document.getElementById('urduTcDownload');
         var printBtn = document.getElementById('urduTcPrint');
         var buttons = document.querySelectorAll('[data-urdu-receipt]');
+        var sectionBoxes = Array.from(
+            document.querySelectorAll('[data-urdu-section]')
+        );
 
         function urlFor(action) {
             var url = action === 'print'
@@ -163,6 +227,13 @@
             }
             var copies = document.querySelector('input[name="urduCopies"]:checked');
             url += '&copies=' + (copies ? copies.value : '1');
+            // Optional sheet sections: send an explicit 1/0 for each so the
+            // server never has to guess an unchecked box apart from an old
+            // link (where a missing key means "show", the approved sheet).
+            sectionBoxes.forEach(function (cb) {
+                url += '&' + cb.dataset.urduSection + '=' +
+                       (cb.checked ? '1' : '0');
+            });
             modal.hide();
             location.href = url;
         }
@@ -186,6 +257,9 @@
                 tcYes.checked = true;
                 tcNo.checked = false;
                 tcOptions.style.display = 'block';
+                // Nothing is remembered between receipts: every dialog starts
+                // from the full approved sheet.
+                sectionBoxes.forEach(function (cb) { cb.checked = true; });
                 modal.show();
             });
         });

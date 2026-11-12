@@ -984,3 +984,99 @@ def test_confirmation_multiple_term_ids_are_all_used(client, sale, app):
            f"&tc_ids={ids[0]}&tc_ids={ids[1]}")
     html = client.get(url).get_data(as_text=True)
     assert 'پہلی منفرد شرط' in html and 'دوسری منفرد شرط' in html
+
+
+# ---------------------------------------------------------------------------
+# Optional sheet sections (print dialog switches)
+# ---------------------------------------------------------------------------
+
+def test_all_sections_are_on_by_default():
+    doc = _document()
+    assert doc['show_qr'] is True
+    assert doc['show_note'] is True
+    assert doc['show_signature'] is True
+    labels = [row['label'] for row in doc['summary']]
+    assert 'پچھلا بقایا' in labels
+    left_panel = [op for op in R.layout_document(doc)[0].ops
+                  if op['op'] == 'text'
+                  and str(op['text']).startswith('ڈیلیوری')]
+    assert left_panel, 'the delivery line is part of the approved sheet'
+
+
+def test_qr_and_shop_note_can_be_hidden():
+    doc = _document(sections={'qr': False, 'note': False})
+    assert doc['show_qr'] is False and doc['show_note'] is False
+    sheet = R.layout_document(doc)[0]
+    modules = [op for op in sheet.ops if op['op'] == 'rect'
+               and op['fill'] == R.NAVY
+               and R.QR_X - 0.1 <= op['x'] < R.QR_X + R.QR_SIZE
+               and R.QR_Y - 0.1 <= op['y'] < R.QR_Y + R.QR_SIZE]
+    assert not modules, 'no QR modules when the section is switched off'
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text' and op['text'] == NOTE]
+    # The rest of the header - shop name, address, phones - is untouched.
+    assert [op for op in sheet.ops
+            if op['op'] == 'text' and op['text'] == doc['company_address']]
+
+
+def test_previous_balance_can_be_hidden_without_recomputing_the_balance():
+    full = _document()
+    without = _document(sections={'prev': False})
+    assert 'پچھلا بقایا' in [row['label'] for row in full['summary']]
+    assert 'پچھلا بقایا' not in [row['label'] for row in without['summary']]
+    # One row is hidden; the closing balance itself is still the real one.
+    assert full['summary'][-1]['value'] == without['summary'][-1]['value']
+    assert without['summary'][-1].get('total') is True
+
+
+def test_signature_and_delivery_can_be_hidden():
+    doc = _document(sections={'sig': False, 'delivery': False})
+    assert doc['show_signature'] is False
+    sheet = R.layout_document(doc)[0]
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text' and op['text'] == 'مجاز دستخط']
+    assert not [op for op in sheet.ops
+                if op['op'] == 'line' and op['color'] == R.NAVY
+                and abs(op['x0'] - R.SIG_LINE_X0) < 0.01
+                and abs(op['x1'] - R.SIG_LINE_X1) < 0.01]
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text'
+                and str(op['text']).startswith('ڈیلیوری')]
+
+
+def test_section_flags_default_on_and_the_last_value_wins():
+    from werkzeug.datastructures import MultiDict
+    from app.blueprints.sales._bills_download_invoice import _urdu_section_flags
+
+    defaults = _urdu_section_flags(MultiDict())
+    assert set(defaults) == {'qr', 'note', 'prev', 'sig', 'delivery'}
+    assert all(defaults.values()), 'a link with no flags prints the full sheet'
+
+    # The confirm page posts a hidden 0 then the checked 1; the last wins.
+    assert _urdu_section_flags(MultiDict([('qr', '0'), ('qr', '1')]))['qr'] is True
+    assert _urdu_section_flags(MultiDict([('qr', '1'), ('qr', '0')]))['qr'] is False
+    assert _urdu_section_flags(MultiDict([('note', '0')]))['note'] is False
+
+
+def test_confirmation_page_offers_the_section_switches(client, sale):
+    url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur")
+    html = client.get(url).get_data(as_text=True)
+    for key in ('qr', 'note', 'prev', 'sig', 'delivery'):
+        assert f'name="{key}" value="1"' in html, key
+        assert f'name="{key}" value="0"' in html, key
+
+
+def test_route_section_switches_reach_the_urdu_sheet(client, sale):
+    off = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur&action=print&tc=0"
+           f"&qr=0&note=0&prev=0&sig=0&delivery=0")
+    html = client.get(off).get_data(as_text=True)
+    for marker in ('مجاز دستخط', 'ڈیلیوری'):
+        assert marker not in html, marker
+
+    on = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+          f"&src_id={sale['id']}&lang=ur&action=print&tc=0")
+    html = client.get(on).get_data(as_text=True)
+    assert 'مجاز دستخط' in html
+    assert 'ڈیلیوری' in html

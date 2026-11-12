@@ -78,6 +78,37 @@
                             </div>
                         </div>
 
+                        <div class="mb-3 border rounded p-3 bg-dark-subtle">
+                            <div class="small text-warning fw-bold text-uppercase mb-1">
+                                <i class="bi bi-layout-text-window-reverse me-1"></i> Sections on this receipt
+                            </div>
+                            <div class="text-white-50 small mb-2">
+                                All sections are on by default — untick any you do not want printed.
+                            </div>
+                            <div class="row g-2">
+                                {% for key, label, urdu in [
+                                    ('qr', 'QR code', 'بارکوڈ'),
+                                    ('note', 'Shop note', 'سامان کی معلومات'),
+                                    ('prev', 'Previous balance', 'پچھلا بقایا'),
+                                    ('sig', 'Signature line', 'دستخط'),
+                                    ('delivery', 'Delivery detail', 'ڈیلیوری')] %}
+                                <div class="col-sm-6">
+                                    <div class="form-check">
+                                        {# A hidden 0 plus the checked 1: an unchecked box still
+                                           posts an explicit "off" instead of being dropped. #}
+                                        <input type="hidden" name="{{ key }}" value="0">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="{{ key }}" value="1" id="sec-{{ key }}" checked>
+                                        <label class="form-check-label text-white" for="sec-{{ key }}">
+                                            {{ label }}
+                                            <span class="text-white-50">(<bdi dir="rtl">{{ urdu }}</bdi>)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                             <a href="{{ url_for('view_bill', bill_no=bill_no) }}" class="btn btn-outline-light btn-sm">
                                 <i class="bi bi-x-lg me-1"></i> Cancel

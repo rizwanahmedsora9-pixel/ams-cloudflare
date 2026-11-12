@@ -614,8 +614,14 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
                    qr_caption='', signature_label='مجاز دستخط',
                    items_title=ITEMS_TITLE, continuation_label='جاری',
                    show_items=True, footer_thanks='', footer_credit='',
-                   signature_left='', signature_right=''):
-    """Assemble the data the sheet needs, copied verbatim from the bill."""
+                   signature_left='', signature_right='',
+                   show_qr=True, show_note=True, show_signature=True):
+    """Assemble the data the sheet needs, copied verbatim from the bill.
+
+    ``show_qr``, ``show_note`` and ``show_signature`` are the optional sheet
+    sections the print dialog can switch off.  They default to ``True`` so the
+    approved A5 sheet is unchanged unless the user asked for less.
+    """
     if fields is None:
         fields = _default_fields(party_label, party_name, party_code, detail_rows)
     return {
@@ -643,6 +649,9 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
         'footer_thanks': footer_thanks,
         'footer_credit': footer_credit,
         'show_items': bool(show_items and items),
+        'show_qr': bool(show_qr),
+        'show_note': bool(show_note),
+        'show_signature': bool(show_signature),
         'items_title': items_title or ITEMS_TITLE,
         'continuation_label': continuation_label,
     }
@@ -663,7 +672,8 @@ def layout_document(doc):
     if doc['show_items']:
         _draw_items(state, doc, sheets)
     _draw_summary(state, doc, sheets)
-    _draw_signature(state, doc)
+    if doc.get('show_signature', True):
+        _draw_signature(state, doc)
     if doc.get('terms'):
         _draw_terms(state, doc, sheets)
     return sheets
@@ -720,7 +730,8 @@ def _content_bottom():
 def _draw_header(state, doc, first=True):
     sheet = state['sheet']
     if first:
-        _draw_qr(sheet, doc)
+        if doc.get('show_qr', True):
+            _draw_qr(sheet, doc)
         name = doc['company_name']
         name_size = 25.0
         if has_arabic(name):
@@ -747,7 +758,7 @@ def _draw_header(state, doc, first=True):
         sheet.rect(LEFT, Y_RULE_1, CONTENT_W, RULE_1_H, fill=NAVY)
         sheet.hline(LEFT, RIGHT, Y_RULE_2, color=DOT, width=RULE_2_H,
                     dash=(2.9968, 2.9968))
-        if doc['note']:
+        if doc['note'] and doc.get('show_note', True):
             note = _fit(doc['note'], 7.5, CONTENT_W, urdu=has_arabic(doc['note']))
             sheet.text(RIGHT, Y_NOTE, note, 7.5, color=INK, align='right',
                        urdu=True)
@@ -978,9 +989,19 @@ def _draw_summary(state, doc, sheets):
     total_index = next((i for i, r in enumerate(rows) if r.get('total')),
                        len(rows) - 1)
     gap = SUMMARY_GAP if doc['show_items'] else 12.0
+    # Without a signature rule the summary box is the only thing on that band,
+    # so it no longer reserves the signature's clearance.
+    show_signature = doc.get('show_signature', True)
+
+    def _sig_rel(each_gap):
+        if not show_signature:
+            return 0.0
+        return max(total_index * SUM_ROW_H + 1.625,
+                   SIG_MIN_CLEARANCE - each_gap)
+
     top = state['y'] + gap
-    sig_rel = max(total_index * SUM_ROW_H + 1.625, SIG_MIN_CLEARANCE - gap)
-    block_h = max(box_h, sig_rel + SIG_LABEL_OFFSET + 4.0)
+    sig_rel = _sig_rel(gap)
+    block_h = max(box_h, sig_rel + SIG_LABEL_OFFSET + 4.0) if show_signature else box_h
     needed = block_h + TERMS_GAP + (62.0 if doc.get('terms') else 0.0)
     if top + needed > _content_bottom():
         sheet = _new_sheet()
@@ -989,7 +1010,7 @@ def _draw_summary(state, doc, sheets):
         _draw_header(state, doc, first=False)
         gap = 12.0
         top = state['y'] + gap
-        sig_rel = max(total_index * SUM_ROW_H + 1.625, SIG_MIN_CLEARANCE - gap)
+        sig_rel = _sig_rel(gap)
     sheet = state['sheet']
 
     box_w = SUM_RIGHT - SUM_LEFT
@@ -1015,7 +1036,10 @@ def _draw_summary(state, doc, sheets):
 
     state['summary_top'] = top
     state['summary_h'] = box_h
-    state['sig_y'] = top + sig_rel
+    if show_signature:
+        state['sig_y'] = top + sig_rel
+    else:
+        state.pop('sig_y', None)
     state['y'] = top + box_h
 
 
