@@ -88,6 +88,17 @@ class User(UserMixin, db.Model):
     access_mode = db.Column(db.String(20), default='read_write')
     created_at = db.Column(db.DateTime, default=pk_model_now)
 
+    @property
+    def is_active(self):
+        """Whether this account may authenticate, using the password-login rule.
+
+        UserMixin otherwise treats every persisted user as active, including
+        accounts an administrator suspended. Keep this derived from the existing
+        status column so no schema change or duplicate active flag is needed.
+        Unknown/empty statuses fail closed, just as they do at password login.
+        """
+        return (self.status or '').strip().lower() == 'active'
+
 
 class Settings(db.Model):
     """Application settings"""

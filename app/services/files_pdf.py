@@ -406,15 +406,33 @@ def _disable_response_cache(response):
 
 
 def save_photo(file):
-    """Save uploaded photo and return filename"""
-    if file and file.filename != '':
-        filename = secure_filename(
-            f"{pk_now().strftime('%Y%m%d%H%M%S')}_{file.filename}")
-        upload_folder = os.path.join(basedir, 'static', 'uploads')
-        os.makedirs(upload_folder, exist_ok=True)
-        file_path = os.path.join(upload_folder, filename)
-        file.save(file_path)
-        return filename
-    return None
+    """Save a bounded, signature-checked raster image; ignore unsafe uploads gracefully."""
+    if not file or not file.filename:
+        return None
+
+    allowed_signatures = {
+        '.jpg': lambda data: data.startswith(b'\xff\xd8\xff'),
+        '.jpeg': lambda data: data.startswith(b'\xff\xd8\xff'),
+        '.png': lambda data: data.startswith(b'\x89PNG\r\n\x1a\n'),
+        '.gif': lambda data: data.startswith((b'GIF87a', b'GIF89a')),
+        '.webp': lambda data: len(data) >= 12 and data[:4] == b'RIFF' and data[8:12] == b'WEBP',
+    }
+    safe_name = secure_filename(file.filename)
+    ext = os.path.splitext(safe_name)[1].lower()
+    validator = allowed_signatures.get(ext)
+    max_bytes = int(app.config.get('MAX_CONTENT_LENGTH') or (10 * 1024 * 1024))
+    data = file.stream.read(max_bytes + 1)
+    file.stream.seek(0)
+    if len(data) > max_bytes or not validator or not validator(data):
+        flash('Photo upload rejected: use a valid JPG, PNG, GIF, or WebP image under the upload size limit.', 'danger')
+        return None
+
+    filename = secure_filename(f"{pk_now().strftime('%Y%m%d%H%M%S%f')}_{safe_name}")
+    upload_folder = os.path.join(basedir, 'static', 'uploads')
+    os.makedirs(upload_folder, exist_ok=True)
+    file_path = os.path.join(upload_folder, filename)
+    with open(file_path, 'wb') as saved:
+        saved.write(data)
+    return filename
 
 

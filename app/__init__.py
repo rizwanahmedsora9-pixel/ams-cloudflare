@@ -355,20 +355,21 @@ def create_app(test_config: dict | None = None) -> Flask:
         # local runs, and every deployment reload) after the ORM bootstrap so
         # model tables already exist; only pending numbered SQL files in
         # app/migrations/ are applied and recorded in migration_history.
-        # A failure here never blocks boot — the app continues on the current
-        # schema and the error is visible in the logs.
+        # A failure here is fatal: continuing could expose a partially updated
+        # schema to users and corrupt/report inconsistent business data.
         try:
             from app.services.auto_migrate import (
                 run_sql_migrations as _run_auto_migrations,
             )
 
             app.config["AMS_MIGRATION_REPORT"] = _run_auto_migrations()
-        except Exception:
-            logging.getLogger(__name__).warning(
-                "Automatic schema migrations failed to run at startup; "
-                "the app continues on the current schema.",
+        except Exception as exc:
+            logging.getLogger(__name__).critical(
+                "Automatic schema migration failed; refusing to serve requests "
+                "against a potentially partial schema.",
                 exc_info=True,
             )
+            raise RuntimeError("Automatic schema migration failed; application startup aborted.") from exc
 
         # Daily Cash & Bank Reconciliation stores the physically counted
         # amounts and verified day locks against a numeric account id.  Older
