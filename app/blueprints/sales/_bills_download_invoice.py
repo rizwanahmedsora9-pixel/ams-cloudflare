@@ -3,6 +3,35 @@ from ._common import *  # noqa
 from app.services.urdu_names import urdu_name
 from app.services.terms import get_selected_terms
 
+# Optional marks on the Urdu sheet the print dialog can switch off.  The list
+# lives in the sheet module itself so the page map, the route and the layout
+# cannot drift apart; it maps onto ``bill_urdu.build_document(sections=...)``.
+from app.services.urdu_receipt import SHEET_OPTIONS as _URDU_SECTION_KEYS
+
+_TRUTHY = {'1', 'yes', 'true', 'on', 'show'}
+_FALSY = {'0', 'no', 'false', 'off', 'hide'}
+
+
+def _urdu_section_flags(args):
+    """``{key: bool}`` for the Urdu receipt's page map.
+
+    Every mark on the sheet defaults to **on**, so an old bookmark or a direct
+    link that carries no section parameters still prints the approved full
+    sheet.  A key may be repeated (the dialog posts a hidden ``0`` plus the
+    checkbox's ``1`` so an unchecked box is never silently dropped); the last
+    value wins.
+    """
+    flags = {key: True for key in _URDU_SECTION_KEYS}
+    for key in _URDU_SECTION_KEYS:
+        for raw in args.getlist(key):
+            value = (raw or '').strip().lower()
+            if value in _TRUTHY:
+                flags[key] = True
+            elif value in _FALSY:
+                flags[key] = False
+    return flags
+
+
 def _material_urdu_names():
     """``{english material name (casefolded): urdu name}`` for printed bills.
 
@@ -528,6 +557,7 @@ def download_invoice(bill_no):
     # page opens the same dialog as a modal so the normal flow is one click.
     show_terms_ur = False
     selected_terms_ur = []
+    sections_ur = {key: True for key in _URDU_SECTION_KEYS}
     if lang == 'ur' and 'tc' not in request.args:
         return render_template(
             'urdu_terms_confirm.html',
@@ -555,6 +585,7 @@ def download_invoice(bill_no):
         if want_tc:
             show_terms_ur = True
             selected_terms_ur = get_selected_terms(tc_ids)
+        sections_ur = _urdu_section_flags(request.args)
 
     # Prefer saved Urdu names; otherwise use a best-effort transliteration.
     # Shared with the scanned-bill page so both show the same Urdu names.
@@ -593,6 +624,7 @@ def download_invoice(bill_no):
             action=action,
             disposition=disposition,
             copies=copies,
+            sections=sections_ur,
         )
     section_map = {
         'Booking': 'BOOKING',
@@ -686,12 +718,15 @@ _URDU_SECTION = {
 def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
                         client_balance, delivery_people, driver_name_ur,
                         client_name_ur, transaction_label, transaction_note,
-                        terms, grn_bd, action, disposition, copies=1):
+                        terms, grn_bd, action, disposition, copies=1,
+                        sections=None):
     """Return the Urdu bill as a PDF (download) or as the print page.
 
     ``copies`` is the carbon-copy switch: 1 (the default) prints the single
     approved A5 sheet; 2 prints the same receipt twice on one A4 landscape
     leaf - original for the customer on the right, office copy on the left.
+    ``sections`` switches off optional parts of the sheet (QR, shop note,
+    previous balance, signature, delivery); anything absent stays on.
     """
     from app.services import bill_urdu
     from app.services.files_pdf import _safe_download_name
@@ -718,6 +753,7 @@ def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
         terms=terms,
         grn_bd=grn_bd,
         party_label=party_label,
+        sections=sections,
     )
 
     stamp = pk_now().strftime('%d-%m-%Y_%I-%M%p')

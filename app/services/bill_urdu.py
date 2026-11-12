@@ -128,8 +128,14 @@ def _payment_account_name(bill):
     return ''
 
 
-def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
-    """``[(urdu label, value)]`` for the sheet's left-hand panel column."""
+def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None,
+                 show=None):
+    """``[(urdu label, value)]`` for the sheet's left-hand panel column.
+
+    ``show`` is the page-map predicate; a row whose key is switched off is not
+    added to the panel at all.
+    """
+    keep = show or (lambda key: True)
     rows = []
     method = _payment_method(bill)
     account_name = _payment_account_name(bill)
@@ -138,34 +144,34 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None):
 
     if bill_type == 'GRN':
         supplier = urdu_name((getattr(bill, 'supplier_name', '') or '').strip())
-        if supplier:
+        if supplier and keep('party'):
             rows.append((L_SUPPLIER, supplier))
-        if method:
+        if method and keep('method'):
             rows.append(('ادائیگی', _method_label(method)))
-        if grn_bd:
+        if grn_bd and keep('account'):
             vehicle = (getattr(bill, 'vehicle_no', '') or '').strip()
             if vehicle:
                 rows.append(('گاڑی نمبر', vehicle))
         return rows
 
-    if method:
+    if method and keep('method'):
         label = _method_label(method)
         value = f'({label}) {method}' if label and label != method else method
         rows.append(('ادائیگی', value))
-    if payment_type and bill_type in _RECEIPT_TYPES | {'Payment'}:
+    if payment_type and bill_type in _RECEIPT_TYPES | {'Payment'} and keep('method'):
         rows.append(('ادائیگی کی قسم', _urdu_word(payment_type)))
-    if bank:
+    if bank and keep('account'):
         rows.append(('بینک', bank))
-    if account_name:
+    if account_name and keep('account'):
         rows.append(('اکاؤنٹ', account_name))
     account_no = (getattr(bill, 'account_no', '') or '').strip()
-    if account_no:
+    if account_no and keep('account'):
         rows.append(('اکاؤنٹ نمبر', account_no))
 
     people = [urdu_name(p) for p in (delivery_people or []) if p]
     if not people and driver_name_ur:
         people = [urdu_name(driver_name_ur)]
-    if people:
+    if people and keep('delivery'):
         rows.append(('ڈیلیوری', '، '.join(people)))
     return rows[:4]
 
@@ -199,31 +205,49 @@ def _item_rows(items):
     return rows
 
 
-def _summary_rows(bill_type, amount, paid, discount, previous):
-    """Sales totals first, then the carried-forward balance."""
+def _summary_rows(bill_type, amount, paid, discount, previous, show=None):
+    """Sales totals first, then the carried-forward balance.
+
+    ``show`` is the page-map predicate.  Hiding a row never recomputes a
+    figure: the closing balance is still the real one, so a receipt cannot
+    disagree with the ledger just because a line was left off the paper.
+    """
+    keep = show or (lambda key: True)
     rows = []
     if bill_type in _RECEIPT_TYPES or bill_type == 'Payment':
-        rows.append({'label': L_RECEIVED, 'value': _money(amount)})
+        if keep('sum_received'):
+            rows.append({'label': L_RECEIVED, 'value': _money(amount),
+                         'key': 'sum_received'})
         if previous:
-            rows.append({'label': L_PREVIOUS, 'value': _money(previous)})
-            rows.append({'label': L_BALANCE_AFTER,
-                         'value': _money(previous - amount), 'total': True})
-        else:
+            if keep('prev'):
+                rows.append({'label': L_PREVIOUS, 'value': _money(previous),
+                             'key': 'prev'})
+            if keep('sum_balance'):
+                rows.append({'label': L_BALANCE_AFTER,
+                             'value': _money(previous - amount),
+                             'total': True, 'key': 'sum_balance'})
+        elif rows and keep('sum_balance'):
             # Nothing was owed before this payment, so there is no closing
             # balance to print: the money received is the whole story.  A
             # "-45,000" balance under a receipt reads as a debt.
             rows[-1]['total'] = True
         return rows
 
-    rows.append({'label': L_TOTAL_SALES, 'value': _money(amount)})
-    if previous:
-        rows.append({'label': L_PREVIOUS, 'value': _money(previous)})
-    if discount:
-        rows.append({'label': L_DISCOUNT, 'value': _money(discount)})
-    rows.append({'label': L_PAID, 'value': _money(paid)})
+    if keep('sum_total_sales'):
+        rows.append({'label': L_TOTAL_SALES, 'value': _money(amount),
+                     'key': 'sum_total_sales'})
+    if previous and keep('prev'):
+        rows.append({'label': L_PREVIOUS, 'value': _money(previous),
+                     'key': 'prev'})
+    if discount and keep('sum_discount'):
+        rows.append({'label': L_DISCOUNT, 'value': _money(discount),
+                     'key': 'sum_discount'})
+    if keep('sum_paid'):
+        rows.append({'label': L_PAID, 'value': _money(paid), 'key': 'sum_paid'})
     outstanding = previous + amount - paid - discount
-    rows.append({'label': L_OUTSTANDING, 'value': _money(outstanding),
-                 'total': True})
+    if keep('sum_total'):
+        rows.append({'label': L_OUTSTANDING, 'value': _money(outstanding),
+                     'total': True, 'key': 'sum_total'})
     return rows
 
 
@@ -442,8 +466,20 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
                    previous_balance=0, client_balance=0, delivery_people=None,
                    driver_name_ur='', client_name_ur='', transaction_label='',
                    transaction_note='', settings=None, terms=None,
-                   grn_bd=None, party_label='', qr_text=None, qr_caption=None):
-    """Return the :mod:`app.services.urdu_receipt` document for one bill."""
+                   grn_bd=None, party_label='', qr_text=None, qr_caption=None,
+                   sections=None):
+    """Return the :mod:`app.services.urdu_receipt` document for one bill.
+
+    ``sections`` is the print dialog's optional-section map.  Keys ``qr``,
+    ``note``, ``sig``, ``prev`` and ``delivery`` switch the matching sheet
+    section off when set to a false value; anything absent stays on, so every
+    existing caller (and a direct link) still gets the approved full sheet.
+    """
+    sections = dict(sections or {})
+
+    def _show(key):
+        return bool(sections.get(key, True))
+
     bill = bill
     amount = float(getattr(bill, 'amount', 0) or 0)
     paid = float(getattr(bill, 'paid_amount', 0) or 0)
@@ -511,9 +547,10 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         date_posted = getattr(bill, 'created_at', None)
 
     detail_rows = _detail_rows(bill_type, bill, delivery_people,
-                               driver_name_ur, grn_bd=grn_bd)
+                               driver_name_ur, grn_bd=grn_bd, show=_show)
     item_rows = _item_rows(items)
-    summary_rows = _summary_rows(bill_type, amount, paid, discount, previous)
+    summary_rows = _summary_rows(bill_type, amount, paid, discount, previous,
+                                 show=_show)
     # Build the sheet document once without a QR so the payload quotes the
     # exact bill number, date, time and totals that are printed on it.
     document = R.build_document(
@@ -537,11 +574,16 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         terms=term_rows,
         signature_label=L_SIGN,
         items_title=L_ITEMS,
+        show_qr=_show('qr'),
+        show_note=_show('note'),
+        show_signature=_show('sig'),
+        show_items=_show('items'),
+        options=sections,
     )
     # The header QR is the bill itself: shop, number, type, date and time,
     # client name and ID, delivery person, the line items and the totals.
     qr_error = ''
-    if qr_text is None:
+    if qr_text is None and _show('qr'):
         delivery = '، '.join(urdu_name(p) for p in (delivery_people or []) if p)
         if delivery:
             delivery = f"ڈیلیوری {delivery}"

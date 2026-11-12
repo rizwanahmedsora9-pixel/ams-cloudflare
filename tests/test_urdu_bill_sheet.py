@@ -984,3 +984,220 @@ def test_confirmation_multiple_term_ids_are_all_used(client, sale, app):
            f"&tc_ids={ids[0]}&tc_ids={ids[1]}")
     html = client.get(url).get_data(as_text=True)
     assert 'پہلی منفرد شرط' in html and 'دوسری منفرد شرط' in html
+
+
+# ---------------------------------------------------------------------------
+# Optional sheet sections (print dialog switches)
+# ---------------------------------------------------------------------------
+
+def test_all_sections_are_on_by_default():
+    doc = _document()
+    assert doc['show_qr'] is True
+    assert doc['show_note'] is True
+    assert doc['show_signature'] is True
+    labels = [row['label'] for row in doc['summary']]
+    assert 'پچھلا بقایا' in labels
+    left_panel = [op for op in R.layout_document(doc)[0].ops
+                  if op['op'] == 'text'
+                  and str(op['text']).startswith('ڈیلیوری')]
+    assert left_panel, 'the delivery line is part of the approved sheet'
+
+
+def test_qr_and_shop_note_can_be_hidden():
+    doc = _document(sections={'qr': False, 'note': False})
+    assert doc['show_qr'] is False and doc['show_note'] is False
+    sheet = R.layout_document(doc)[0]
+    modules = [op for op in sheet.ops if op['op'] == 'rect'
+               and op['fill'] == R.NAVY
+               and R.QR_X - 0.1 <= op['x'] < R.QR_X + R.QR_SIZE
+               and R.QR_Y - 0.1 <= op['y'] < R.QR_Y + R.QR_SIZE]
+    assert not modules, 'no QR modules when the section is switched off'
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text' and op['text'] == NOTE]
+    # The rest of the header - shop name, address, phones - is untouched.
+    assert [op for op in sheet.ops
+            if op['op'] == 'text' and op['text'] == doc['company_address']]
+
+
+def test_previous_balance_can_be_hidden_without_recomputing_the_balance():
+    full = _document()
+    without = _document(sections={'prev': False})
+    assert 'پچھلا بقایا' in [row['label'] for row in full['summary']]
+    assert 'پچھلا بقایا' not in [row['label'] for row in without['summary']]
+    # One row is hidden; the closing balance itself is still the real one.
+    assert full['summary'][-1]['value'] == without['summary'][-1]['value']
+    assert without['summary'][-1].get('total') is True
+
+
+def test_signature_and_delivery_can_be_hidden():
+    doc = _document(sections={'sig': False, 'delivery': False})
+    assert doc['show_signature'] is False
+    sheet = R.layout_document(doc)[0]
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text' and op['text'] == 'مجاز دستخط']
+    assert not [op for op in sheet.ops
+                if op['op'] == 'line' and op['color'] == R.NAVY
+                and abs(op['x0'] - R.SIG_LINE_X0) < 0.01
+                and abs(op['x1'] - R.SIG_LINE_X1) < 0.01]
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text'
+                and str(op['text']).startswith('ڈیلیوری')]
+
+
+def test_section_flags_default_on_and_the_last_value_wins():
+    from werkzeug.datastructures import MultiDict
+    from app.blueprints.sales._bills_download_invoice import _urdu_section_flags
+
+    from app.services.urdu_receipt import SHEET_OPTIONS
+
+    defaults = _urdu_section_flags(MultiDict())
+    assert set(defaults) == set(SHEET_OPTIONS)
+    assert all(defaults.values()), 'a link with no flags prints the full sheet'
+
+    # The confirm page posts a hidden 0 then the checked 1; the last wins.
+    assert _urdu_section_flags(MultiDict([('qr', '0'), ('qr', '1')]))['qr'] is True
+    assert _urdu_section_flags(MultiDict([('qr', '1'), ('qr', '0')]))['qr'] is False
+    assert _urdu_section_flags(MultiDict([('note', '0')]))['note'] is False
+
+
+def test_confirmation_page_offers_every_item_on_the_page_map(client, sale):
+    from app.services.urdu_receipt import SHEET_OPTIONS
+
+    url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur")
+    html = client.get(url).get_data(as_text=True)
+    for key in SHEET_OPTIONS:
+        assert f'name="{key}" value="1"' in html, key
+        assert f'name="{key}" value="0"' in html, key
+
+
+def test_route_section_switches_reach_the_urdu_sheet(client, sale):
+    off = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur&action=print&tc=0"
+           f"&qr=0&note=0&prev=0&sig=0&delivery=0")
+    html = client.get(off).get_data(as_text=True)
+    for marker in ('مجاز دستخط', 'ڈیلیوری'):
+        assert marker not in html, marker
+
+    on = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+          f"&src_id={sale['id']}&lang=ur&action=print&tc=0")
+    html = client.get(on).get_data(as_text=True)
+    assert 'مجاز دستخط' in html
+    assert 'ڈیلیوری' in html
+
+
+def _texts(doc):
+    return [op['text'] for op in R.layout_document(doc)[0].ops
+            if op['op'] == 'text']
+
+
+def test_header_marks_can_be_hidden_individually():
+    doc = _document(sections={'company': False, 'address': False,
+                              'proprietor': False, 'phones': False})
+    texts = _texts(doc)
+    assert doc['company_name'] not in texts
+    assert doc['company_address'] not in texts
+    assert 'پروپرائٹر:' not in texts
+    assert not any(str(t).startswith('+92') for t in texts)
+    # the header rule still closes the block
+    assert [op for op in R.layout_document(doc)[0].ops
+            if op['op'] == 'rect' and op['y'] == R.Y_RULE_1]
+
+
+def test_meta_strip_cells_can_be_hidden_individually():
+    doc = _document(sections={'meta_time': False, 'meta_date': False,
+                              'meta_type': False, 'meta_bill': False})
+    texts = _texts(doc)
+    for label in ('وقت:', 'تاریخ:', 'بل نمبر:'):
+        assert label not in texts, label
+    assert 'Sale' not in texts, 'the type label was not switched off'
+
+
+def test_client_panel_marks_can_be_hidden_individually():
+    doc = _document(sections={'party': False, 'ref': False, 'code': False,
+                              'delivery': False, 'account': False,
+                              'method': False})
+    texts = _texts(doc)
+    for label in ('بل برائے:', 'حوالہ:', 'کوڈ:', 'ڈیلیوری:', 'اکاؤنٹ:',
+                  'ادائیگی:'):
+        assert label not in texts, label
+
+
+def test_whole_items_table_can_be_hidden():
+    doc = _document(sections={'items': False})
+    assert doc['show_items'] is False
+    texts = _texts(doc)
+    assert 'ٹرانزیکشن کی تفصیلات' not in texts
+    for header in ('نمبر', 'تفصیل / آئٹم', 'مقدار', 'ریٹ', 'رقم (روپے)'):
+        assert header not in texts, header
+
+
+def test_items_heading_and_prices_note_can_be_hidden():
+    doc = _document(sections={'items_title': False, 'items_note': False})
+    texts = _texts(doc)
+    assert 'ٹرانزیکشن کی تفصیلات' not in texts
+    assert R.SECTION_NOTE not in texts
+    # the table itself is still there
+    assert 'مقدار' in texts and 'ریٹ' in texts
+
+
+def test_item_columns_can_be_hidden_one_by_one():
+    doc = _document(sections={'col_rate': False})
+    column = next(c for c in R._item_columns() if c['key'] == 'rate')
+    sheet = R.layout_document(doc)[0]
+    assert 'ریٹ' not in [op['text'] for op in sheet.ops if op['op'] == 'text']
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text' and abs(op['x'] - column['x']) < 0.01]
+    assert not [op for op in sheet.ops
+                if op['op'] == 'text' and abs(op['x'] - column['label_x']) < 0.01]
+    # the other columns are untouched
+    assert 'مقدار' in [op['text'] for op in sheet.ops if op['op'] == 'text']
+
+
+def test_summary_rows_can_be_hidden_individually():
+    doc = _document(sections={'sum_total_sales': False,
+                              'sum_discount': False,
+                              'sum_paid': False, 'prev': False})
+    labels = [row['label'] for row in doc['summary']]
+    assert labels == ['کل بقایا رقم'], labels
+    assert doc['summary'][0]['value'] == '646,636'
+
+
+def test_total_balance_row_can_be_hidden_without_promoting_another_row():
+    doc = _document(sections={'sum_total': False})
+    assert not any(row.get('total') for row in doc['summary'])
+    sheet = R.layout_document(doc)[0]
+    total_bar = [op for op in sheet.ops
+                 if op['op'] == 'rect' and op['fill'] == R.NAVY
+                 and abs(op['x'] - (R.SUM_LEFT + 0.375)) < 0.01
+                 and abs(op['h'] - R.SUM_ROW_H) < 0.01]
+    assert not total_bar, 'no other row may take the total bar'
+
+
+def test_route_can_hide_every_mark_on_the_page(client, sale):
+    from app.services.urdu_receipt import SHEET_OPTIONS
+
+    query = '&'.join(f'{key}=0' for key in SHEET_OPTIONS)
+    url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}&lang=ur&action=print&tc=0&{query}")
+    html = client.get(url).get_data(as_text=True)
+    for marker in ('مجاز دستخط', 'ڈیلیوری', 'ٹرانزیکشن کی تفصیلات',
+                   'کل بقایا رقم', 'کل فروخت'):
+        assert marker not in html, marker
+    # the paper itself still exists
+    assert '<div class="pg"' in html
+
+
+def test_print_dialog_lists_every_mark_on_the_page_map(client, sale):
+    from app.services.urdu_receipt import SHEET_OPTIONS
+
+    url = (f"/view_bill/{sale['bill_no']}?src=direct_sale"
+           f"&src_id={sale['id']}")
+    resp = client.get(url)
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    for key in SHEET_OPTIONS:
+        assert f'data-urdu-section="{key}"' in html, key
+    # six page-order groups and the show-all / hide-all shortcuts
+    assert html.count('data-urdu-group-toggle=') == 6
+    assert 'urduMapAll' in html and 'urduMapNone' in html

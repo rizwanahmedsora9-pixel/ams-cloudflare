@@ -1,8 +1,9 @@
 {# ===========================================================================
    Urdu receipt print/download options modal.
    Opened when the user clicks "Urdu Print" or "Urdu PDF" on a bill view.
-   Asks whether to show Terms & Conditions and which ones; only Urdu receipts
-   get this dialog — English receipts link straight to PDF/print as before.
+   Offers the page map (every mark on the sheet, in page order), the Terms &
+   Conditions choice and the number of copies.  Only Urdu receipts get this
+   dialog — English receipts link straight to PDF/print as before.
    =========================================================================== #}
 <div class="modal fade" id="urduTermsModal" tabindex="-1" aria-labelledby="urduTermsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -75,6 +76,92 @@
                         {% endfor %}
                     </div>
                 </div>
+
+                <div class="mb-3 border rounded p-2 bg-dark-subtle">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                        <div class="small text-warning fw-bold text-uppercase">
+                            <i class="bi bi-map me-1"></i> Page map — tick what prints
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-light btn-sm py-0" id="urduMapAll">Show all</button>
+                            <button type="button" class="btn btn-outline-light btn-sm py-0" id="urduMapNone">Hide all</button>
+                        </div>
+                    </div>
+                    <div class="text-white-50 small mb-2">
+                        Every mark on the receipt is listed in page order and is on by default.
+                        Untick anything to leave it off this receipt only.
+                    </div>
+                    <div class="pe-1" style="max-height:45vh; overflow-y:auto;">
+                        {% set section_groups = [
+                            ('1 · Header', [
+                                ('qr', 'QR code', 'بارکوڈ'),
+                                ('company', 'Shop name', 'دکان کا نام'),
+                                ('address', 'Address', 'پتہ'),
+                                ('proprietor', 'Proprietor', 'پروپرائٹر'),
+                                ('phones', 'Phone numbers', 'فون'),
+                                ('note', 'Shop note', 'سامان کی معلومات')]),
+                            ('2 · Date / time strip', [
+                                ('meta_time', 'Time', 'وقت'),
+                                ('meta_date', 'Date', 'تاریخ'),
+                                ('meta_type', 'Type', 'قسم'),
+                                ('meta_bill', 'Bill number', 'بل نمبر')]),
+                            ('3 · Client panel', [
+                                ('party', 'Client name', 'گاہک'),
+                                ('ref', 'Reference / phone', 'حوالہ'),
+                                ('code', 'Client code', 'کوڈ'),
+                                ('delivery', 'Delivery', 'ڈیلیوری'),
+                                ('account', 'Account / bank', 'اکاؤنٹ'),
+                                ('method', 'Payment method', 'ادائیگی')]),
+                            ('4 · Items table', [
+                                ('items', 'Items table', 'آئٹمز کی فہرست'),
+                                ('items_title', 'Heading', 'ٹرانزیکشن کی تفصیلات'),
+                                ('items_note', 'Prices note', 'قیمتیں روپے میں'),
+                                ('col_index', 'No. column', 'نمبر'),
+                                ('col_name', 'Item column', 'تفصیل'),
+                                ('col_qty', 'Qty column', 'مقدار'),
+                                ('col_rate', 'Rate column', 'ریٹ'),
+                                ('col_amount', 'Amount column', 'رقم')]),
+                            ('5 · Summary box', [
+                                ('sum_total_sales', 'Total sales', 'کل فروخت'),
+                                ('prev', 'Previous balance', 'پچھلا بقایا'),
+                                ('sum_discount', 'Discount', 'رعایت'),
+                                ('sum_paid', 'Paid', 'ادا شدہ رقم'),
+                                ('sum_total', 'Total balance', 'کل بقایا رقم'),
+                                ('sum_received', 'Received', 'وصول شدہ رقم'),
+                                ('sum_balance', 'Balance after', 'بقایا رقم')]),
+                            ('6 · Footer', [
+                                ('sig', 'Signature line', 'دستخط')])
+                        ] %}
+                        {% for group_name, group_items in section_groups %}
+                        {% set gi = loop.index %}
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-1 mb-1">
+                                <span class="small text-info fw-bold text-uppercase">{{ group_name }}</span>
+                                <label class="form-check-label small text-white-50 mb-0">
+                                    <input class="form-check-input me-1" type="checkbox"
+                                           data-urdu-group-toggle="{{ gi }}" checked> all
+                                </label>
+                            </div>
+                            <div class="row g-1">
+                                {% for key, label, urdu in group_items %}
+                                <div class="col-sm-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="urduMap-{{ key }}"
+                                               data-urdu-section="{{ key }}"
+                                               data-urdu-group="{{ gi }}" checked>
+                                        <label class="form-check-label text-white small" for="urduMap-{{ key }}">
+                                            {{ label }}
+                                            <span class="text-white-50">(<bdi dir="rtl">{{ urdu }}</bdi>)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">
@@ -113,6 +200,65 @@
         var downloadBtn = document.getElementById('urduTcDownload');
         var printBtn = document.getElementById('urduTcPrint');
         var buttons = document.querySelectorAll('[data-urdu-receipt]');
+        var sectionBoxes = Array.from(
+            document.querySelectorAll('[data-urdu-section]')
+        );
+        var groupToggles = Array.from(
+            document.querySelectorAll('[data-urdu-group-toggle]')
+        );
+
+        // Group master switches: tick/untick a whole page area, and keep the
+        // master showing all / none / partial as its children change.
+        function groupBoxes(groupId) {
+            return sectionBoxes.filter(function (cb) {
+                return cb.dataset.urduGroup === groupId;
+            });
+        }
+        function syncGroup(groupId) {
+            var master = groupToggles.find(function (el) {
+                return el.dataset.urduGroupToggle === groupId;
+            });
+            if (!master) return;
+            var boxes = groupBoxes(groupId);
+            var on = boxes.filter(function (cb) { return cb.checked; }).length;
+            master.checked = boxes.length > 0 && on === boxes.length;
+            master.indeterminate = on > 0 && on < boxes.length;
+        }
+        function syncGroups() {
+            groupToggles.forEach(function (master) {
+                syncGroup(master.dataset.urduGroupToggle);
+            });
+        }
+        function setAllSections(checked) {
+            sectionBoxes.forEach(function (cb) { cb.checked = checked; });
+            syncGroups();
+        }
+        groupToggles.forEach(function (master) {
+            master.addEventListener('change', function () {
+                var groupId = master.dataset.urduGroupToggle;
+                groupBoxes(groupId).forEach(function (cb) {
+                    cb.checked = master.checked;
+                });
+                syncGroup(groupId);
+            });
+        });
+        sectionBoxes.forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                syncGroup(cb.dataset.urduGroup);
+            });
+        });
+        var showAllBtn = document.getElementById('urduMapAll');
+        var hideAllBtn = document.getElementById('urduMapNone');
+        if (showAllBtn) {
+            showAllBtn.addEventListener('click', function () {
+                setAllSections(true);
+            });
+        }
+        if (hideAllBtn) {
+            hideAllBtn.addEventListener('click', function () {
+                setAllSections(false);
+            });
+        }
 
         function urlFor(action) {
             var url = action === 'print'
@@ -163,6 +309,13 @@
             }
             var copies = document.querySelector('input[name="urduCopies"]:checked');
             url += '&copies=' + (copies ? copies.value : '1');
+            // Optional sheet sections: send an explicit 1/0 for each so the
+            // server never has to guess an unchecked box apart from an old
+            // link (where a missing key means "show", the approved sheet).
+            sectionBoxes.forEach(function (cb) {
+                url += '&' + cb.dataset.urduSection + '=' +
+                       (cb.checked ? '1' : '0');
+            });
             modal.hide();
             location.href = url;
         }
@@ -186,6 +339,9 @@
                 tcYes.checked = true;
                 tcNo.checked = false;
                 tcOptions.style.display = 'block';
+                // Nothing is remembered between receipts: every dialog starts
+                // from the full approved sheet.
+                setAllSections(true);
                 modal.show();
             });
         });

@@ -171,6 +171,36 @@ _BASELINE_RATIO = {
 COPY_ORIGINAL = 'اصل'
 COPY_CARBON = 'نقل'
 
+# Every optional mark on the sheet, in page order top to bottom.  The print
+# dialog's "page map" offers exactly these keys and all of them default to on,
+# so the approved A5 sheet is what prints unless the user unticks something.
+# Keys are stable: they are the query-string names on the download route.
+SHEET_OPTIONS = (
+    # header
+    'qr', 'company', 'address', 'proprietor', 'phones', 'note',
+    # date / time strip
+    'meta_time', 'meta_date', 'meta_type', 'meta_bill',
+    # client + delivery panels
+    'party', 'ref', 'code', 'delivery', 'account', 'method',
+    # items table
+    'items', 'items_title', 'items_note',
+    'col_index', 'col_name', 'col_qty', 'col_rate', 'col_amount',
+    # summary box
+    'sum_total_sales', 'prev', 'sum_discount', 'sum_paid', 'sum_total',
+    'sum_received', 'sum_balance',
+    # signature
+    'sig',
+)
+
+
+def sheet_option(doc, key, default=True):
+    """True when *key* should be drawn on this sheet.
+
+    ``doc['options']`` is the map the print dialog sends; a missing key means
+    "on", so an old bookmark or a direct link still prints the full sheet.
+    """
+    return bool((doc.get('options') or {}).get(key, default))
+
 _latin_registered = False
 
 
@@ -614,10 +644,23 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
                    qr_caption='', signature_label='مجاز دستخط',
                    items_title=ITEMS_TITLE, continuation_label='جاری',
                    show_items=True, footer_thanks='', footer_credit='',
-                   signature_left='', signature_right=''):
-    """Assemble the data the sheet needs, copied verbatim from the bill."""
+                   signature_left='', signature_right='',
+                   show_qr=True, show_note=True, show_signature=True,
+                   options=None):
+    """Assemble the data the sheet needs, copied verbatim from the bill.
+
+    ``options`` is the page map: any :data:`SHEET_OPTIONS` key set to a false
+    value leaves that mark off the sheet.  The ``show_qr`` / ``show_note`` /
+    ``show_signature`` arguments are kept as the older three-key spelling and
+    fold into the same map.  Everything defaults to on, so the approved A5
+    sheet is unchanged unless the user asked for less.
+    """
     if fields is None:
         fields = _default_fields(party_label, party_name, party_code, detail_rows)
+    sheet_options = dict(options or {})
+    sheet_options.setdefault('qr', show_qr)
+    sheet_options.setdefault('note', show_note)
+    sheet_options.setdefault('sig', show_signature)
     return {
         'bill_no': bill_no or '',
         'date': _urdu_date(date_posted),
@@ -643,6 +686,10 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
         'footer_thanks': footer_thanks,
         'footer_credit': footer_credit,
         'show_items': bool(show_items and items),
+        'show_qr': bool(sheet_options['qr']),
+        'show_note': bool(sheet_options['note']),
+        'show_signature': bool(sheet_options['sig']),
+        'options': sheet_options,
         'items_title': items_title or ITEMS_TITLE,
         'continuation_label': continuation_label,
     }
@@ -663,7 +710,8 @@ def layout_document(doc):
     if doc['show_items']:
         _draw_items(state, doc, sheets)
     _draw_summary(state, doc, sheets)
-    _draw_signature(state, doc)
+    if sheet_option(doc, 'sig'):
+        _draw_signature(state, doc)
     if doc.get('terms'):
         _draw_terms(state, doc, sheets)
     return sheets
@@ -720,19 +768,21 @@ def _content_bottom():
 def _draw_header(state, doc, first=True):
     sheet = state['sheet']
     if first:
-        _draw_qr(sheet, doc)
-        name = doc['company_name']
-        name_size = 25.0
-        if has_arabic(name):
-            while name_size > 13.0 and _urdu_width(name, name_size) > 232.0:
-                name_size -= 0.5
-        sheet.text(COMPANY_CENTER, Y_COMPANY, name, name_size, color=NAVY,
-                   align='center', urdu=True)
-        if doc['company_address']:
+        if sheet_option(doc, 'qr'):
+            _draw_qr(sheet, doc)
+        if sheet_option(doc, 'company'):
+            name = doc['company_name']
+            name_size = 25.0
+            if has_arabic(name):
+                while name_size > 13.0 and _urdu_width(name, name_size) > 232.0:
+                    name_size -= 0.5
+            sheet.text(COMPANY_CENTER, Y_COMPANY, name, name_size, color=NAVY,
+                       align='center', urdu=True)
+        if doc['company_address'] and sheet_option(doc, 'address'):
             sheet.text(COMPANY_CENTER, Y_ADDRESS, doc['company_address'], 8.0,
                        color=ADDRESS, align='center', urdu=True)
 
-        if doc['proprietor']:
+        if doc['proprietor'] and sheet_option(doc, 'proprietor'):
             label = 'پروپرائٹر:'
             right = RIGHT - 0.75
             sheet.text(right, Y_PROPRIETOR, label, 7.6, color=INK,
@@ -740,14 +790,15 @@ def _draw_header(state, doc, first=True):
             cursor = right - _urdu_width(label, 7.6) - 0.9
             sheet.text(cursor, Y_PROPRIETOR, doc['proprietor'], 10.0,
                        color=INK, align='right', urdu=True)
-        for index, phone in enumerate(doc['phones'][:2]):
-            sheet.text(RIGHT - 0.764, Y_PHONE_1 + index * PHONE_STEP, phone,
-                       6.6, color=INK, font=SANS, align='right')
+        if sheet_option(doc, 'phones'):
+            for index, phone in enumerate(doc['phones'][:2]):
+                sheet.text(RIGHT - 0.764, Y_PHONE_1 + index * PHONE_STEP, phone,
+                           6.6, color=INK, font=SANS, align='right')
 
         sheet.rect(LEFT, Y_RULE_1, CONTENT_W, RULE_1_H, fill=NAVY)
         sheet.hline(LEFT, RIGHT, Y_RULE_2, color=DOT, width=RULE_2_H,
                     dash=(2.9968, 2.9968))
-        if doc['note']:
+        if doc['note'] and sheet_option(doc, 'note'):
             note = _fit(doc['note'], 7.5, CONTENT_W, urdu=has_arabic(doc['note']))
             sheet.text(RIGHT, Y_NOTE, note, 7.5, color=INK, align='right',
                        urdu=True)
@@ -778,15 +829,18 @@ def _draw_meta_strip(sheet, doc):
     type_right = META_CELLS[2][1]
     bill_right = META_CELLS[3][1]
 
-    _label_value(sheet, time_right, META_BASELINE, 'وقت', doc['time'],
-                 value_size=8.0, gap=0.2)
-    _label_value(sheet, date_right, META_BASELINE, 'تاریخ', doc['date'],
-                 value_size=8.0, gap=0.2)
-    if doc.get('type_label'):
+    if sheet_option(doc, 'meta_time'):
+        _label_value(sheet, time_right, META_BASELINE, 'وقت', doc['time'],
+                     value_size=8.0, gap=0.2)
+    if sheet_option(doc, 'meta_date'):
+        _label_value(sheet, date_right, META_BASELINE, 'تاریخ', doc['date'],
+                     value_size=8.0, gap=0.2)
+    if doc.get('type_label') and sheet_option(doc, 'meta_type'):
         sheet.text(type_right, META_BASELINE, doc['type_label'], 7.4,
                    color=INK, font=SANS, align='right')
-    _label_value(sheet, bill_right, META_BASELINE, 'بل نمبر', doc['bill_no'],
-                 value_size=7.4, gap=0.2)
+    if sheet_option(doc, 'meta_bill'):
+        _label_value(sheet, bill_right, META_BASELINE, 'بل نمبر', doc['bill_no'],
+                     value_size=7.4, gap=0.2)
 
 
 def _label_value(sheet, right_x, baseline, label, value, value_size=8.0,
@@ -832,19 +886,23 @@ def _draw_panel(state, doc):
     left_inner = LEFT + PANEL_BOX_W - PANEL_INNER_PAD
 
     # Right panel: bill-to + contact on the first row, code on the second.
-    cursor = _panel_field(sheet, right_inner, PANEL_RIGHT_TOP,
-                          doc.get('party_label') or 'بل برائے',
-                          doc.get('party_name'), PANEL_PARTY_SIZE,
-                          max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 60)
-    contact = doc.get('party_phone') or '____'
-    contact_urdu = has_arabic(contact) or contact == '____'
-    _panel_field(sheet, cursor, PANEL_RIGHT_TOP, 'حوالہ', contact,
-                 PANEL_LABEL_SIZE if contact_urdu else PANEL_LATIN_SIZE,
-                 max_width=max(20.0, cursor - PANEL_RIGHT_X - PANEL_INNER_PAD),
-                 urdu=contact_urdu)
-    _panel_field(sheet, right_inner, PANEL_RIGHT_BOTTOM, 'کوڈ',
-                 doc.get('party_code'), PANEL_LATIN_SIZE,
-                 max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 20)
+    cursor = right_inner
+    if sheet_option(doc, 'party'):
+        cursor = _panel_field(sheet, right_inner, PANEL_RIGHT_TOP,
+                              doc.get('party_label') or 'بل برائے',
+                              doc.get('party_name'), PANEL_PARTY_SIZE,
+                              max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 60)
+    if sheet_option(doc, 'ref'):
+        contact = doc.get('party_phone') or '____'
+        contact_urdu = has_arabic(contact) or contact == '____'
+        _panel_field(sheet, cursor, PANEL_RIGHT_TOP, 'حوالہ', contact,
+                     PANEL_LABEL_SIZE if contact_urdu else PANEL_LATIN_SIZE,
+                     max_width=max(20.0, cursor - PANEL_RIGHT_X - PANEL_INNER_PAD),
+                     urdu=contact_urdu)
+    if sheet_option(doc, 'code'):
+        _panel_field(sheet, right_inner, PANEL_RIGHT_BOTTOM, 'کوڈ',
+                     doc.get('party_code'), PANEL_LATIN_SIZE,
+                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 20)
 
     # Left panel: delivery (or method) on the first row, account on the second.
     fields = doc.get('fields') or []
@@ -882,15 +940,16 @@ def _draw_items(state, doc, sheets):
         chunk = pending[:capacity]
         pending = pending[capacity:]
 
-        sheet.text(RIGHT - 2.242, title_y, doc['items_title'], 9.0,
-                   color=NAVY, align='right', urdu=True)
-        if first:
+        if sheet_option(doc, 'items_title'):
+            sheet.text(RIGHT - 2.242, title_y, doc['items_title'], 9.0,
+                       color=NAVY, align='right', urdu=True)
+        if first and sheet_option(doc, 'items_note'):
             sheet.text(LEFT - 2.25, Y_SECTION_NOTE, SECTION_NOTE, 7.5,
                        color=NOTE_COLOR, align='left', urdu=True)
         head_top = Y_ITEMS_HEAD if first else CONT_HEAD_TOP
-        _draw_item_header(sheet, head_top)
+        _draw_item_header(sheet, head_top, doc)
         top = head_top + ITEMS_HEAD_H
-        _draw_item_rows(sheet, top, chunk, index)
+        _draw_item_rows(sheet, top, chunk, index, doc)
         index += len(chunk)
         state['y'] = top + len(chunk) * ROW_H
 
@@ -918,14 +977,16 @@ def _item_columns():
     ]
 
 
-def _draw_item_header(sheet, top):
+def _draw_item_header(sheet, top, doc=None):
     sheet.rect(LEFT, top, CONTENT_W, ITEMS_HEAD_H, fill=NAVY)
     for column in _item_columns():
+        if doc is not None and not sheet_option(doc, 'col_' + column['key']):
+            continue
         sheet.text(column['label_x'], top + 9.8508, column['label'], 8.0,
                    color=WHITE, align='right', urdu=True)
 
 
-def _draw_item_rows(sheet, top, rows, start_index=0):
+def _draw_item_rows(sheet, top, rows, start_index=0, doc=None):
     if not rows:
         return
     height = len(rows) * ROW_H
@@ -944,6 +1005,8 @@ def _draw_item_rows(sheet, top, rows, start_index=0):
         latin_baseline = row_top + 10.215
         for column in _item_columns():
             key = column['key']
+            if doc is not None and not sheet_option(doc, 'col_' + key):
+                continue
             if key == 'index':
                 sheet.text(column['x'], latin_baseline, str(item.get('index', '')),
                            7.4, color=INK, align='center')
@@ -975,12 +1038,24 @@ def _draw_summary(state, doc, sheets):
 
     rows = doc['summary']
     box_h = _summary_box_height(rows)
-    total_index = next((i for i, r in enumerate(rows) if r.get('total')),
-                       len(rows) - 1)
+    # The highlighted total is the row the bill marked as the total.  If the
+    # page map hid that row, no other row is promoted to the navy bar.
+    total_index = next((i for i, r in enumerate(rows) if r.get('total')), None)
     gap = SUMMARY_GAP if doc['show_items'] else 12.0
+    # Without a signature rule the summary box is the only thing on that band,
+    # so it no longer reserves the signature's clearance.
+    show_signature = sheet_option(doc, 'sig')
+
+    def _sig_rel(each_gap):
+        if not show_signature:
+            return 0.0
+        anchor = total_index if total_index is not None else len(rows) - 1
+        return max(anchor * SUM_ROW_H + 1.625,
+                   SIG_MIN_CLEARANCE - each_gap)
+
     top = state['y'] + gap
-    sig_rel = max(total_index * SUM_ROW_H + 1.625, SIG_MIN_CLEARANCE - gap)
-    block_h = max(box_h, sig_rel + SIG_LABEL_OFFSET + 4.0)
+    sig_rel = _sig_rel(gap)
+    block_h = max(box_h, sig_rel + SIG_LABEL_OFFSET + 4.0) if show_signature else box_h
     needed = block_h + TERMS_GAP + (62.0 if doc.get('terms') else 0.0)
     if top + needed > _content_bottom():
         sheet = _new_sheet()
@@ -989,23 +1064,26 @@ def _draw_summary(state, doc, sheets):
         _draw_header(state, doc, first=False)
         gap = 12.0
         top = state['y'] + gap
-        sig_rel = max(total_index * SUM_ROW_H + 1.625, SIG_MIN_CLEARANCE - gap)
+        sig_rel = _sig_rel(gap)
     sheet = state['sheet']
 
     box_w = SUM_RIGHT - SUM_LEFT
     inner_top = top + 0.375
     # total bar
-    sheet.rect(SUM_LEFT + 0.375, inner_top + total_index * SUM_ROW_H,
-               box_w - 0.75, SUM_ROW_H, fill=NAVY)
+    if total_index is not None:
+        sheet.rect(SUM_LEFT + 0.375, inner_top + total_index * SUM_ROW_H,
+                   box_w - 0.75, SUM_ROW_H, fill=NAVY)
     for index in range(1, len(rows)):
         sheet.hline(SUM_LEFT, SUM_RIGHT, inner_top + index * SUM_ROW_H,
                     color=BORDER, width=0.75)
     sheet.rect(SUM_LEFT, top, box_w, box_h, stroke=BORDER, width=0.75)
-    sheet.vline(SUM_DIVIDER, top, inner_top + total_index * SUM_ROW_H - 0.375,
-                color=BORDER, width=0.75)
+    if total_index is not None:
+        sheet.vline(SUM_DIVIDER, top,
+                    inner_top + total_index * SUM_ROW_H - 0.375,
+                    color=BORDER, width=0.75)
 
     for index, row in enumerate(rows):
-        is_total = bool(row.get('total')) or index == total_index
+        is_total = bool(row.get('total'))
         label_color = WHITE if is_total else INK
         y = inner_top + index * SUM_ROW_H
         sheet.text(SUM_LABEL_X, y + 9.3265, row.get('label', ''), 8.0,
@@ -1015,7 +1093,10 @@ def _draw_summary(state, doc, sheets):
 
     state['summary_top'] = top
     state['summary_h'] = box_h
-    state['sig_y'] = top + sig_rel
+    if show_signature:
+        state['sig_y'] = top + sig_rel
+    else:
+        state.pop('sig_y', None)
     state['y'] = top + box_h
 
 
