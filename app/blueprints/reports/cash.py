@@ -1676,12 +1676,14 @@ def _ft_build_context(args, prefix='', embed=False, posted_after=None):
     preset = (args.get(prefix + 'preset') or 'this_month').strip().lower()
     from_d, to_d = _ft_date_preset(preset, today)
     f_direction = (args.get(prefix + 'direction') or 'all').strip().lower()
+    f_section = (args.get(prefix + 'section') or '').strip()
     f_category = (args.get(prefix + 'category') or '').strip()
     f_account = (args.get(prefix + 'account') or '').strip()
     f_client = (args.get(prefix + 'client') or '').strip()
     f_supplier = (args.get(prefix + 'supplier') or '').strip()
     f_partner = (args.get(prefix + 'partner') or '').strip()
     f_worker = (args.get(prefix + 'worker') or '').strip()
+    f_lender = (args.get(prefix + 'lender') or '').strip()
     f_vehicle = (args.get(prefix + 'vehicle') or '').strip().lower()
     f_method = (args.get(prefix + 'method') or 'all').strip().lower()
     f_q = (args.get(prefix + 'q') or '').strip().lower()
@@ -1692,8 +1694,11 @@ def _ft_build_context(args, prefix='', embed=False, posted_after=None):
     )
 
     role_filters = {
-        'client': f_client, 'supplier': f_supplier,
-        'partner': f_partner, 'worker': f_worker,
+        ('client',): f_client,
+        ('supplier',): f_supplier,
+        ('partner',): f_partner,
+        ('worker',): f_worker,
+        ('loan_lender', 'loan'): f_lender,
     }
     active_roles = {k: v for k, v in role_filters.items() if v and v != 'all'}
 
@@ -1705,6 +1710,9 @@ def _ft_build_context(args, prefix='', embed=False, posted_after=None):
             continue
         if f_direction == 'transfer' and r.get('type') != CF_DIR_TRANSFER:
             continue
+        if f_section and f_section.lower() != 'all':
+            if (r.get('section_label') or '').strip().lower() != f_section.lower():
+                continue
         if f_category and f_category.lower() not in (r.get('category') or '').lower():
             continue
         if f_account:
@@ -1718,8 +1726,8 @@ def _ft_build_context(args, prefix='', embed=False, posted_after=None):
             ptype = (r.get('party_type') or '').lower()
             pname = (r.get('party_name') or '')
             ok = False
-            for role, val in active_roles.items():
-                if ptype == role and (val.lower() == pname.lower() or val.lower() in pname.lower()):
+            for roles, val in active_roles.items():
+                if ptype in roles and (val.lower() == pname.lower() or val.lower() in pname.lower()):
                     ok = True
             if not ok:
                 continue
@@ -1727,8 +1735,13 @@ def _ft_build_context(args, prefix='', embed=False, posted_after=None):
             r.get('description') or '', r.get('note') or '', r.get('reference') or ''
         ]).lower():
             continue
-        if f_method != 'all' and f_method not in (r.get('method') or r.get('origin_label') or '').lower():
-            continue
+        if f_method != 'all':
+            method_val = ' '.join(filter(None, [
+                r.get('method') or '',
+                r.get('account_category') or '',
+            ])).lower() or (r.get('origin_label') or '').lower()
+            if f_method not in method_val:
+                continue
         if f_q:
             blob = ' '.join([
                 str(r.get('reference') or ''), str(r.get('description') or ''),
@@ -1746,26 +1759,34 @@ def _ft_build_context(args, prefix='', embed=False, posted_after=None):
 
     # Dropdown options sourced from the data.
     all_rows_active = [r for r in rows if (r.get('status') or 'active') == 'active']
+    section_opts = sorted({
+        (r.get('section_label') or '').strip()
+        for r in all_rows_active
+        if (r.get('section_label') or '').strip()
+    })
     cat_options = sorted({(r.get('category') or '').strip() for r in all_rows_active if (r.get('category') or '').strip()})
     account_options = [{'id': a.id, 'label': _cf_account_label(a)} for a in _cf_company_accounts(active_only=True)]
 
-    def _party_opts(ptype):
+    def _party_opts(*ptypes):
+        wanted = {p.lower() for p in ptypes}
         return sorted({
             (r.get('party_name') or '').strip()
             for r in all_rows_active
-            if (r.get('party_type') or '').lower() == ptype and (r.get('party_name') or '').strip()
+            if (r.get('party_type') or '').lower() in wanted and (r.get('party_name') or '').strip()
         })
 
     ctx = dict(
         preset=preset, from_d=from_d, to_d=to_d,
-        f_direction=f_direction, f_category=f_category, f_account=f_account,
+        f_direction=f_direction, f_section=f_section, f_category=f_category, f_account=f_account,
         f_client=f_client, f_supplier=f_supplier, f_partner=f_partner,
-        f_worker=f_worker, f_vehicle=f_vehicle, f_method=f_method, f_q=f_q,
+        f_worker=f_worker, f_lender=f_lender, f_vehicle=f_vehicle, f_method=f_method, f_q=f_q,
         rows=filtered, total_in=total_in, total_out=total_out, net=net,
         record_count=len(filtered),
+        section_opts=section_opts,
         cat_options=cat_options, account_options=account_options,
         client_opts=_party_opts('client'), supplier_opts=_party_opts('supplier'),
         partner_opts=_party_opts('partner'), worker_opts=_party_opts('worker'),
+        lender_opts=_party_opts('loan_lender', 'loan'),
         vehicle_opts=sorted({(r.get('vehicle') or '').strip() for r in all_rows_active if (r.get('vehicle') or '').strip()}),
         breakdown_cat=summary['breakdown_cat'],
         breakdown_account=summary['breakdown_account'],
