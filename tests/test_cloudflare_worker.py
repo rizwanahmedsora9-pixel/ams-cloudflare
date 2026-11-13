@@ -45,6 +45,9 @@ def _load_worker(monkeypatch):
     workers_pkg.WorkerEntrypoint = type("WorkerEntrypoint", (), {})
     workers_pkg.wsgi = recorder
     monkeypatch.setitem(sys.modules, "workers", workers_pkg)
+    # The entry point preloads SQLAlchemy for the Workers startup snapshot;
+    # these adapter tests do not need the real database library.
+    monkeypatch.setitem(sys.modules, "sqlalchemy", types.ModuleType("sqlalchemy"))
 
     module_name = "ams_cloudflare_worker_under_test"
     spec = importlib.util.spec_from_file_location(module_name, WORKER_PATH)
@@ -83,6 +86,9 @@ def test_entry_point_is_a_worker_entrypoint(monkeypatch):
     # The runtime calls fetch() on the class; the Flask app is built lazily.
     assert hasattr(worker.Default, "fetch")
     assert worker._APP is None
+    # Expensive library initialization happens before the first request;
+    # creating the app and opening its database remains lazy.
+    assert worker.sqlalchemy is sys.modules["sqlalchemy"]
 
 
 @pytest.mark.asyncio

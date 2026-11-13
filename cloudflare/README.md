@@ -156,10 +156,13 @@ those routes keep their existing "install requirements-…" messages. QR codes u
 the built-in pure-Python encoder, so bills and client-ledger QR links still
 render. WeasyPrint/ReportLab PDF downloads are not available.
 
-**CPU time.** The account's default CPU limit applies. The Free plan does not
-support configuring `limits.cpu_ms`; large requests or application startup may
-exceed the default limit. A paid plan can configure a higher limit, but that does
-not resolve the lack of persistent storage.
+**CPU time.** The account's default CPU limit applies. The entry point preloads
+SQLAlchemy during Worker initialization so Cloudflare can include its import in
+the Python startup snapshot; app creation and SQLite initialization still occur
+on the first request. This is not a guarantee that startup or other requests fit
+the Free plan's CPU limit. The Free plan does not support configuring
+`limits.cpu_ms`. A paid plan can configure a higher limit, but that does not
+resolve the lack of persistent storage.
 
 **Upload flow.** The Worker does not serve `static/` from the script; the assets
 binding must stay configured, and `run_worker_first` must remain `true` for the
