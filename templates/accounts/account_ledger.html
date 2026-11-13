@@ -124,9 +124,13 @@
                     <td class="text-end"><span class="led-running {% if r.running < 0 %}neg{% endif %}">Rs. {{ "%.2f"|format(r.running) }}</span></td>
                     <td class="text-end">
                         {% if not tx.is_void %}
-                        <form method="POST" action="{{ url_for('accounts.void_transaction', tx_id=tx.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this transaction? Account balances will be reversed.');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-x-octagon"></i></button>
-                        </form>
+                            {% if tx.source_type == 'LoanPrincipal' %}
+                            <a href="{{ url_for('accounts.loan_register') }}" class="btn btn-sm btn-outline-primary" title="Manage in Loan Register"><i class="bi bi-journal-check"></i></a>
+                            {% else %}
+                            <form method="POST" action="{{ url_for('accounts.void_transaction', tx_id=tx.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this transaction? Account balances will be reversed.');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-x-octagon"></i></button>
+                            </form>
+                            {% endif %}
                         {% endif %}
                     </td>
                 </tr>
