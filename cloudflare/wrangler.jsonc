@@ -24,11 +24,8 @@
     "run_worker_first": true
   },
 
-  // The app needs to write SQLite, uploads and logs; give it the CPU and
-  // request-size headroom a full ERP UI (large Excel/JSON imports) needs.
-  "limits": {
-    "cpu_ms": 30000
-  },
+  // Use the account's default CPU limit. Explicit CPU limits require a paid
+  // Workers plan and cause deployments on the Free plan to be rejected.
 
   "observability": {
     "enabled": true
@@ -45,7 +42,7 @@
   "vars": {
     "AMS_SCHEMA_VERSION": "v44",
     // Set the public URL used inside printed QR codes / links.
-    "PUBLIC_BASE_URL": "https://ams-cloudflare.<your-subdomain>.workers.dev"
+    "PUBLIC_BASE_URL": "https://ams-cloudflare.rizwanahmedsora9.workers.dev"
   }
 
   // Secrets are NOT stored here. Set them once with:
