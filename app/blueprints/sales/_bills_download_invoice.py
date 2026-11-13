@@ -61,6 +61,21 @@ def _field(item, *names, default=None):
     return default
 
 
+def _translate_material_ur(raw_name, names_map):
+    """Translate a material name (including alternate-material labels) to Urdu."""
+    text = str(raw_name or '').strip()
+    if not text:
+        return ''
+    alt_match = re.match(r'^(.+?)\s*\(ALT for booked (.+?)\)$', text)
+    if alt_match:
+        deliv_raw = alt_match.group(1).strip()
+        booked_raw = alt_match.group(2).strip()
+        deliv_ur = urdu_name(deliv_raw, names_map.get(deliv_raw.casefold(), ''))
+        booked_ur = urdu_name(booked_raw, names_map.get(booked_raw.casefold(), ''))
+        return f"{deliv_ur} (بجائے {booked_ur})"
+    return urdu_name(text, names_map.get(text.casefold(), ''))
+
+
 def _with_urdu_item_names(items, lang):
     """Return bill rows with ``name_ur`` filled from the material catalogue."""
     rows = []
@@ -72,8 +87,9 @@ def _with_urdu_item_names(items, lang):
         if lang == 'ur':
             urdu = str(_field(item, 'name_ur', default='') or '').strip()
             if not urdu:
-                urdu = names.get(str(name).strip().casefold(), '')
-            urdu = urdu_name(name, urdu)
+                urdu = _translate_material_ur(name, names)
+            else:
+                urdu = urdu_name(name, urdu)
         rows.append({
             'name': name,
             'name_ur': urdu,
@@ -81,6 +97,49 @@ def _with_urdu_item_names(items, lang):
             'price_at_time': _field(item, 'price_at_time', default=0),
         })
     return rows
+
+
+def _with_urdu_booked_summary(summary):
+    """Copy ``material_stock_summary`` rows with Urdu material names added."""
+    if not summary:
+        return []
+    names = _material_urdu_names()
+    rows = []
+    for row in summary:
+        item = dict(row) if isinstance(row, dict) else {
+            'material': getattr(row, 'material', ''),
+            'dispatched': getattr(row, 'dispatched', 0),
+            'added': getattr(row, 'added', 0),
+            'last_stock': getattr(row, 'last_stock', 0),
+            'remaining': getattr(row, 'remaining', 0),
+        }
+        mat = str(item.get('material') or '').strip()
+        if not (item.get('material_ur') or '').strip():
+            item['material_ur'] = _translate_material_ur(mat, names)
+        rows.append(item)
+    return rows
+
+
+def _find_receipt_account_tx(source_type, source_id):
+    if not source_id:
+        return None
+    marker = f'[SRC:{source_type}:{source_id}]'
+    return AccountTransaction.query.filter(
+        AccountTransaction.is_void == False,
+        or_(
+            and_(AccountTransaction.source_type == source_type,
+                 AccountTransaction.source_id == source_id),
+            AccountTransaction.note.ilike(f'%{marker}%'),
+        )
+    ).order_by(AccountTransaction.id.desc()).first()
+
+
+def _extract_method_from_note(note):
+    match = re.search(
+        r'(?:^|\s)Method:\s*([A-Za-z0-9 _-]+?)(?=\s*(?:\||\[SRC:|$))',
+        str(note or ''),
+    )
+    return match.group(1).strip() if match else ''
 
 
 def bill_document_source(bill_no, *, hint_type=None, hint_id=None,
@@ -222,12 +281,40 @@ def bill_document_source(bill_no, *, hint_type=None, hint_id=None,
             )
             if inferred_driver:
                 setattr(booking, 'driver_name', inferred_driver)
+        if getattr(booking, 'receive_in_account', None) is not None:
+            setattr(booking, '_resolved_payment_account', booking.receive_in_account)
+        if (booking.paid_amount or 0) > 0 or getattr(booking, 'receive_in_account_id', None):
+            tx = _find_receipt_account_tx('Booking', booking.id)
+            if tx:
+                if getattr(booking, '_resolved_payment_account', None) is None and tx.to_account is not None:
+                    setattr(booking, '_resolved_payment_account', tx.to_account)
+                parsed_method = _extract_method_from_note(tx.note)
+                if parsed_method:
+                    setattr(booking, '_resolved_payment_method', parsed_method)
     elif payment:
         bill_obj = payment
         bill_type = 'Payment'
+        if (getattr(payment, 'payment_type', '') or '').strip().lower() != 'waive-off' and (
+            getattr(payment, 'payment_account', None) is None
+            and not (getattr(payment, 'account_name', '') or '').strip()
+            and not (getattr(payment, 'bank_name', '') or '').strip()
+            and float(getattr(payment, 'amount', 0) or 0) > 0
+        ):
+            tx = _find_receipt_account_tx('Payment', payment.id)
+            if tx and (tx.to_account or tx.from_account):
+                setattr(payment, '_resolved_payment_account', tx.to_account or tx.from_account)
     elif sale:
         bill_obj = sale
         bill_type = 'DirectSale'
+        if (
+            float(getattr(sale, 'paid_amount', 0) or 0) > 0
+            and getattr(sale, 'payment_account', None) is None
+            and not (getattr(sale, 'account_name', '') or '').strip()
+            and not (getattr(sale, 'bank_name', '') or '').strip()
+        ):
+            tx = _find_receipt_account_tx('DirectSale', sale.id)
+            if tx and tx.to_account is not None:
+                setattr(sale, '_resolved_payment_account', tx.to_account)
         if not (getattr(sale, 'note', None) or '').strip():
             if getattr(sale, 'invoice', None) and (getattr(sale.invoice, 'note', None) or '').strip():
                 sale.note = sale.invoice.note.strip()
@@ -331,6 +418,47 @@ def bill_document_source(bill_no, *, hint_type=None, hint_id=None,
             invoice_discount = sum((getattr(ds, 'discount', 0) or 0) for ds in invoice.direct_sales)
         invoice.discount = invoice_discount
         invoice.paid_amount = max(0, (invoice.total_amount or 0) - invoice_discount - (invoice.balance or 0))
+        if getattr(invoice, 'direct_sales', None):
+            active_sales = [ds for ds in invoice.direct_sales if not getattr(ds, 'is_void', False)]
+            paid_sales = [
+                ds for ds in active_sales
+                if float(getattr(ds, 'paid_amount', 0) or 0) > 0
+                or getattr(ds, 'payment_account_id', None)
+                or (getattr(ds, 'account_name', '') or '').strip()
+                or (getattr(ds, 'bank_name', '') or '').strip()
+            ]
+            target_sales = paid_sales or active_sales
+            if target_sales:
+                primary_ds = target_sales[0]
+                if getattr(primary_ds, 'payment_account', None) is None and float(getattr(primary_ds, 'paid_amount', 0) or 0) > 0:
+                    tx = _find_receipt_account_tx('DirectSale', primary_ds.id)
+                    if tx and tx.to_account is not None:
+                        setattr(primary_ds, '_resolved_payment_account', tx.to_account)
+                acc_names = []
+                for ds in target_sales:
+                    acc_obj = getattr(ds, '_resolved_payment_account', None) or getattr(ds, 'payment_account', None)
+                    nm = (
+                        (getattr(acc_obj, 'name', '') or getattr(acc_obj, 'account_holder_name', '') or '').strip()
+                        or (getattr(ds, 'account_name', '') or '').strip()
+                        or (getattr(ds, 'bank_name', '') or '').strip()
+                    )
+                    if nm and nm not in acc_names:
+                        acc_names.append(nm)
+                primary_acc = getattr(primary_ds, '_resolved_payment_account', None) or getattr(primary_ds, 'payment_account', None)
+                if len(acc_names) == 1 and primary_acc is not None:
+                    setattr(invoice, '_resolved_payment_account', primary_acc)
+                elif acc_names:
+                    setattr(invoice, 'account_name', ' / '.join(acc_names))
+                for attr, target_attr in (('payment_method', '_resolved_payment_method'),
+                                        ('bank_name', 'bank_name'),
+                                        ('account_no', 'account_no')):
+                    val = (getattr(primary_ds, attr, '') or '').strip()
+                    if val and not (getattr(invoice, target_attr, '') or '').strip():
+                        setattr(invoice, target_attr, val)
+                if not (getattr(invoice, 'account_name', '') or '').strip():
+                    val = (getattr(primary_ds, 'account_name', '') or '').strip()
+                    if val:
+                        setattr(invoice, 'account_name', val)
         invoice.date_posted = _parse_dt_safe(getattr(invoice, 'created_at', None)) or (datetime.combine(invoice.date, datetime.min.time()) if invoice.date else None)
         if getattr(invoice, 'entries', None) and invoice.entries:
             entry_total_qty = sum(float(e.qty or 0) for e in invoice.entries)
@@ -467,6 +595,7 @@ def urdu_bill_data(source, *, show_terms=False, terms=None):
         'client_name_ur': client_name_ur,
         'driver_name_ur': driver_name_ur,
         'delivery_people': delivery_people,
+        'booked_summary': _with_urdu_booked_summary(source.get('material_stock_summary')),
         'terms': get_selected_terms(terms) if show_terms else [],
     }
 
@@ -504,6 +633,7 @@ def urdu_bill_document(source, *, show_terms=False, terms=None):
         terms=prepared['terms'],
         grn_bd=source['grn_bd'],
         party_label='',
+        booked_summary=prepared['booked_summary'],
     )
 
 
@@ -625,6 +755,7 @@ def download_invoice(bill_no):
             disposition=disposition,
             copies=copies,
             sections=sections_ur,
+            booked_summary=prepared['booked_summary'],
         )
     section_map = {
         'Booking': 'BOOKING',
@@ -719,7 +850,7 @@ def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
                         client_balance, delivery_people, driver_name_ur,
                         client_name_ur, transaction_label, transaction_note,
                         terms, grn_bd, action, disposition, copies=1,
-                        sections=None):
+                        sections=None, booked_summary=None):
     """Return the Urdu bill as a PDF (download) or as the print page.
 
     ``copies`` is the carbon-copy switch: 1 (the default) prints the single
@@ -754,6 +885,7 @@ def _urdu_bill_response(*, bill_type, bill, items, client, previous_balance,
         grn_bd=grn_bd,
         party_label=party_label,
         sections=sections,
+        booked_summary=booked_summary,
     )
 
     stamp = pk_now().strftime('%d-%m-%Y_%I-%M%p')

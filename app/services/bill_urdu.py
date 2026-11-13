@@ -39,6 +39,14 @@ L_RECEIVED = 'وصول شدہ رقم'
 L_BALANCE_AFTER = 'بقایا رقم'
 L_SUPPLIER = 'سپلائر'
 L_PARTY = 'بل برائے'
+L_DELIVERY_PERSON = 'ڈیلیوری پرسن'
+L_DELIVERY_PERSONS = 'ڈیلیوری پرسنز'
+L_BOOKED_SUMMARY = 'بک شدہ فروخت کا خلاصہ'
+L_BOOKED_COL_MATERIAL = 'میٹیریل'
+L_BOOKED_COL_PREV = 'پچھلا اسٹاک'
+L_BOOKED_COL_DELIVERED = 'ڈیلیور شدہ'
+L_BOOKED_COL_BOOKED = 'بک شدہ'
+L_BOOKED_COL_REMAINING = 'بقایا'
 L_TERMS = 'شرائط و ضوابط'
 L_SIGN = 'مجاز دستخط'
 
@@ -106,25 +114,48 @@ def _payment_method(bill):
     """The method as the bill recorded it.
 
     A ``DirectSale`` keeps it in ``payment_method``; payments, receipts and
-    invoices keep it in ``method``.  Reading only one of the two leaves the
-    Urdu sheet's detail column empty on half the document types.
+    invoices keep it in ``method``; bookings keep an account link and a linked
+    ``AccountTransaction``.  Reading only one of those leaves the Urdu sheet's
+    detail column empty on part of the document types.
     """
-    for name in ('method', 'payment_method'):
+    for name in ('_resolved_payment_method', 'method', 'payment_method'):
         value = (getattr(bill, name, '') or '').strip()
         if value:
             return value
+    paid = float(getattr(bill, 'paid_amount', 0) or 0)
+    has_acc_id = bool(getattr(bill, 'receive_in_account_id', None)
+                      or getattr(bill, 'payment_account_id', None))
+    if paid > 0 or has_acc_id:
+        for rel_name in ('_resolved_payment_account', 'payment_account',
+                         'receive_in_account'):
+            account = getattr(bill, rel_name, None)
+            if account is not None:
+                cat = (getattr(account, 'category', '') or '').strip().lower()
+                return 'Bank' if cat == 'bank' else 'Cash'
     return ''
 
 
 def _payment_account_name(bill):
-    """The account the money moved through, snapshotted or joined."""
+    """The account the money moved through, preferring the linked Account name.
+
+    For bank accounts ``bill.account_name`` often snapshots the account holder
+    name (the proprietor) while ``Account.name`` holds the actual receiving
+    account label (e.g. ``Meezan Main`` or ``Drawer Cash``).  Check linked
+    ``payment_account`` / ``receive_in_account`` first, then fall back to the
+    snapshotted ``account_name`` / ``bank_name`` strings.
+    """
+    for rel_name in ('_resolved_payment_account', 'payment_account',
+                     'receive_in_account'):
+        account = getattr(bill, rel_name, None)
+        if account is not None:
+            for attr in ('name', 'account_holder_name'):
+                value = (getattr(account, attr, '') or '').strip()
+                if value:
+                    return value
     for name in ('account_name', 'bank_name'):
         value = (getattr(bill, name, '') or '').strip()
         if value:
             return value
-    account = getattr(bill, 'payment_account', None)
-    if account is not None:
-        return (getattr(account, 'name', '') or '').strip()
     return ''
 
 
@@ -141,6 +172,7 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None,
     account_name = _payment_account_name(bill)
     bank = (getattr(bill, 'bank_name', '') or '').strip()
     payment_type = (getattr(bill, 'payment_type', '') or '').strip()
+    paid = float(getattr(bill, 'paid_amount', 0) or 0)
 
     if bill_type == 'GRN':
         supplier = urdu_name((getattr(bill, 'supplier_name', '') or '').strip())
@@ -154,16 +186,18 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None,
                 rows.append(('گاڑی نمبر', vehicle))
         return rows
 
-    if method and keep('method'):
+    if method and keep('method') and (
+            bill_type in _RECEIPT_TYPES | {'Payment'}
+            or paid > 0 or bool(account_name)):
         label = _method_label(method)
         value = f'({label}) {method}' if label and label != method else method
         rows.append(('ادائیگی', value))
     if payment_type and bill_type in _RECEIPT_TYPES | {'Payment'} and keep('method'):
         rows.append(('ادائیگی کی قسم', _urdu_word(payment_type)))
-    if bank and keep('account'):
-        rows.append(('بینک', bank))
     if account_name and keep('account'):
         rows.append(('اکاؤنٹ', account_name))
+    if bank and keep('account'):
+        rows.append(('بینک', bank))
     account_no = (getattr(bill, 'account_no', '') or '').strip()
     if account_no and keep('account'):
         rows.append(('اکاؤنٹ نمبر', account_no))
@@ -172,8 +206,9 @@ def _detail_rows(bill_type, bill, delivery_people, driver_name_ur, grn_bd=None,
     if not people and driver_name_ur:
         people = [urdu_name(driver_name_ur)]
     if people and keep('delivery'):
-        rows.append(('ڈیلیوری', '، '.join(people)))
-    return rows[:4]
+        label = L_DELIVERY_PERSONS if len(people) > 1 else L_DELIVERY_PERSON
+        rows.append((label, '، '.join(people)))
+    return rows
 
 
 def _item_rows(items):
@@ -254,28 +289,73 @@ def _summary_rows(bill_type, amount, paid, discount, previous, show=None):
 def _panel_fields(bill_type, party_label, party_name, party_code, detail_rows):
     """The four inline fields of the info panel, in the sheet's order.
 
-    Reading right to left the approved bill prints: bill-to, delivery, code,
-    account.  A payment receipt has no delivery, so its method fills the slot
-    instead.  Four is the panel's width - anything after that is dropped
-    rather than pushed under the next field.
+    Reading right to left the approved bill prints: bill-to, delivery person,
+    code, account.  A payment receipt (or a paid bill without delivery) fills
+    the delivery slot with the payment method instead so both method and
+    receiving account appear.  Four is the panel's width - anything after
+    that is dropped rather than pushed under the next field.
     """
     fields = []
     if party_name:
         fields.append((party_label or L_PARTY, party_name))
     rows = [r for r in (detail_rows or []) if r and r[1]]
     delivery = [r for r in rows if r[0].startswith('ڈیلیوری')]
-    account = [r for r in rows if r[0] in ('اکاؤنٹ', 'بینک', 'اکاؤنٹ نمبر')]
+    account = [r for r in rows if r[0] == 'اکاؤنٹ']
+    if not account:
+        account = [r for r in rows if r[0] in ('بینک', 'اکاؤنٹ نمبر')]
     method = [r for r in rows if r[0] == 'ادائیگی']
     rest = [r for r in rows
-            if r not in delivery and r not in account and r not in method]
+            if r not in delivery and r not in account and r not in method
+            and r[0] not in ('بینک', 'اکاؤنٹ نمبر')]
     fields.extend(delivery)
     if party_code:
         fields.append(('کوڈ', party_code))
     fields.extend(account[:1])
-    if bill_type in _RECEIPT_TYPES or bill_type == 'Payment':
-        fields.extend(method[:1])
+    fields.extend(method[:1])
     fields.extend(rest)
     return fields[:4]
+
+
+def _booked_summary_rows(bill_type, summary):
+    """Normalize ``material_stock_summary`` rows for the Urdu sheet."""
+    is_booking = (bill_type == 'Booking')
+    rows = []
+    any_added = False
+    any_dispatched = False
+    for row in summary or []:
+        if isinstance(row, dict):
+            mat_ur = str(row.get('material_ur') or '').strip()
+            raw_mat = row.get('material') or row.get('material_display') or ''
+            prev_qty = float(row.get('last_stock') or 0)
+            added_qty = float(row.get('added') or 0)
+            disp_qty = float(row.get('dispatched') or 0)
+            rem_qty = float(row.get('remaining') or 0)
+        else:
+            mat_ur = str(getattr(row, 'material_ur', '') or '').strip()
+            raw_mat = (getattr(row, 'material', '')
+                       or getattr(row, 'material_display', '') or '')
+            prev_qty = float(getattr(row, 'last_stock', 0) or 0)
+            added_qty = float(getattr(row, 'added', 0) or 0)
+            disp_qty = float(getattr(row, 'dispatched', 0) or 0)
+            rem_qty = float(getattr(row, 'remaining', 0) or 0)
+        mat = mat_ur or urdu_name(raw_mat)
+        if added_qty > 0:
+            any_added = True
+        if disp_qty > 0:
+            any_dispatched = True
+        delta_qty = (added_qty if (is_booking or (added_qty > 0 and disp_qty == 0))
+                     else disp_qty)
+        rows.append({
+            'material': str(mat).strip(),
+            'prev': _money(prev_qty),
+            'delta': _money(delta_qty),
+            'remaining': _money(rem_qty),
+        })
+    if is_booking or (any_added and not any_dispatched):
+        delta_label = L_BOOKED_COL_BOOKED
+    else:
+        delta_label = L_BOOKED_COL_DELIVERED
+    return rows, delta_label
 
 
 # ---------------------------------------------------------------------------
@@ -467,7 +547,7 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
                    driver_name_ur='', client_name_ur='', transaction_label='',
                    transaction_note='', settings=None, terms=None,
                    grn_bd=None, party_label='', qr_text=None, qr_caption=None,
-                   sections=None):
+                   sections=None, booked_summary=None):
     """Return the :mod:`app.services.urdu_receipt` document for one bill.
 
     ``sections`` is the print dialog's optional-section map.  Keys ``qr``,
@@ -551,6 +631,7 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     item_rows = _item_rows(items)
     summary_rows = _summary_rows(bill_type, amount, paid, discount, previous,
                                  show=_show)
+    booked_rows, booked_delta_label = _booked_summary_rows(bill_type, booked_summary)
     # Build the sheet document once without a QR so the payload quotes the
     # exact bill number, date, time and totals that are printed on it.
     document = R.build_document(
@@ -571,6 +652,9 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
         type_label=_TYPE_LABEL.get(bill_type, ''),
         items=item_rows,
         summary=summary_rows,
+        booked_summary=(booked_rows if _show('booked_summary') else []),
+        booked_summary_title=L_BOOKED_SUMMARY,
+        booked_summary_delta_label=booked_delta_label,
         terms=term_rows,
         signature_label=L_SIGN,
         items_title=L_ITEMS,
@@ -584,11 +668,13 @@ def build_document(*, bill_type='DirectSale', bill=None, items=None, client=None
     # client name and ID, delivery person, the line items and the totals.
     qr_error = ''
     if qr_text is None and _show('qr'):
-        delivery = '، '.join(urdu_name(p) for p in (delivery_people or []) if p)
+        people_list = [urdu_name(p) for p in (delivery_people or []) if p]
+        delivery = '، '.join(people_list)
         if delivery:
-            delivery = f"ڈیلیوری {delivery}"
+            prefix = L_DELIVERY_PERSONS if len(people_list) > 1 else L_DELIVERY_PERSON
+            delivery = f"{prefix} {delivery}"
         elif driver_name_ur:
-            delivery = f"ڈیلیوری {urdu_name(driver_name_ur)}"
+            delivery = f"{L_DELIVERY_PERSON} {urdu_name(driver_name_ur)}"
         qr_text, qr_error = _qr_payload(
             document, item_rows,
             company_name=company_name,

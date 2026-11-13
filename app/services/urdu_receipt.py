@@ -188,6 +188,8 @@ SHEET_OPTIONS = (
     # summary box
     'sum_total_sales', 'prev', 'sum_discount', 'sum_paid', 'sum_total',
     'sum_received', 'sum_balance',
+    # booked sale / delivery summary
+    'booked_summary',
     # signature
     'sig',
 )
@@ -640,7 +642,10 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
                    company_address='', company_phone='', proprietor='',
                    note='', party_name='', party_code='', party_label='بل برائے',
                    party_phone='', fields=None, detail_rows=None, items=None,
-                   summary=None, terms=None, type_label='', qr_text='',
+                   summary=None, booked_summary=None,
+                   booked_summary_title='بک شدہ فروخت کا خلاصہ',
+                   booked_summary_delta_label='ڈیلیور شدہ',
+                   terms=None, type_label='', qr_text='',
                    qr_caption='', signature_label='مجاز دستخط',
                    items_title=ITEMS_TITLE, continuation_label='جاری',
                    show_items=True, footer_thanks='', footer_credit='',
@@ -681,6 +686,9 @@ def build_document(*, bill_no='', date_posted=None, company_name='',
         'detail_rows': [r for r in (detail_rows or []) if r and r[1]],
         'items': list(items or []),
         'summary': list(summary or []),
+        'booked_summary': list(booked_summary or []),
+        'booked_summary_title': booked_summary_title or 'بک شدہ فروخت کا خلاصہ',
+        'booked_summary_delta_label': booked_summary_delta_label or 'ڈیلیور شدہ',
         'terms': list(terms or []),
         'signature_label': signature_label or signature_right or 'مجاز دستخط',
         'footer_thanks': footer_thanks,
@@ -712,6 +720,8 @@ def layout_document(doc):
     _draw_summary(state, doc, sheets)
     if sheet_option(doc, 'sig'):
         _draw_signature(state, doc)
+    if doc.get('booked_summary') and sheet_option(doc, 'booked_summary'):
+        _draw_booked_summary(state, doc, sheets)
     if doc.get('terms'):
         _draw_terms(state, doc, sheets)
     return sheets
@@ -858,7 +868,8 @@ def _label_value(sheet, right_x, baseline, label, value, value_size=8.0,
 
 
 def _panel_field(sheet, right_x, baseline, label, value, value_size,
-                 label_color=MUTED, gap=1.0, max_width=None, urdu=None):
+                 label_color=MUTED, gap=1.0, max_width=None, urdu=None,
+                 left_limit=None):
     """Draw ``label: value`` right-to-left; return the cursor after the value."""
     label_text = label if label.endswith(':') else label + ':'
     sheet.text(right_x, baseline, label_text, PANEL_LABEL_SIZE,
@@ -866,7 +877,10 @@ def _panel_field(sheet, right_x, baseline, label, value, value_size,
     cursor = right_x - _urdu_width(label_text, PANEL_LABEL_SIZE) - gap
     if value:
         urdu = has_arabic(value) if urdu is None else urdu
-        available = max_width if max_width is not None else cursor - LEFT
+        floor = LEFT if left_limit is None else left_limit
+        available = max_width if max_width is not None else cursor - floor
+        if left_limit is not None:
+            available = min(available, max(20.0, cursor - left_limit))
         value = _fit(value, value_size, available, urdu=urdu)
         sheet.text(cursor, baseline, value, value_size, color=INK,
                    font=SANS, align='right', urdu=urdu)
@@ -883,7 +897,9 @@ def _draw_panel(state, doc):
                stroke=BORDER, width=0.75)
 
     right_inner = RIGHT - PANEL_INNER_PAD
+    right_floor = PANEL_RIGHT_X + PANEL_INNER_PAD
     left_inner = LEFT + PANEL_BOX_W - PANEL_INNER_PAD
+    left_floor = LEFT + PANEL_INNER_PAD
 
     # Right panel: bill-to + contact on the first row, code on the second.
     cursor = right_inner
@@ -891,23 +907,27 @@ def _draw_panel(state, doc):
         cursor = _panel_field(sheet, right_inner, PANEL_RIGHT_TOP,
                               doc.get('party_label') or 'بل برائے',
                               doc.get('party_name'), PANEL_PARTY_SIZE,
-                              max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 60)
+                              max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 60,
+                              left_limit=right_floor)
     if sheet_option(doc, 'ref'):
         contact = doc.get('party_phone') or '____'
         contact_urdu = has_arabic(contact) or contact == '____'
         _panel_field(sheet, cursor, PANEL_RIGHT_TOP, 'حوالہ', contact,
                      PANEL_LABEL_SIZE if contact_urdu else PANEL_LATIN_SIZE,
-                     max_width=max(20.0, cursor - PANEL_RIGHT_X - PANEL_INNER_PAD),
-                     urdu=contact_urdu)
+                     max_width=max(20.0, cursor - right_floor),
+                     urdu=contact_urdu, left_limit=right_floor)
     if sheet_option(doc, 'code'):
         _panel_field(sheet, right_inner, PANEL_RIGHT_BOTTOM, 'کوڈ',
                      doc.get('party_code'), PANEL_LATIN_SIZE,
-                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 20)
+                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 20,
+                     left_limit=right_floor)
 
     # Left panel: delivery (or method) on the first row, account on the second.
     fields = doc.get('fields') or []
     delivery = next((f for f in fields if 'ڈیلیوری' in f[0] or 'ڈلیوری' in f[0]), None)
-    account = next((f for f in fields if 'اکاؤنٹ' in f[0] or 'بینک' in f[0]), None)
+    account = next((f for f in fields if f[0] == 'اکاؤنٹ'), None)
+    if account is None:
+        account = next((f for f in fields if 'اکاؤنٹ' in f[0] or 'بینک' in f[0]), None)
     others = [f for f in fields if f not in (delivery, account)
               and f[0] != (doc.get('party_label') or 'بل برائے') and f[0] != 'کوڈ']
     top_field = delivery or (others[0] if others else None)
@@ -916,12 +936,14 @@ def _draw_panel(state, doc):
         size = PANEL_DELIVERY_SIZE if has_arabic(top_field[1]) else PANEL_LATIN_SIZE
         _panel_field(sheet, left_inner, PANEL_LEFT_TOP, top_field[0],
                      top_field[1], size,
-                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 20)
+                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD,
+                     left_limit=left_floor)
     if bottom_field:
         size = PANEL_LATIN_SIZE if not has_arabic(bottom_field[1]) else 8.6
         _panel_field(sheet, left_inner, PANEL_LEFT_BOTTOM, bottom_field[0],
                      bottom_field[1], size,
-                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD - 20)
+                     max_width=PANEL_BOX_W - 2 * PANEL_INNER_PAD,
+                     left_limit=left_floor)
 
     state['y'] = Y_PANEL + PANEL_H
 
@@ -1056,7 +1078,8 @@ def _draw_summary(state, doc, sheets):
     top = state['y'] + gap
     sig_rel = _sig_rel(gap)
     block_h = max(box_h, sig_rel + SIG_LABEL_OFFSET + 4.0) if show_signature else box_h
-    needed = block_h + TERMS_GAP + (62.0 if doc.get('terms') else 0.0)
+    has_booked_summary = bool(doc.get('booked_summary')) and sheet_option(doc, 'booked_summary')
+    needed = block_h + (0.0 if has_booked_summary else (TERMS_GAP + (62.0 if doc.get('terms') else 0.0)))
     if top + needed > _content_bottom():
         sheet = _new_sheet()
         sheets.append(sheet)
@@ -1113,6 +1136,108 @@ def _draw_signature(state, doc):
     state['y'] = max(state['y'], line_y + SIG_LABEL_OFFSET + 4.0)
 
 
+BOOKED_GAP = 8.0
+BOOKED_TITLE_OFFSET = 7.5
+BOOKED_HEAD_OFFSET = 11.5
+BOOKED_HEAD_H = 14.5
+BOOKED_ROW_H = 14.0
+
+
+def _booked_summary_columns(delta_label):
+    col_w = 64.0
+    x_rem = LEFT
+    x_delta = x_rem + col_w
+    x_prev = x_delta + col_w
+    x_mat = x_prev + col_w
+    return [
+        {'key': 'remaining', 'x0': x_rem, 'x1': x_delta, 'align': 'center',
+         'x': (x_rem + x_delta) / 2.0, 'label': 'بقایا',
+         'label_x': (x_rem + x_delta) / 2.0, 'label_align': 'center'},
+        {'key': 'delta', 'x0': x_delta, 'x1': x_prev, 'align': 'center',
+         'x': (x_delta + x_prev) / 2.0,
+         'label': delta_label or 'ڈیلیور شدہ',
+         'label_x': (x_delta + x_prev) / 2.0, 'label_align': 'center'},
+        {'key': 'prev', 'x0': x_prev, 'x1': x_mat, 'align': 'center',
+         'x': (x_prev + x_mat) / 2.0, 'label': 'پچھلا اسٹاک',
+         'label_x': (x_prev + x_mat) / 2.0, 'label_align': 'center'},
+        {'key': 'material', 'x0': x_mat, 'x1': RIGHT, 'align': 'right',
+         'x': RIGHT - 4.6, 'label': 'میٹیریل',
+         'label_x': RIGHT - 4.6, 'label_align': 'right'},
+    ]
+
+
+def _draw_booked_summary(state, doc, sheets):
+    rows = list(doc.get('booked_summary') or [])
+    if not rows:
+        return
+    cols = _booked_summary_columns(doc.get('booked_summary_delta_label'))
+    title = doc.get('booked_summary_title') or 'بک شدہ فروخت کا خلاصہ'
+    bottom = _content_bottom() - 4.0
+    pending = rows
+    first_chunk = True
+    while pending:
+        gap = BOOKED_GAP if first_chunk else 8.0
+        min_block = BOOKED_HEAD_OFFSET + BOOKED_HEAD_H + BOOKED_ROW_H
+        if state['y'] + gap + min_block > bottom:
+            sheet = _new_sheet()
+            sheets.append(sheet)
+            state['sheet'] = sheet
+            _draw_header(state, doc, first=False)
+            gap = 8.0
+        sheet = state['sheet']
+        top = state['y'] + gap
+        head_top = top + BOOKED_HEAD_OFFSET
+        rows_top = head_top + BOOKED_HEAD_H
+        capacity = max(1, int((bottom - rows_top) / BOOKED_ROW_H))
+        chunk = pending[:capacity]
+        pending = pending[capacity:]
+
+        heading = title if first_chunk else f"{title} ({doc.get('continuation_label') or 'جاری'})"
+        sheet.text(RIGHT - 2.242, top + BOOKED_TITLE_OFFSET, heading, 8.5,
+                   color=NAVY, align='right', urdu=True)
+        sheet.rect(LEFT, head_top, CONTENT_W, BOOKED_HEAD_H, fill=NAVY)
+        for col in cols:
+            sheet.text(col['label_x'], head_top + 9.2, col['label'], 8.0,
+                       color=WHITE, align=col['label_align'], urdu=True)
+
+        height = len(chunk) * BOOKED_ROW_H
+        for offset in range(len(chunk)):
+            if offset % 2 == 1:
+                sheet.rect(LEFT, rows_top + offset * BOOKED_ROW_H, CONTENT_W,
+                           BOOKED_ROW_H, fill=BAR)
+        for offset in range(len(chunk) + 1):
+            sheet.hline(LEFT, RIGHT, rows_top + offset * BOOKED_ROW_H,
+                        color=GRID, width=0.75)
+        for col in cols[1:]:
+            sheet.vline(col['x0'], rows_top, rows_top + height,
+                        color=GRID, width=0.75)
+        sheet.rect(LEFT, rows_top, CONTENT_W, height, stroke=GRID, width=0.75)
+
+        for offset, row in enumerate(chunk):
+            row_top = rows_top + offset * BOOKED_ROW_H
+            urdu_y = row_top + 9.0
+            latin_y = row_top + 9.5
+            for col in cols:
+                key = col['key']
+                if key == 'material':
+                    mat = str(row.get('material') or '')
+                    urdu = has_arabic(mat)
+                    size = 8.2 if urdu else 7.2
+                    mat = _fit(mat, size, col['x'] - col['x0'] - 4.0,
+                               urdu=urdu)
+                    sheet.text(col['x'], urdu_y if urdu else latin_y, mat,
+                               size, color=INK, align='right', urdu=urdu)
+                elif key == 'remaining':
+                    sheet.text(col['x'], latin_y, str(row.get('remaining', '')),
+                               7.2, color=INK, font=SANS_BOLD, align='center')
+                else:
+                    sheet.text(col['x'], latin_y, str(row.get(key, '')),
+                               7.2, color=INK, align='center')
+
+        state['y'] = rows_top + height
+        first_chunk = False
+
+
 def _draw_terms(state, doc, sheets):
     terms = doc['terms']
     if not terms:
@@ -1131,6 +1256,12 @@ def _draw_terms(state, doc, sheets):
             entries.append((number, text))
     if not entries:
         return
+
+    if state['y'] + TERMS_GAP + 20.4924 + round(step * 0.86, 2) > bottom:
+        sheet = _new_sheet()
+        sheets.append(sheet)
+        state['sheet'] = sheet
+        _draw_header(state, doc, first=False)
 
     def lines_of(items, width):
         return sum(max(1, len(wrap_urdu(text, size, width, max_lines=3)))
