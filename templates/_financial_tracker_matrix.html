@@ -1,16 +1,17 @@
 {# Shared "Financial Tracking Filter Matrix" (reference layout #2).
    Context: dict `ft` built by _ft_build_context() with keys:
-     preset, from_d, to_d, f_direction, f_category, f_account, f_client,
-     f_supplier, f_partner, f_worker, f_vehicle, f_method, f_q,
+     preset, from_d, to_d, f_direction, f_section, f_category, f_account, f_client,
+     f_supplier, f_partner, f_worker, f_lender, f_vehicle, f_method, f_q,
      rows, total_in, total_out, net, record_count,
-     cat_options, account_options, client_opts, supplier_opts, partner_opts,
-     worker_opts, vehicle_opts, breakdown_cat, breakdown_account,
+     section_opts, cat_options, account_options, client_opts, supplier_opts,
+     partner_opts, worker_opts, lender_opts, vehicle_opts,
+     breakdown_cat, breakdown_account,
      prefix (query-param prefix, '' standalone / 'ft_' embedded),
      embed (bool — true when rendered inside the Cash Flow "Transactions" tab). #}
 {% set P = ft.prefix or '' %}
 {% set ft_form_action = (url_for('cash_flow') ~ '#tab-transactions') if ft.embed else url_for('financial_tracker') %}
 {% set ft_reset_url = url_for('cash_flow', _anchor='tab-transactions') if ft.embed else url_for('financial_tracker') %}
-{% set ft_export_url = url_for('financial_tracker', preset=ft.preset, direction=ft.f_direction, category=ft.f_category, account=ft.f_account, client=ft.f_client, supplier=ft.f_supplier, partner=ft.f_partner, worker=ft.f_worker, vehicle=ft.f_vehicle, method=ft.f_method, q=ft.f_q, export_csv=1) %}
+{% set ft_export_url = url_for('financial_tracker', preset=ft.preset, direction=ft.f_direction, section=ft.f_section, category=ft.f_category, account=ft.f_account, client=ft.f_client, supplier=ft.f_supplier, partner=ft.f_partner, worker=ft.f_worker, lender=ft.f_lender, vehicle=ft.f_vehicle, method=ft.f_method, q=ft.f_q, export_csv=1) %}
 <style>
   .ft-wrap { background:#eef2f7; padding:20px 16px; {% if not ft.embed %}min-height:100vh;{% else %}border-radius:14px;{% endif %} }
   .ft-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; }
@@ -62,6 +63,12 @@
           <option value="transfer" {% if ft.f_direction=='transfer' %}selected{% endif %}>Transfer</option>
         </select>
       </div>
+      <div class="col-md-3"><div class="ft-label">Section</div>
+        <select name="{{ P }}section" class="form-select">
+          <option value="">All Sections</option>
+          {% for s in ft.section_opts %}<option value="{{ s }}" {% if ft.f_section==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
       <div class="col-md-3"><div class="ft-label">Category</div>
         <select name="{{ P }}category" class="form-select">
           <option value="">All Categories</option>
@@ -95,6 +102,11 @@
           {% for o in ft.worker_opts %}<option value="{{ o }}" {% if ft.f_worker==o %}selected{% endif %}>{{ o }}</option>{% endfor %}
         </select>
       </div>
+      <div class="col-md-3"><div class="ft-label">Loan Lender</div>
+        <select name="{{ P }}lender" class="form-select"><option value="all">All Lenders</option>
+          {% for o in ft.lender_opts %}<option value="{{ o }}" {% if ft.f_lender==o %}selected{% endif %}>{{ o }}</option>{% endfor %}
+        </select>
+      </div>
 
       <div class="col-md-3"><div class="ft-label">Vehicle</div>
         <select name="{{ P }}vehicle" class="form-select"><option value="">All Vehicles</option>
@@ -109,7 +121,7 @@
           <option value="check" {% if ft.f_method=='check' %}selected{% endif %}>Check</option>
         </select>
       </div>
-      <div class="col-md-3"><div class="ft-label">Text / Ref Search</div>
+      <div class="col-md-6"><div class="ft-label">Text / Ref Search</div>
         <div class="input-group"><span class="input-group-text"><i class="bi bi-search"></i></span>
           <input type="text" name="{{ P }}q" class="form-control" placeholder="Search reference, description..." value="{{ ft.f_q }}">
         </div>

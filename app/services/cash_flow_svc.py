@@ -253,6 +253,7 @@ SRC_DRIVER_PAYMENT = 'DRIVER_PAYMENT'
 SRC_ACCOUNT_RECEIPT = 'ACCOUNT_RECEIPT'
 SRC_ACCOUNT_EXPENSE = 'ACCOUNT_EXPENSE'
 SRC_GRN_PAYMENT = 'GRN_PAYMENT'
+SRC_LOAN_PRINCIPAL = 'LoanPrincipal'
 
 CF_SOURCE_LABELS = {
     SRC_MANUAL: 'Manual',
@@ -264,6 +265,7 @@ CF_SOURCE_LABELS = {
     SRC_ACCOUNT_RECEIPT: 'Other system-generated',
     SRC_ACCOUNT_EXPENSE: 'Other system-generated',
     SRC_GRN_PAYMENT: 'GRN Payment',
+    SRC_LOAN_PRINCIPAL: 'Loan Register',
 }
 
 # ---------------------------------------------------------------------------
@@ -286,6 +288,7 @@ CF_SECTION_GRN_PAYMENTS = 'GRN Payments'
 CF_SECTION_SALES_RETURNS = 'Sales Returns'
 CF_SECTION_DELIVERY_RENT = 'Delivery & Rent'
 CF_SECTION_RECONCILIATION = 'Reconciliation'
+CF_SECTION_LOAN_REGISTER = 'Loan Register'
 
 _CF_SECTION_BY_SOURCE = {
     'cashflowentry': CF_SECTION_CASH_FLOW,
@@ -318,6 +321,10 @@ _CF_SECTION_BY_SOURCE = {
     'account_reconciliation': CF_SECTION_RECONCILIATION,
     'cashdaydifference': CF_SECTION_RECONCILIATION,
     'cash_day_difference': CF_SECTION_RECONCILIATION,
+    'loanprincipal': CF_SECTION_LOAN_REGISTER,
+    'loan_principal': CF_SECTION_LOAN_REGISTER,
+    'loanmovement': CF_SECTION_LOAN_REGISTER,
+    'loan_movement': CF_SECTION_LOAN_REGISTER,
     'account_receipt': CF_SECTION_ACCOUNTS,
     'account_expense': CF_SECTION_ACCOUNTS,
     'entry': CF_SECTION_ACCOUNTS,
@@ -381,6 +388,8 @@ _CF_CREATOR_SOURCES = {
     'account_reconciliation': ('AccountReconciliation', 'created_by', None),
     'materialreturn': ('MaterialReturn', 'created_by', 'payment'),
     'material_return': ('MaterialReturn', 'created_by', 'payment'),
+    'loanprincipal': ('LoanMovement', 'created_by', None),
+    'loan_principal': ('LoanMovement', 'created_by', None),
 }
 
 # Last resort: the structured accounting audit trail records who created the
@@ -397,6 +406,8 @@ _CF_CREATOR_AUDIT_ENTITIES = {
     'direct_sale': ('DirectSale',),
     'materialreturn': ('MaterialReturn',),
     'deliverypersonpayment': ('DeliveryPersonPayment',),
+    'loanprincipal': ('LoanMovement',),
+    'loan_principal': ('LoanMovement',),
 }
 
 
@@ -433,6 +444,7 @@ def _cf_creator_lookup(txs):
         'DeliveryPersonPayment': DeliveryPersonPayment,
         'AccountReconciliation': AccountReconciliation,
         'MaterialReturn': MaterialReturn,
+        'LoanMovement': LoanMovement,
     }
     audit_wanted = {}
     for source_type, ids in wanted.items():
@@ -1437,6 +1449,20 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
     # without a user, so fall back to the source document / audit trail.
     creator_by_source = _cf_creator_lookup(txs)
 
+    loan_refs = {}
+    loan_ids = {
+        int(tx.source_id)
+        for tx in txs
+        if (tx.source_type or '').strip().lower() == 'loanprincipal' and tx.source_id
+    }
+    if loan_ids:
+        for chunk in _cf_chunks(loan_ids):
+            for mid, mref in db.session.query(LoanMovement.id, LoanMovement.reference).filter(
+                LoanMovement.id.in_(chunk)
+            ).all():
+                if (mref or '').strip():
+                    loan_refs[int(mid)] = mref.strip()
+
     for tx in txs:
         from_acc = account_by_id.get(tx.from_account_id)
         to_acc = account_by_id.get(tx.to_account_id)
@@ -1448,6 +1474,7 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             direction = CF_DIR_TRANSFER
             account_id = tx.from_account_id
             account_name = from_acc.name if from_acc else ''
+            account_cat = (from_acc.category or '').strip().lower() if from_acc else ''
             dest_account_id = tx.to_account_id
             dest_account_name = to_acc.name if to_acc else ''
             cash_in = 0.0
@@ -1457,6 +1484,7 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             direction = CF_DIR_IN
             account_id = tx.to_account_id
             account_name = to_acc.name if to_acc else ''
+            account_cat = (to_acc.category or '').strip().lower() if to_acc else ''
             dest_account_id = None
             dest_account_name = ''
             cash_in = float(tx.amount or 0)
@@ -1466,6 +1494,7 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             direction = CF_DIR_OUT
             account_id = tx.from_account_id
             account_name = from_acc.name if from_acc else ''
+            account_cat = (from_acc.category or '').strip().lower() if from_acc else ''
             dest_account_id = None
             dest_account_name = ''
             cash_in = 0.0
@@ -1492,10 +1521,25 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             party_type = getattr(tx, 'party_type', '') or ''
             description = tx.description or tx.transaction_type or ''
             note = tx.note or ''
-            reference = f'TX-{tx.id}'
-            origin = 'derived'
-            origin_label = f'From Accounts · {tx.source_type or tx.transaction_type}'
             source_type = tx.source_type or 'SYSTEM'
+            loan_ref = (
+                loan_refs.get(int(tx.source_id))
+                if source_type.strip().lower() == 'loanprincipal' and tx.source_id
+                else ''
+            )
+            reference = loan_ref or f'TX-{tx.id}'
+            origin = 'derived'
+            origin_label = (
+                'From Accounts · Loan Register'
+                if source_type.strip().lower() == 'loanprincipal'
+                else f'From Accounts · {tx.source_type or tx.transaction_type}'
+            )
+
+        note_method_match = re.search(r'(?:^|\s)Method:\s*([A-Za-z]+)', note or '', re.IGNORECASE)
+        row_method = (
+            (note_method_match.group(1).strip() if note_method_match else '')
+            or (account_cat.capitalize() if account_cat else '')
+        )
 
         rows.append({
             'date': tx.date_posted.date() if hasattr(tx.date_posted, 'date') else tx.date_posted,
@@ -1508,6 +1552,8 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             'amount': float(tx.amount or 0),
             'account_id': account_id,
             'account_name': account_name,
+            'account_category': account_cat,
+            'method': row_method,
             'account_to_id': dest_account_id,
             'account_to_name': dest_account_name,
             'account_display': f"{account_name} → {dest_account_name}" if direction == CF_DIR_TRANSFER else account_name,
@@ -1539,8 +1585,6 @@ def collect_cash_flow_rows(from_date, to_date, *, posted_after=None, include_voi
             ),
             'status': 'voided' if tx.is_void else 'active',
             'grn_id': getattr(tx, 'grn_id', None),
-            'party_name': party_name,
-            'party_type': party_type,
             'entry_id': e.id if e else None,
             'tx_id': tx.id,
         })
@@ -1670,6 +1714,11 @@ def _is_recon_row(row):
     return (row.get('source_type') or '').strip().lower() in RECON_SOURCE_TYPES
 
 
+_CF_PARTY_TYPE_LABELS = {
+    'loan_lender': 'Loan Lender',
+}
+
+
 def summarize_cash_flow_rows(rows, account_id=None):
     active = [r for r in rows if (r.get('status') or 'active') == 'active']
     counted = [r for r in active if not _is_recon_row(r)]
@@ -1696,7 +1745,9 @@ def summarize_cash_flow_rows(rows, account_id=None):
         breakdown_cat[ck]['in'] += float(r.get('cash_in') or 0)
         breakdown_cat[ck]['out'] += float(r.get('cash_out') or 0)
         breakdown_cat[ck]['transfer'] += float(r.get('transfer_amount') or 0)
-        pk = ((r.get('party_type') or '') + ' · ' + (r.get('party_name') or '—')).strip(' ·')
+        raw_ptype = (r.get('party_type') or '').strip()
+        ptype_label = _CF_PARTY_TYPE_LABELS.get(raw_ptype.lower(), raw_ptype)
+        pk = (ptype_label + ' · ' + (r.get('party_name') or '—')).strip(' ·')
         breakdown_party.setdefault(pk, {'in': 0.0, 'out': 0.0, 'transfer': 0.0})
         breakdown_party[pk]['in'] += float(r.get('cash_in') or 0)
         breakdown_party[pk]['out'] += float(r.get('cash_out') or 0)
