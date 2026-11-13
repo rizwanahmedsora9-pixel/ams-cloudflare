@@ -182,11 +182,12 @@ def _material_ledger_current_summary(material_ledger_recent, bill_refs):
         if not matched:
             continue
         matched_sorted = sorted(matched, key=lambda r: r.get('date_dt') or datetime.min)
+        first_row = matched_sorted[0]
         last_row = matched_sorted[-1]
         dispatched = sum(float(r.get('qty_dispatched') or 0) for r in matched_sorted)
         added = sum(float(r.get('qty_added') or 0) for r in matched_sorted)
-        last_stock = float(last_row.get('remaining') or 0) - float(last_row.get('qty_added') or 0) + float(last_row.get('qty_dispatched') or 0)
-        remaining = float(rows[-1].get('remaining') or 0)
+        last_stock = float(first_row.get('remaining') or 0) - float(first_row.get('qty_added') or 0) + float(first_row.get('qty_dispatched') or 0)
+        remaining = float(last_row.get('remaining') or 0)
         summary.append({
             'material': last_row.get('material_display') or group.get('material') or '',
             'dispatched': dispatched,

@@ -299,7 +299,7 @@ def test_sheet_text_holds_the_urdu_furniture_and_every_figure():
 def test_panel_model_keeps_the_two_card_fields_in_reading_order():
     doc = _document()
     assert [label for label, _value in doc['fields']] == [
-        'بل برائے', 'ڈیلیوری', 'کوڈ', 'اکاؤنٹ']
+        'بل برائے', 'ڈیلیوری پرسن', 'کوڈ', 'اکاؤنٹ']
     values = [value for _label, value in doc['fields']]
     assert values[0] == 'محمد شفیق'
     assert values[1] == 'عدنان احمد'
@@ -685,7 +685,7 @@ def test_party_panel_carries_the_contact_placeholder_and_code():
     assert '____' in text
     assert 'کوڈ:' in text
     assert 'FBMCL-00002' in text
-    assert 'ڈیلیوری:' in text
+    assert 'ڈیلیوری پرسن:' in text
     assert 'اکاؤنٹ:' in text
 
 
@@ -1131,8 +1131,8 @@ def test_client_panel_marks_can_be_hidden_individually():
                               'delivery': False, 'account': False,
                               'method': False})
     texts = _texts(doc)
-    for label in ('بل برائے:', 'حوالہ:', 'کوڈ:', 'ڈیلیوری:', 'اکاؤنٹ:',
-                  'ادائیگی:'):
+    for label in ('بل برائے:', 'حوالہ:', 'کوڈ:', 'ڈیلیوری پرسن:',
+                  'ڈیلیوری پرسنز:', 'اکاؤنٹ:', 'ادائیگی:'):
         assert label not in texts, label
 
 
@@ -1194,8 +1194,8 @@ def test_route_can_hide_every_mark_on_the_page(client, sale):
     url = (f"/download_invoice/{sale['bill_no']}?src=direct_sale"
            f"&src_id={sale['id']}&lang=ur&action=print&tc=0&{query}")
     html = client.get(url).get_data(as_text=True)
-    for marker in ('مجاز دستخط', 'ڈیلیوری', 'ٹرانزیکشن کی تفصیلات',
-                   'کل بقایا رقم', 'کل فروخت'):
+    for marker in ('مجاز دستخط', 'ڈیلیوری پرسن', 'ٹرانزیکشن کی تفصیلات',
+                   'کل بقایا رقم', 'کل فروخت', 'بک شدہ فروخت کا خلاصہ'):
         assert marker not in html, marker
     # the paper itself still exists
     assert '<div class="pg"' in html
@@ -1211,6 +1211,319 @@ def test_print_dialog_lists_every_mark_on_the_page_map(client, sale):
     html = resp.get_data(as_text=True)
     for key in SHEET_OPTIONS:
         assert f'data-urdu-section="{key}"' in html, key
-    # six page-order groups and the show-all / hide-all shortcuts
-    assert html.count('data-urdu-group-toggle=') == 6
+    # seven page-order groups and the show-all / hide-all shortcuts
+    assert html.count('data-urdu-group-toggle=') == 7
     assert 'urduMapAll' in html and 'urduMapNone' in html
+    assert 'Delivery Person' in html and 'ڈیلیوری پرسن' in html
+    assert 'Booked sale summary' in html and 'بک شدہ فروخت کا خلاصہ' in html
+
+
+def test_delivery_person_plural_and_panel_horizontal_clamping():
+    """Multiple delivery persons use ڈیلیوری پرسنز and stay inside panel bounds."""
+    doc = _document(
+        delivery_people=['Tariq Mahmood Gujjar Very Long Driver Name Here',
+                         'Bilal Hussain Qureshi Another Driver'],
+    )
+    fields = dict(doc['fields'])
+    assert 'ڈیلیوری پرسنز' in fields
+    sheet = R.layout_document(doc)[0]
+    left_texts = [op for op in sheet.ops
+                  if op['op'] == 'text'
+                  and abs(op['y'] - R.PANEL_LEFT_TOP) < 0.1]
+    assert any(op['text'] == 'ڈیلیوری پرسنز:' for op in left_texts)
+    # Every character in the left panel stays to the right of LEFT + PANEL_INNER_PAD
+    value_ops = [op for op in left_texts if op['text'] != 'ڈیلیوری پرسنز:']
+    assert len(value_ops) == 1
+    val = value_ops[0]
+    w = (R._urdu_width(val['text'], val['size']) if val['font'] == 'ur'
+         else R._latin_width(val['text'], val['font'], val['size']))
+    assert val['x'] - w >= R.LEFT + R.PANEL_INNER_PAD - 0.5
+
+
+def test_receiving_account_appears_on_payment_direct_sale_booking_and_invoice():
+    """Receiving account is never dropped by bank/holder fields or [:4] slice."""
+    # 1. Bank Payment: bank_name + holder account_name + linked payment_account.name
+    pay = SimpleNamespace(
+        id=10, manual_bill_no='PAY-10', amount=25000,
+        date_posted=datetime(2026, 11, 13, 12, 0),
+        client_name='Client A', client_code='FBMCL-00001',
+        method='Bank', payment_type='Receipt',
+        bank_name='Meezan Bank',
+        account_name='Fazal Building Materials',
+        account_no='PK99MEZN0001',
+        payment_account=SimpleNamespace(name='Meezan Main',
+                                        account_holder_name='Fazal Building Materials',
+                                        category='bank'),
+        note='',
+    )
+    pay_doc = bill_urdu.build_document(bill_type='Payment', bill=pay)
+    pay_fields = dict(pay_doc['fields'])
+    assert pay_fields.get('اکاؤنٹ') == 'Meezan Main'
+    assert pay_fields.get('ادائیگی') == '(بینک) Bank'
+
+    # 2. Paid DirectSale without driver shows both method and account
+    ds_paid = SimpleNamespace(
+        id=11, manual_bill_no='SB-SL-11', amount=10000, paid_amount=10000,
+        discount=0, date_posted=datetime(2026, 11, 13, 12, 0),
+        client_name='Client A', client_code='FBMCL-00001',
+        payment_method='Cash',
+        payment_account=SimpleNamespace(name='Main Cash Counter', category='cash'),
+        bank_name='', account_name='Main Cash Counter', account_no='',
+        driver_name='', note='',
+    )
+    ds_paid_doc = bill_urdu.build_document(bill_type='DirectSale', bill=ds_paid)
+    ds_paid_fields = dict(ds_paid_doc['fields'])
+    assert ds_paid_fields.get('اکاؤنٹ') == 'Main Cash Counter'
+    assert ds_paid_fields.get('ادائیگی') == '(نقد) Cash'
+
+    # 3. Unpaid DirectSale (paid_amount=0, default payment_method='Cash', no account)
+    #    must NOT print bogus Cash method
+    ds_unpaid = SimpleNamespace(
+        id=12, manual_bill_no='SB-SL-12', amount=10000, paid_amount=0,
+        discount=0, date_posted=datetime(2026, 11, 13, 12, 0),
+        client_name='Client A', client_code='FBMCL-00001',
+        payment_method='Cash', payment_account=None,
+        bank_name='', account_name='', account_no='',
+        driver_name='', note='',
+    )
+    ds_unpaid_doc = bill_urdu.build_document(bill_type='DirectSale', bill=ds_unpaid)
+    assert 'ادائیگی' not in dict(ds_unpaid_doc['fields'])
+    assert 'اکاؤنٹ' not in dict(ds_unpaid_doc['fields'])
+
+    # 4. Booking with receive_in_account & Paid Now > 0
+    bk = SimpleNamespace(
+        id=13, manual_bill_no='BK-13', amount=50000, paid_amount=20000,
+        discount=0, date_posted=datetime(2026, 11, 13, 12, 0),
+        client_name='Client A', client_code='FBMCL-00001',
+        receive_in_account_id=5,
+        receive_in_account=SimpleNamespace(name='HBL Business', category='bank'),
+        note='',
+    )
+    bk_doc = bill_urdu.build_document(bill_type='Booking', bill=bk)
+    bk_fields = dict(bk_doc['fields'])
+    assert bk_fields.get('اکاؤنٹ') == 'HBL Business'
+    assert bk_fields.get('ادائیگی') == '(بینک) Bank'
+
+
+def test_booked_summary_renders_paginates_and_toggles_cleanly():
+    """Booked Sale Summary prints columns in Urdu, obeys toggle, and paginates."""
+    summary_rows = [
+        {'material': 'DG Cement', 'material_ur': 'سیمنٹ DG',
+         'last_stock': 120, 'dispatched': 50, 'added': 0, 'remaining': 70},
+    ]
+    doc_on = _document(booked_summary=summary_rows)
+    texts_on = _texts(doc_on)
+    for expected in ('بک شدہ فروخت کا خلاصہ', 'میٹیریل', 'پچھلا اسٹاک',
+                     'ڈیلیور شدہ', 'بقایا', '120', '50', '70'):
+        assert expected in texts_on, expected
+
+    doc_off = _document(booked_summary=summary_rows,
+                        sections={'booked_summary': False})
+    assert 'بک شدہ فروخت کا خلاصہ' not in _texts(doc_off)
+
+    # Booking bill uses بک شدہ instead of ڈیلیور شدہ
+    bk = _bill(manual_bill_no='BK-20', paid_amount=5000)
+    bk_doc = bill_urdu.build_document(
+        bill_type='Booking', bill=bk,
+        items=[{'name': 'سیمنٹ DG', 'qty': 100, 'price_at_time': 1250}],
+        booked_summary=[{'material': 'DG Cement', 'material_ur': 'سیمنٹ DG',
+                         'last_stock': 20, 'dispatched': 0, 'added': 100,
+                         'remaining': 120}],
+    )
+    bk_texts = [op['text'] for op in R.layout_document(bk_doc)[0].ops
+                if op['op'] == 'text']
+    assert 'بک شدہ' in bk_texts
+    assert 'ڈیلیور شدہ' not in bk_texts
+
+    # 15 items + booked_summary + 7 terms stays within PAGE_BOTTOM across 2 pages
+    many_items = [{'name': f'میٹیریل {i}', 'qty': i + 1, 'price_at_time': 500}
+                  for i in range(15)]
+    full_doc = _document(
+        items=many_items,
+        booked_summary=summary_rows,
+        terms=[SimpleNamespace(title='', content_ur=text) for text in TERMS],
+    )
+    sheets = R.layout_document(full_doc)
+    assert len(sheets) >= 2
+    for sheet in sheets:
+        for op in sheet.ops:
+            if op['op'] == 'text':
+                assert op['y'] <= R.PAGE_BOTTOM, op
+
+
+def test_booking_delivery_invoice_and_payment_e2e_urdu_receipt(client, app):
+    """End-to-end DB flows verify receiving account, Booked Sale Summary,
+    pre-bill toggle, and QR verification across Booking, Delivery, Invoice, Payment."""
+    from app import db
+    from app.services import bill_verify
+    from models import (
+        Account, Booking, DirectSale, Invoice, Material, Payment, Settings,
+    )
+
+    _login(client)
+    with app.app_context():
+        settings = Settings.query.first() or Settings()
+        settings.allow_global_negative_stock = True
+        db.session.add(settings)
+        db.session.commit()
+
+    client.post('/add_material',
+                data={'material_name': 'DG Cement', 'material_unit': 'Bag'},
+                follow_redirects=True)
+    client.post('/add_client', data={
+        'name': 'Tariq Builders', 'code': 'FBMCL-00088',
+        'category': 'General', 'opening_balance': '0',
+    }, follow_redirects=True)
+    client.post('/accounts/accounts/add', data={
+        'name': 'Meezan Main UrduTest', 'class_category': 'Assets',
+        'class_subcategory': 'Bank', 'class_account_type': 'Operating Bank',
+        'bank_name': 'Meezan Bank', 'account_holder_name': 'Fazal Building Materials',
+        'account_number': '1122334455',
+        'account_status': 'active', 'opening_amount': '0',
+        'opening_position': 'debit',
+        'opening_effective_date': '2026-01-01',
+    }, follow_redirects=True)
+    client.post('/delivery_persons/add', data={
+        'name': 'Aslam Khan', 'phone': '03001112233',
+    }, follow_redirects=True)
+
+    with app.app_context():
+        mat = Material.query.filter_by(name='DG Cement').first()
+        acc = Account.query.filter(Account.name.like('%Meezan Main UrduTest%')).first()
+        assert mat is not None and acc is not None
+        mat_id, acc_id = mat.id, acc.id
+
+    # 1. Create a Booking with Paid Now into Meezan Main UrduTest
+    resp_bk = client.post('/add_booking', data={
+        'client_code': 'FBMCL-00088',
+        'client_name': 'Tariq Builders',
+        'manual_bill_no': 'BK-UR-88',
+        'amount': '120000',
+        'paid_amount': '25000',
+        'payment_method': 'Bank',
+        'receive_in_account_id': str(acc_id),
+        'payment_account_id': str(acc_id),
+        'material_name[]': ['DG Cement'],
+        'material_id[]': [str(mat_id)],
+        'qty[]': ['100'],
+        'unit_rate[]': ['1200'],
+        'date': '2026-06-01',
+    }, follow_redirects=True)
+    assert resp_bk.status_code == 200
+
+    # 2. Create a Booking Delivery DirectSale with delivery person + Bank payment
+    resp_ds = client.post('/add_direct_sale', data={
+        'client_code': 'FBMCL-00088',
+        'client_name': 'Tariq Builders',
+        'category': 'Booking Delivery',
+        'manual_bill_no': 'DS-UR-88',
+        'driver_name': 'Aslam Khan',
+        'paid_amount': '5000',
+        'payment_method': 'Bank',
+        'payment_account_id': str(acc_id),
+        'product_name[]': ['DG Cement'],
+        'material_id[]': [str(mat_id)],
+        'qty[]': ['40'],
+        'unit_rate[]': ['1200'],
+        'date': '2026-06-02',
+    }, follow_redirects=True)
+    assert resp_ds.status_code == 200
+
+    # 3. Create a Payment into Meezan Main UrduTest
+    resp_pay = client.post('/add_payment', data={
+        'client_code': 'FBMCL-00088',
+        'client_name': 'Tariq Builders',
+        'amount': '10000',
+        'method': 'Bank',
+        'payment_type': 'Receipt',
+        'payment_account_id': str(acc_id),
+        'manual_bill_no': 'PAY-UR-88',
+        'date': '2026-06-03',
+    }, follow_redirects=True)
+    assert resp_pay.status_code == 200
+
+    with app.app_context():
+        bk = Booking.query.order_by(Booking.id.desc()).first()
+        bk_id, bk_no = bk.id, (bk.manual_bill_no or bk.auto_bill_no)
+        ds = DirectSale.query.order_by(DirectSale.id.desc()).first()
+        ds_id, ds_no, inv_id = ds.id, (ds.manual_bill_no or ds.auto_bill_no), ds.invoice_id
+        inv = db.session.get(Invoice, inv_id) if inv_id else None
+        if inv is None:
+            inv = Invoice(
+                client_code='FBMCL-00088',
+                client_name='Tariq Builders',
+                invoice_no='INV-UR-88',
+                total_amount=float(ds.amount or 48000),
+                balance=max(0.0, float(ds.amount or 48000) - float(ds.paid_amount or 0)),
+                status='OPEN',
+            )
+            db.session.add(inv)
+            db.session.flush()
+            ds.invoice_id = inv.id
+            db.session.commit()
+            inv_id = inv.id
+        inv_no = inv.invoice_no
+        pay = Payment.query.order_by(Payment.id.desc()).first()
+        pay_id, pay_no = pay.id, (pay.manual_bill_no or pay.auto_bill_no)
+        ds_token = bill_verify.make_token('DirectSale', ds_id, ds_no)
+
+    # Confirm page lists Delivery Person + Booked sale summary toggles
+    confirm_html = client.get(
+        f'/download_invoice/{ds_no}?src=direct_sale&src_id={ds_id}&lang=ur'
+    ).get_data(as_text=True)
+    assert 'Delivery Person' in confirm_html
+    assert 'Booked sale summary' in confirm_html
+    assert 'name="booked_summary" value="1"' in confirm_html
+
+    # Booking Urdu print shows account + Booked Sale Summary (بک شدہ)
+    bk_html = client.get(
+        f'/download_invoice/{bk_no}?src=booking&src_id={bk_id}&lang=ur&action=print&tc=0'
+    ).get_data(as_text=True)
+    assert 'Meezan Main UrduTest' in bk_html
+    assert 'بک شدہ فروخت کا خلاصہ' in bk_html
+    assert 'بک شدہ' in bk_html
+
+    # Booking Delivery Urdu print shows Delivery Person + account + Booked Sale Summary
+    ds_html = client.get(
+        f'/download_invoice/{ds_no}?src=direct_sale&src_id={ds_id}&lang=ur&action=print&tc=0&booked_summary=1'
+    ).get_data(as_text=True)
+    assert 'ڈیلیوری پرسن' in ds_html
+    assert 'Meezan Main UrduTest' in ds_html
+    assert 'بک شدہ فروخت کا خلاصہ' in ds_html
+    assert '100' in ds_html and '40' in ds_html and '60' in ds_html
+
+    # Pre-bill print option booked_summary=0 hides Booked Sale Summary
+    ds_hidden_html = client.get(
+        f'/download_invoice/{ds_no}?src=direct_sale&src_id={ds_id}&lang=ur&action=print&tc=0&booked_summary=0'
+    ).get_data(as_text=True)
+    assert 'بک شدہ فروخت کا خلاصہ' not in ds_hidden_html
+
+    # Payment Urdu print shows receiving account (not holder name) + method
+    pay_html = client.get(
+        f'/download_invoice/{pay_no}?src=payment&src_id={pay_id}&lang=ur&action=print&tc=0'
+    ).get_data(as_text=True)
+    assert 'Meezan Main UrduTest' in pay_html
+    assert 'Bank' in pay_html
+
+    # Linked Invoice inherits receiving account + booked summary
+    inv_html = client.get(
+        f'/download_invoice/{inv_no}?src=invoice&src_id={inv_id}&lang=ur&action=print&tc=0'
+    ).get_data(as_text=True)
+    assert 'Meezan Main UrduTest' in inv_html
+    assert 'بک شدہ فروخت کا خلاصہ' in inv_html
+
+    # Carbon-copy PDF (copies=2) renders cleanly for a delivery with booked summary
+    pdf_resp = client.get(
+        f'/download_invoice/{ds_no}?src=direct_sale&src_id={ds_id}&lang=ur&action=download&tc=0&copies=2&booked_summary=1'
+    )
+    assert pdf_resp.status_code == 200
+    assert pdf_resp.content_type == 'application/pdf'
+    assert pdf_resp.data[:4] == b'%PDF'
+
+    # Public QR verify page carries Booked Sale Summary + Delivery Person + Account
+    verify_resp = client.get(f'/verify/bill/{ds_token}')
+    assert verify_resp.status_code == 200
+    verify_html = verify_resp.get_data(as_text=True)
+    assert 'بک شدہ فروخت کا خلاصہ' in verify_html
+    assert 'ڈیلیوری پرسن' in verify_html
+    assert 'Meezan Main UrduTest' in verify_html
