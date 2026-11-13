@@ -41,6 +41,12 @@ from pathlib import Path
 
 from workers import WorkerEntrypoint, wsgi
 
+# Cloudflare snapshots module initialization. SQLAlchemy's import is expensive
+# in Pyodide; importing it on the first request can exceed the Free CPU budget.
+# Only preload the library here: app creation needs request-time bindings and
+# must not snapshot a SQLite connection or a writable filesystem.
+import sqlalchemy  # noqa: F401
+
 LOG = logging.getLogger("ams.worker")
 
 #: Worker vars/secrets forwarded into ``os.environ`` before the app is built.
