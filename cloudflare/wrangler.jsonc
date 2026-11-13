@@ -2,7 +2,7 @@
   // Cloudflare Python Worker configuration for the AMS ERP Flask app.
   // Deploy from this directory:  ./deploy.sh   (or `uv run pywrangler deploy`)
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ams-erp",
+  "name": "ams-cloudflare",
   "main": "src/worker.py",
   "compatibility_date": "2026-11-13",
   "compatibility_flags": ["python_workers"],
@@ -45,7 +45,7 @@
   "vars": {
     "AMS_SCHEMA_VERSION": "v44",
     // Set the public URL used inside printed QR codes / links.
-    "PUBLIC_BASE_URL": "https://ams-erp.<your-subdomain>.workers.dev"
+    "PUBLIC_BASE_URL": "https://ams-cloudflare.<your-subdomain>.workers.dev"
   }
 
   // Secrets are NOT stored here. Set them once with:
