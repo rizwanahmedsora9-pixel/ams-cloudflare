@@ -211,6 +211,8 @@ def test_wrangler_config_matches_the_documented_contract():
     assert config["main"] == "src/worker.py"
     assert config["compatibility_flags"] == ["python_workers"]
     assert config["compatibility_date"]
+    # Explicit CPU limits are rejected by Cloudflare's Free plan.
+    assert "cpu_ms" not in config.get("limits", {})
     assert config["find_additional_modules"] is True
     # Static assets (fonts, CSS, JS) are published separately from the script.
     assert config["assets"]["directory"] == "../static"

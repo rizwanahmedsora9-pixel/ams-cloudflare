@@ -18,6 +18,18 @@ cd cloudflare
 ./deploy.sh                 # bundle + deploy
 ```
 
+For Cloudflare Git builds, use `cloudflare` as the root directory, set the
+build command to `python3 -m pip install uv`, and set the deploy command to:
+
+```bash
+UV_BIN="$(python3 -c 'import uv; print(uv.find_uv_bin())')" && PATH="$(dirname "$UV_BIN"):$PATH" "$UV_BIN" run --python 3.14.10 pywrangler deploy --name ams-cloudflare
+```
+
+Invoke the uv binary directly rather than `python3 -m uv`: the module wrapper
+sets a parent interpreter that can cause Pyodide dependency installation to use
+the build host's Python instead. The PATH adjustment also ensures pywrangler's
+subprocesses use the installed uv rather than an older system version.
+
 First time only:
 
 ```bash
@@ -144,8 +156,10 @@ those routes keep their existing "install requirements-…" messages. QR codes u
 the built-in pure-Python encoder, so bills and client-ledger QR links still
 render. WeasyPrint/ReportLab PDF downloads are not available.
 
-**CPU time.** `limits.cpu_ms` is raised to 30 s. Large imports/exports that take
-longer than the CPU budget will be terminated by the runtime.
+**CPU time.** The account's default CPU limit applies. The Free plan does not
+support configuring `limits.cpu_ms`; large requests or application startup may
+exceed the default limit. A paid plan can configure a higher limit, but that does
+not resolve the lack of persistent storage.
 
 **Upload flow.** The Worker does not serve `static/` from the script; the assets
 binding must stay configured, and `run_worker_first` must remain `true` for the
