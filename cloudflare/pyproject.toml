@@ -1,0 +1,26 @@
+[project]
+# Cloudflare Python Worker manifest (`pywrangler sync/deploy` reads this file).
+# Keep in sync with ../../requirements.txt, minus what Pyodide cannot run:
+#   * openpyxl / reportlab / pandas are not needed to boot the app; the
+#     spreadsheet and PDF exports degrade to their existing "unavailable"
+#     messages on Workers.
+#   * `segno` is optional: app/services/qr_code.py provides a pure-Python QR
+#     encoder, so printed bills and client-ledger QRs keep working.
+name = "ams-erp-worker"
+version = "0.1.0"
+description = "AMS ERP (Flask + SQLite) running as a Cloudflare Python Worker"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0,<4.0",
+    "flask-login>=0.6,<1.0",
+    "flask-sqlalchemy>=3.1,<4.0",
+    "werkzeug>=3.0,<4.0",
+    "sqlalchemy>=2.0,<3.0",
+    "workers-runtime-sdk>=1.8.2",
+]
+
+[dependency-groups]
+dev = [
+    "workers-py",
+    "workers-runtime-sdk",
+]

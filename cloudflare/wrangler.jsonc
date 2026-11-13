@@ -1,0 +1,54 @@
+{
+  // Cloudflare Python Worker configuration for the AMS ERP Flask app.
+  // Deploy from this directory:  ./deploy.sh   (or `uv run pywrangler deploy`)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ams-erp",
+  "main": "src/worker.py",
+  "compatibility_date": "2026-11-13",
+  "compatibility_flags": ["python_workers"],
+
+  // The bundle root is src/ (the default: the directory of `main`).  Wrangler
+  // uploads every module found under it — app packages, templates, SQL under
+  // app/migrations — because they are discovered by walking the tree rather
+  // than by an import statement wrangler could follow.
+  "base_dir": "src",
+  "find_additional_modules": true,
+
+  // `static/` (13 MB of Urdu/Latin fonts, CSS and JS) is served by Cloudflare
+  // static assets instead of being embedded in the Worker script.
+  // run_worker_first keeps Flask routes — including /static/<path> — in front
+  // of the asset worker so the app can still decide what is public.
+  "assets": {
+    "directory": "../static",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+
+  // The app needs to write SQLite, uploads and logs; give it the CPU and
+  // request-size headroom a full ERP UI (large Excel/JSON imports) needs.
+  "limits": {
+    "cpu_ms": 30000
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Keep the bundle in sync with the repository before every upload, so a
+  // Cloudflare Git build works without an extra step.  The one-liner finds the
+  // builder whether wrangler runs from the repository root or from this folder
+  // (`pywrangler` runs it from here, Cloudflare's Git integration from the root).
+  "build": {
+    "command": "python3 -c \"import os,runpy,sys; p=next(x for x in ('build_bundle.py','cloudflare/build_bundle.py') if os.path.isfile(x)); sys.argv=['build_bundle.py']; runpy.run_path(p, run_name='__main__')\""
+  },
+
+  "vars": {
+    "AMS_SCHEMA_VERSION": "v44",
+    // Set the public URL used inside printed QR codes / links.
+    "PUBLIC_BASE_URL": "https://ams-erp.<your-subdomain>.workers.dev"
+  }
+
+  // Secrets are NOT stored here. Set them once with:
+  //   npx wrangler secret put SECRET_KEY
+  //   npx wrangler secret put DEFAULT_ADMIN_PASSWORD
+}
