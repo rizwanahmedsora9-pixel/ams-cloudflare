@@ -1,0 +1,21 @@
+# Generated Worker bundle: build_bundle.py copies (or links) the application
+# packages here before `pywrangler deploy`.  Never commit the copies — the
+# sources live at the repository root.
+/src/app/
+/src/blueprints/
+/src/models/
+/src/utils/
+/src/templates/
+/src/cash_flow_reconciliation_helpers.py
+
+# pywrangler / Pyodide dependency sync output
+/python_modules/
+/.venv-workers/
+/.venv/
+/pylock.toml
+/uv.lock
+
+# Local wrangler state and dry-run output
+/.wrangler/
+/dist/
+/node_modules/

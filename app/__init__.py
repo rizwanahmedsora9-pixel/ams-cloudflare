@@ -487,6 +487,15 @@ def _warm_template_cache(app: Flask) -> None:
     Only compiles (``jinja_env.get_template``); it never renders, so no request
     context or context-processor data is needed.
     """
+    if (os.environ.get("AMS_SKIP_TEMPLATE_WARMUP") or "").strip().lower() in (
+        "1", "true", "yes", "on",
+    ):
+        # Serverless hosts (Cloudflare Python Workers) pay for startup CPU and
+        # then keep the app in memory only briefly; compiling all ~140
+        # templates up front there is slower than compiling the few pages the
+        # isolate actually serves.  Templates are cached lazily instead.
+        logging.getLogger(__name__).info("Template warm-up disabled by AMS_SKIP_TEMPLATE_WARMUP")
+        return
     try:
         templates_root = Path(app.template_folder)
         count = 0

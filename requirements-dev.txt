@@ -1,6 +1,8 @@
 # Full local/CI test environment.
 -r requirements-full.txt
 pytest>=8.0,<9.0
+# Async tests: tests/test_cloudflare_worker.py drives the Worker fetch handler.
+pytest-asyncio>=1.0
 pypdf>=4.0,<6.0
 # Rasterises the generated Urdu invoice PDF so the receipt-layout tests can measure
 # ink bands (tests/test_urdu_receipt_layout.py skips them when it is absent).
