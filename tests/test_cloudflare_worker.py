@@ -207,7 +207,7 @@ def test_wrangler_config_matches_the_documented_contract():
     stripped = re.sub(r"^\s*//.*$", "", text, flags=re.MULTILINE)
     config = json.loads(stripped)
 
-    assert config["name"] == "ams-erp"
+    assert config["name"] == "ams-cloudflare"
     assert config["main"] == "src/worker.py"
     assert config["compatibility_flags"] == ["python_workers"]
     assert config["compatibility_date"]
